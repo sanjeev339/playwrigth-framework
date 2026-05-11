@@ -1,0 +1,22 @@
+{
+  "env": "qa",
+  "baseUrl": "https://backoffice.qa.zice.it/login",
+
+  "timeouts": {
+    "default": 15000,
+    "navigation": 30000
+  },
+
+  "retry": {
+    "test": 2,
+    "action": 3
+  },
+
+  "users": {
+    "admin": {
+      "username": "ramabd17@gmail.com",
+      "password": "Zice@123"
+    }
+  }
+}
+ 
