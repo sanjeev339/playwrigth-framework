@@ -1,7 +1,7 @@
 
 {
   "env": "dev",
-  "baseUrl": "https://dev.zice.it/login", 
+  "baseUrl": "https://adminportal.dev.eigen-dyne.com/login/",
 
   "timeouts": {
     "default": 15000,
@@ -15,8 +15,8 @@
 
   "users": {
     "admin": {
-      "username": "saikirrug9+123@gmail.com",
-      "password": "Test@123"
+      "username": "saikiranv@piraiinfo.com",
+      "password": "Rblb@123"
     }
   }
 }
