@@ -19,8 +19,8 @@ sauce-automation-v5/
 
 ## Features Scaffolded
 
-  - `Login` — tests/LoginTest.spec.ts
-  - `Checkout` — tests/CheckoutTest.spec.ts
+- `Login` — tests/LoginTest.spec.ts
+- `Checkout` — tests/CheckoutTest.spec.ts
 
 ## Quick Start
 
@@ -65,3 +65,44 @@ npx ts-node utils/page-recon.ts <url>
 # Example
 npx ts-node utils/page-recon.ts https://backoffice.qa.zice.it/configuration/framework
 ```
+
+## MCP Playwright Generator
+
+This repo includes a local MCP server that can generate framework code from a
+structured test case and test data.
+
+```bash
+# Start the MCP stdio server
+corepack pnpm mcp:server
+
+# Preview generated files without writing them
+corepack pnpm mcp:generate mcp-server/examples/invalid-login.request.json --dry-run
+
+# Preview generation from OrchestAI scenario/data artifacts
+corepack pnpm mcp:generate:artifacts TC-UM-001 /path/to/scenarios_combined.csv /path/to/test_data.json https://app.example.com
+
+# Write generated files when the input is ready
+corepack pnpm mcp:generate path/to/request.json
+```
+
+The generator creates or previews these framework files:
+
+```text
+page_objects/{feature}/{Feature}Page.ts
+actions/{feature}/{Feature}Action.ts
+test-data/{feature}/{feature}.data.ts
+tests/{feature}/{feature}.spec.ts
+fixtures/page.fixture.ts
+fixtures/test.fixture.ts
+```
+
+Before writing code, it validates generated output for stability rules like no
+hard sleeps, no XPath locators, no direct browser operations inside specs, no
+environment access outside config, and required assertion flow.
+
+The MCP server exposes two generation tools:
+
+- `generate_playwright_test` accepts already-structured Playwright generation JSON.
+- `generate_playwright_from_artifacts` accepts `scenarios_combined.csv`,
+  `test_data.json`, and a `scenarioId`, then converts that reference format into
+  the structured generator input.

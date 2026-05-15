@@ -8,11 +8,11 @@
     "skipLibCheck": true,
     "outDir": "dist"
   },
-  "include": [
-    "**/*.ts"
-  ],
+  "include": ["**/*.ts"],
   "exclude": [
     "node_modules",
+    "archive",
+    "desktop",
     "dist",
     "playwright-report",
     "test-results"

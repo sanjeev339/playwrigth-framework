@@ -9,6 +9,9 @@
     "test:um": "playwright test tests/UserManagementTest.spec.ts",
     "test:um:headed": "playwright test tests/UserManagementTest.spec.ts --headed",
     "report": "playwright show-report",
+    "mcp:server": "tsx mcp-server/src/server.ts",
+    "mcp:generate": "tsx mcp-server/src/cli.ts",
+    "mcp:generate:artifacts": "tsx mcp-server/src/artifactCli.ts",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
     "allure:generate": "npx allure generate reports/allure-results -o reports/allure-report",
@@ -23,10 +26,13 @@
     "allure-playwright": "^3.7.2",
     "eslint": "^9.0.0",
     "prettier": "^3.2.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.4.0"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.4.2",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
   }
 }

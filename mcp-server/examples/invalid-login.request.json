@@ -1,0 +1,60 @@
+{
+  "featureName": "Generated Login",
+  "testId": "TC-AUTH-001",
+  "title": "should show error for invalid credentials",
+  "description": "Example input for the MCP generator. Run with --dry-run first.",
+  "expectedResult": "An error message should be visible after invalid credentials.",
+  "testData": {
+    "loginUrl": "https://backoffice.qa.zice.it/login",
+    "username": "invalid_user@testmail.dev",
+    "password": "wrong-password",
+    "expectedError": "Invalid"
+  },
+  "steps": [
+    {
+      "action": "goto",
+      "valueKey": "loginUrl"
+    },
+    {
+      "action": "fill",
+      "target": "email input",
+      "locator": {
+        "kind": "css",
+        "value": "input[name=\"email\"]"
+      },
+      "valueKey": "username"
+    },
+    {
+      "action": "fill",
+      "target": "password input",
+      "locator": {
+        "kind": "css",
+        "value": "input[name=\"password\"]"
+      },
+      "valueKey": "password"
+    },
+    {
+      "action": "click",
+      "target": "login button",
+      "locator": {
+        "kind": "role",
+        "role": "button",
+        "name": "Login"
+      }
+    },
+    {
+      "action": "expectText",
+      "target": "error message",
+      "locator": {
+        "kind": "css",
+        "value": "[class*=\"z-[10000]\"]"
+      },
+      "expectedTextKey": "expectedError"
+    }
+  ],
+  "options": {
+    "dryRun": false,
+    "overwrite": false,
+    "updateFixtures": true
+  }
+}
