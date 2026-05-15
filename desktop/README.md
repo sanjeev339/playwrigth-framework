@@ -31,12 +31,15 @@ Command: corepack
 Arguments: pnpm mcp:server
 ```
 
-The chat agent uses the selected LLM provider to convert a free-form manual test
-case into the structured `generate_playwright_test` tool input. The generator
-then creates stable Playwright framework code and runs its stability validator.
+The chat agent can use the selected LLM provider in two ways. For predictable
+generation it converts a free-form manual test case into the structured
+`generate_playwright_test` tool input. When the user asks the LLM to generate
+the Playwright code itself, it routes to `generate_playwright_with_llm`, which
+asks the LLM to draft the framework files and then runs the stability validator.
 If scenario artifacts already exist, the chat agent can route to
-`generate_playwright_from_artifacts` with `scenarios_combined.csv`,
-`test_data.json`, and the selected scenario ID.
+`list_playwright_artifact_scenarios` first, then to
+`generate_playwright_from_artifacts` or `generate_playwright_with_llm` with
+`scenarios_combined.csv`, `test_data.json`, and the selected scenario ID.
 
 Recommended Python setup from the repository root:
 

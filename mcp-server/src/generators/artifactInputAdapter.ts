@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import {
   ArtifactInput,
   ArtifactInputSchema,
+  ArtifactScenarioListInputSchema,
 } from "../schemas/artifactInput.schema";
 import { TestCaseInput, TestStepInput } from "../schemas/testCase.schema";
 import {
@@ -21,6 +22,60 @@ type DataRecord = {
   edge_case_type?: string | null;
   payload?: Record<string, unknown>;
 };
+
+export function listArtifactScenarios(rawInput: unknown): {
+  total: number;
+  returned: number;
+  offset: number;
+  scenarios: Array<Record<string, unknown>>;
+} {
+  const input = ArtifactScenarioListInputSchema.parse(rawInput);
+  const scenarios = readScenarioCsv(input.scenariosCsvPath);
+  const dataRecords = readTestDataJson(input.testDataJsonPath);
+  const dataByScenario = new Map(
+    dataRecords.map((record) => [record.scenario_id, record]),
+  );
+
+  const filtered = scenarios.filter((scenario) => {
+    if (!input.automationSuitability || input.automationSuitability === "All") {
+      return true;
+    }
+    return scenario["Automation Suitability"] === input.automationSuitability;
+  });
+  const offset = input.offset || 0;
+  const limit = input.limit || 50;
+  const page = filtered.slice(offset, offset + limit);
+
+  return {
+    total: filtered.length,
+    returned: page.length,
+    offset,
+    scenarios: page.map((scenario) => {
+      const scenarioId = scenario["Test Case ID"];
+      const dataRecord = dataByScenario.get(scenarioId);
+      return {
+        scenarioId,
+        title: scenario["Test Case Name"],
+        module: scenario.Module,
+        subModule: scenario["Sub Module"],
+        priority: scenario.Priority,
+        category: scenario["Test Category"],
+        automationSuitability: scenario["Automation Suitability"],
+        hasTestData: Boolean(dataRecord),
+        dataStrategy: dataRecord?.data_strategy || "",
+        edgeCaseType: dataRecord?.edge_case_type || "",
+        dataKeys: Object.keys(dataRecord?.payload || {}),
+        objective: scenario["Test Objective"],
+        preconditions: scenario.Preconditions,
+        stepsPreview: splitNumberedText(scenario["Test Steps"]).slice(0, 5),
+        expectedPreview: splitNumberedText(scenario["Expected Results"]).slice(
+          0,
+          3,
+        ),
+      };
+    }),
+  };
+}
 
 export async function generatePlaywrightFromArtifacts(
   rawInput: unknown,
@@ -69,10 +124,19 @@ export function buildTestCaseInputFromArtifacts(
     edgeCaseType: dataRecord.edge_case_type || "",
   };
 
-  const steps = buildSteps(scenario, normalizedPayload, Boolean(input.baseUrl));
+  const steps = buildSteps(
+    scenario,
+    normalizedPayload,
+    Boolean(input.baseUrl),
+    shouldLoginBeforeScenario(input, scenario),
+  );
 
   return {
-    featureName: input.featureName || scenario.Module || "Generated Feature",
+    featureName:
+      input.featureName ||
+      [scenario.Module || "Generated Feature", input.scenarioId]
+        .filter(Boolean)
+        .join(" "),
     testId: input.scenarioId,
     title: scenario["Test Case Name"] || input.scenarioId,
     description: scenario["Test Objective"] || scenario["Test Basis"] || "",
@@ -135,9 +199,14 @@ function buildSteps(
   scenario: ScenarioRow,
   payload: Record<string, string | number | boolean>,
   shouldOpenBaseUrl: boolean,
+  shouldLogin: boolean,
 ): TestStepInput[] {
   const steps: TestStepInput[] = [];
-  if (shouldOpenBaseUrl) {
+  if (shouldLogin) {
+    steps.push({ action: "login" });
+  }
+
+  if (shouldOpenBaseUrl && !shouldLogin) {
     steps.push({ action: "goto", valueKey: "baseUrl" });
   }
 
@@ -167,6 +236,18 @@ function buildSteps(
   }
 
   return steps;
+}
+
+function shouldLoginBeforeScenario(
+  input: ArtifactInput,
+  scenario: ScenarioRow,
+): boolean {
+  if (typeof input.loginBefore === "boolean") return input.loginBefore;
+
+  const preconditions = normalizeText(
+    `${scenario.Preconditions || ""} ${scenario["Pre-conditions"] || ""}`,
+  );
+  return /\blogged in\b/i.test(preconditions);
 }
 
 function mapInstructionToStep(

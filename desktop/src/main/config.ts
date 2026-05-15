@@ -15,6 +15,9 @@ const MODULAR_SERVERS = [
   ["compliance", "Compliance", "qa_orchestrator/compliance_server.py"],
 ] as const;
 
+const MODULAR_SERVER_IDS: ReadonlySet<string> = new Set(
+  MODULAR_SERVERS.map(([id]) => id),
+);
 const PLAYWRIGHT_SERVER_ID = "playwright";
 
 export function inferProjectPath(appPath: string, cwd = process.cwd()): string {
@@ -113,17 +116,20 @@ export function normalizeConfig(
     pythonPath,
     llmProvider,
   );
+  const defaultsById = new Map(
+    defaultServers.map((server) => [server.id, server]),
+  );
   const configuredServers = config.servers?.length
     ? mergeDefaultServers(config.servers, defaultServers)
     : defaultServers;
-  const servers = configuredServers.map((server) => ({
-    ...server,
-    command: resolvePythonPath(server.command, projectPath),
-    env: {
-      ...server.env,
-      LLM_PROVIDER: server.env?.LLM_PROVIDER || llmProvider,
-    },
-  }));
+  const servers = configuredServers.map((server) =>
+    normalizeServerConfig(
+      server,
+      defaultsById.get(server.id),
+      projectPath,
+      llmProvider,
+    ),
+  );
 
   return {
     ...defaults,
@@ -173,6 +179,7 @@ export function refreshServerDefaults(config: DesktopConfig): DesktopConfig {
         ...server,
         command: defaultServer.command,
         args: defaultServer.args,
+        enabled: defaultServer.enabled,
         env: {
           ...server.env,
           ...defaultServer.env,
@@ -191,6 +198,38 @@ function isPlaywrightFrameworkProject(projectPath: string): boolean {
     fs.existsSync(path.join(projectPath, "playwright.config.ts")) &&
     fs.existsSync(path.join(projectPath, "mcp-server"))
   );
+}
+
+function normalizeServerConfig(
+  server: ServerConfig,
+  defaultServer: ServerConfig | undefined,
+  projectPath: string,
+  llmProvider: LlmProvider,
+): ServerConfig {
+  if (defaultServer) {
+    return {
+      ...server,
+      command: defaultServer.command,
+      args: defaultServer.args,
+      enabled: defaultServer.enabled,
+      env: {
+        ...server.env,
+        ...defaultServer.env,
+        LLM_PROVIDER: llmProvider,
+      },
+    };
+  }
+
+  return {
+    ...server,
+    command: MODULAR_SERVER_IDS.has(server.id)
+      ? inferPythonPath(projectPath)
+      : resolvePythonPath(server.command, projectPath),
+    env: {
+      ...server.env,
+      LLM_PROVIDER: server.env?.LLM_PROVIDER || llmProvider,
+    },
+  };
 }
 
 function mergeDefaultServers(

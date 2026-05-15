@@ -4,21 +4,20 @@ import { ConfigManager } from '../../core/config/ConfigManager';
 import { Logger } from '../../core/logger/Logger';
 
 export class LoginAction {
-    private loginPage: LoginPage;
+    private readonly loginPage: LoginPage;
 
     constructor(page: Page) {
         this.loginPage = new LoginPage(page);
     }
 
-    async login(username = ConfigManager.USERNAME, password = ConfigManager.PASSWORD) {
+    async login(
+        username = ConfigManager.USERNAME,
+        password = ConfigManager.PASSWORD,
+    ): Promise<void> {
         Logger.info(`Performing login for user: ${username}`);
         await this.loginPage.loginFlow(username, password);
     }
 
-    /**
-     * Performs login and waits (up to 20 s) for the post-login dashboard to
-     * be fully visible before returning — safe replacement for a hard sleep.
-     */
     async loginAndWaitForLoad(
         username = ConfigManager.USERNAME,
         password = ConfigManager.PASSWORD,

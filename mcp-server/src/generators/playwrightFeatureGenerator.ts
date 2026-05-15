@@ -229,22 +229,27 @@ function buildPageMethodsForTarget(
 
 function buildAction(input: TestCaseInput, names: FeatureNames): string {
   const actionSteps = input.steps.filter((step) =>
-    ["goto", "fill", "click", "check", "select"].includes(step.action),
+    ["login", "goto", "fill", "click", "check", "select"].includes(
+      step.action,
+    ),
   );
   const body = actionSteps
     .map((step) => actionStepLine(step, names))
     .join("\n");
+  const usesLogin = actionSteps.some((step) => step.action === "login");
 
   return `import { Page } from '@playwright/test';
 import { ${names.pageClass} } from '../../page_objects/${names.featureDir}/${names.pageClass}';
 import { ${names.testDataType} } from '../../test-data/${names.featureDir}/${names.featureDir}.data';
-import { Logger } from '../../core/logger/Logger';
+${usesLogin ? "import { LoginAction } from '../../actions/auth/LoginAction';\n" : ""}import { Logger } from '../../core/logger/Logger';
 
 export class ${names.actionClass} {
   private readonly ${names.pageFixture}: ${names.pageClass};
+${usesLogin ? "  private readonly loginAction: LoginAction;\n" : ""}
 
   constructor(page: Page) {
     this.${names.pageFixture} = new ${names.pageClass}(page);
+${usesLogin ? "    this.loginAction = new LoginAction(page);\n" : ""}
   }
 
   async ${names.actionMethod}(data: ${names.testDataType}): Promise<void> {
@@ -288,7 +293,7 @@ export type ${names.testDataType} = typeof ${names.testDataConst};
 `;
 }
 
-function buildPageFixtureFile(names: FeatureNames): GeneratedFile {
+export function buildPageFixtureFile(names: FeatureNames): GeneratedFile {
   const fixturePath = "fixtures/page.fixture.ts";
   const current = readProjectFile(fixturePath);
   const importLine = `import { ${names.pageClass} } from '../page_objects/${names.featureDir}/${names.pageClass}';`;
@@ -314,7 +319,7 @@ function buildPageFixtureFile(names: FeatureNames): GeneratedFile {
   return { path: fixturePath, content };
 }
 
-function buildActionFixtureFile(names: FeatureNames): GeneratedFile {
+export function buildActionFixtureFile(names: FeatureNames): GeneratedFile {
   const fixturePath = "fixtures/test.fixture.ts";
   const current = readProjectFile(fixturePath);
   const importLine = `import { ${names.actionClass} } from '../actions/${names.featureDir}/${names.actionClass}';`;
@@ -341,6 +346,10 @@ function buildActionFixtureFile(names: FeatureNames): GeneratedFile {
 }
 
 function actionStepLine(step: TestStepInput, names: FeatureNames): string {
+  if (step.action === "login") {
+    return "    await this.loginAction.loginAndWaitForLoad();";
+  }
+
   if (step.action === "goto") {
     return `    await this.${names.pageFixture}.goto(${valueExpression(step, "url")});`;
   }
@@ -400,7 +409,12 @@ function collectTargets(steps: TestStepInput[]): TargetInfo[] {
   const targets = new Map<string, TargetInfo>();
 
   for (const step of steps) {
-    if (!step.target || step.action === "goto" || step.action === "expectUrl")
+    if (
+      !step.target ||
+      step.action === "login" ||
+      step.action === "goto" ||
+      step.action === "expectUrl"
+    )
       continue;
 
     const key = step.target;

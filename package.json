@@ -6,6 +6,8 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
+    "test:dev-dashboard": "ENV=dev playwright test tests/dev-dashboard/dev-dashboard.spec.ts --project=chromium",
+    "test:dev-dashboard:headed": "ENV=dev playwright test tests/dev-dashboard/dev-dashboard.spec.ts --headed --project=chromium",
     "test:um": "playwright test tests/UserManagementTest.spec.ts",
     "test:um:headed": "playwright test tests/UserManagementTest.spec.ts --headed",
     "report": "playwright show-report",

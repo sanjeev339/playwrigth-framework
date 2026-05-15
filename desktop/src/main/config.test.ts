@@ -10,15 +10,23 @@ import {
 
 vi.mock("node:fs", async () => {
   const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+  const existsSync = (target: string) => {
+    if (target.includes("playwrigth-framework")) {
+      return (
+        target.endsWith("playwright.config.ts") ||
+        target.endsWith("mcp-server") ||
+        target.endsWith("python")
+      );
+    }
+    return target.includes("OrchestAI") || target.endsWith("python");
+  };
   return {
     ...actual,
     default: {
       ...actual,
-      existsSync: (target: string) =>
-        target.includes("OrchestAI") || target.endsWith("python"),
+      existsSync,
     },
-    existsSync: (target: string) =>
-      target.includes("OrchestAI") || target.endsWith("python"),
+    existsSync,
   };
 });
 
@@ -83,5 +91,34 @@ describe("desktop config", () => {
     expect(resolvePythonPath("python3", "/tmp/OrchestAI")).toBe(
       "/tmp/OrchestAI/venv/bin/python",
     );
+  });
+
+  it("disables stale Python servers when the project is only Playwright", () => {
+    const config = normalizeConfig(
+      {
+        ...createDefaultConfig(
+          "/tmp/playwrigth-framework",
+          "/tmp/playwrigth-framework",
+        ),
+        projectPath: "/tmp/playwrigth-framework",
+        pythonPath: "/tmp/playwrigth-framework/node_modules",
+        servers: createDefaultServers(
+          "/tmp/OrchestAI",
+          "/tmp/playwrigth-framework/node_modules",
+          "openai",
+        ).map((server) => ({ ...server, enabled: true })),
+      },
+      "/tmp/playwrigth-framework",
+    );
+
+    expect(
+      config.servers
+        .filter((server) => server.id !== "playwright")
+        .every((server) => !server.enabled),
+    ).toBe(true);
+    expect(config.servers.find((server) => server.id === "playwright")).toMatchObject({
+      enabled: true,
+      command: "corepack",
+    });
   });
 });

@@ -20,6 +20,7 @@ export const LocatorSchema = z.object({
 
 export const TestStepSchema = z.object({
   action: z.enum([
+    "login",
     "goto",
     "fill",
     "click",

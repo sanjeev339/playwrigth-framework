@@ -42,10 +42,36 @@ const rules: Rule[] = [
   {
     id: "no-direct-page-in-spec",
     severity: "error",
-    pattern: /\bpage\.(goto|locator|click|fill|press|check|selectOption)\s*\(/,
+    pattern:
+      /\bpage\.(goto|locator|click|fill|press|check|selectOption)\s*\(|async\s*\(\s*\{\s*page\s*[},]|\bnew\s+\w+Action\s*\(\s*page\s*\)/,
     message:
       "Specs should use fixtures, actions, and page objects instead of direct page operations.",
     appliesTo: (file) => file.path.endsWith(".spec.ts"),
+  },
+  {
+    id: "no-default-basepage-import",
+    severity: "error",
+    pattern: /import\s+BasePage\s+from\s+['"`].*BasePage['"`]/,
+    message: "BasePage is a named export. Use import { BasePage } from '../../core/base/BasePage'.",
+  },
+  {
+    id: "no-default-loginaction-import",
+    severity: "error",
+    pattern: /import\s+LoginAction\s+from\s+['"`].*LoginAction['"`]/,
+    message: "LoginAction is a named export. Use import { LoginAction } from '../../actions/auth/LoginAction'.",
+  },
+  {
+    id: "no-default-test-import",
+    severity: "error",
+    pattern: /import\s+test\s+from\s+['"`].*fixtures\/test\.fixture['"`]/,
+    message: "The test fixture is a named export. Use import { test } from '../../fixtures/test.fixture'.",
+    appliesTo: (file) => file.path.endsWith(".spec.ts"),
+  },
+  {
+    id: "no-static-loginaction",
+    severity: "error",
+    pattern: /LoginAction\.loginAndWaitForLoad\s*\(/,
+    message: "LoginAction is not static. Instantiate it with the Playwright Page and call this.loginAction.loginAndWaitForLoad().",
   },
   {
     id: "no-env-outside-config",
@@ -57,7 +83,7 @@ const rules: Rule[] = [
   },
   {
     id: "spec-needs-assertion",
-    severity: "warning",
+    severity: "error",
     pattern: /^((?!expect\s*\(|\.expect[A-Z]).)*$/s,
     message:
       "Generated spec has no expect() assertion. Add an expected result step.",

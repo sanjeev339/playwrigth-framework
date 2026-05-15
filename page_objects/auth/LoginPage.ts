@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 import { BasePage } from '../../core/base/BasePage';
 import { ConfigManager } from '../../core/config/ConfigManager';
 
@@ -11,13 +11,11 @@ export class LoginPage extends BasePage {
 
     constructor(page: Page) {
         super(page);
-        // Confirmed live against https://backoffice.qa.zice.it/login
         this.usernameInput = page.locator('input[name="email"]');
         this.passwordInput = page.locator('input[name="password"]');
-        this.loginButton   = page.locator('button').filter({ hasText: /^Login$/ });
-        this.errorToast    = page.locator('[class*="z-[10000]"]');
-        // h1 "Dashboard" is visible immediately after successful login
-        this.dashboardHeading = page.locator('h1').first();
+        this.loginButton = page.getByRole('button', { name: /^Login$/ });
+        this.errorToast = page.locator('[class*="z-[10000]"]');
+        this.dashboardHeading = page.getByRole('heading', { name: 'Dashboard' });
     }
 
     async goto(): Promise<void> {
@@ -25,26 +23,30 @@ export class LoginPage extends BasePage {
     }
 
     async fillUsername(username: string): Promise<void> {
+        await expect(this.usernameInput).toBeVisible();
         await this.usernameInput.fill(username);
     }
 
     async fillPassword(password: string): Promise<void> {
+        await expect(this.passwordInput).toBeVisible();
         await this.passwordInput.fill(password);
     }
 
     async clickLogin(): Promise<void> {
+        await expect(this.loginButton).toBeVisible();
         await this.loginButton.click();
     }
 
     async getErrorMessage(): Promise<string> {
-        const inlineError = this.page.locator('.text-red-500, .error-message, .p-error').first();
+        const inlineError = this.page
+            .locator('.text-red-500, .error-message, .p-error')
+            .first();
         if (await inlineError.isVisible()) {
             return (await inlineError.textContent())?.trim() ?? '';
         }
         return await this.getToastMessage('error');
     }
 
-    /** Full login flow — no agree-checkbox exists on this app. */
     async loginFlow(username: string, password: string): Promise<void> {
         await this.goto();
         await this.fillUsername(username);
@@ -52,11 +54,7 @@ export class LoginPage extends BasePage {
         await this.clickLogin();
     }
 
-    /**
-     * Waits up to 20 s for the post-login dashboard h1 to be visible.
-     * Uses a web-first assertion — no hard sleep required.
-     */
     async waitForPostLoginReady(): Promise<void> {
-        await this.dashboardHeading.waitFor({ state: 'visible', timeout: 20_000 });
+        await expect(this.dashboardHeading).toBeVisible({ timeout: 20_000 });
     }
 }

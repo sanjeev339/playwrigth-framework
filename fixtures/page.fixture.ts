@@ -1,26 +1,24 @@
 import { test as base } from '@playwright/test';
 import { LoginPage } from '../page_objects/auth/LoginPage';
-import { GeneratedLoginPage } from '../page_objects/generated-login/GeneratedLoginPage';
-// import { UserManagementPage } from '../page_objects/user_management/UserManagementPage';
+import { DevDashboardPage } from '../page_objects/dev-dashboard/DevDashboardPage';
+import { UserManagementTcUm001Page } from '../page_objects/user-management-tc-um-001/UserManagementTcUm001Page';
 
 type PageFixtures = {
-    generatedLoginPage: GeneratedLoginPage;
+    userManagementTcUm001Page: UserManagementTcUm001Page;
+    devDashboardPage: DevDashboardPage;
     loginPage: LoginPage;
-    // userManagementPage: UserManagementPage;
 };
 
 export const test = base.extend<PageFixtures>({
-    generatedLoginPage: async ({ page }, use) => {
-        await use(new GeneratedLoginPage(page));
+    userManagementTcUm001Page: async ({ page }, use) => {
+        await use(new UserManagementTcUm001Page(page));
+    },
+    devDashboardPage: async ({ page }, use) => {
+        await use(new DevDashboardPage(page));
     },
     loginPage: async ({ page }, use) => {
         await use(new LoginPage(page));
     },
-    /*
-    userManagementPage: async ({ page }, use) => {
-        await use(new UserManagementPage(page));
-    }
-    */
 });
 
 export { expect } from '@playwright/test';

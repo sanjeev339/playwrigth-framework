@@ -69,7 +69,8 @@ npx ts-node utils/page-recon.ts https://backoffice.qa.zice.it/configuration/fram
 ## MCP Playwright Generator
 
 This repo includes a local MCP server that can generate framework code from a
-structured test case and test data.
+structured test case, OrchestAI scenario artifacts, or an LLM-authored code
+draft.
 
 ```bash
 # Start the MCP stdio server
@@ -100,9 +101,15 @@ Before writing code, it validates generated output for stability rules like no
 hard sleeps, no XPath locators, no direct browser operations inside specs, no
 environment access outside config, and required assertion flow.
 
-The MCP server exposes two generation tools:
+The MCP server exposes these generation tools:
 
+- `list_playwright_artifact_scenarios` accepts `scenarios_combined.csv` and
+  `test_data.json`, then returns scenario IDs and matching data details so cases
+  can be generated one at a time.
 - `generate_playwright_test` accepts already-structured Playwright generation JSON.
 - `generate_playwright_from_artifacts` accepts `scenarios_combined.csv`,
   `test_data.json`, and a `scenarioId`, then converts that reference format into
   the structured generator input.
+- `generate_playwright_with_llm` calls the configured LLM provider to draft the
+  Playwright Page Object, Action, test data, and spec files, then validates the
+  result before writing.
