@@ -42,7 +42,15 @@ type LlmGeneratedPayload = {
   files?: Array<{ path?: string; content?: string }>;
 };
 
+type PreparedLlmOutput = {
+  raw: string;
+  plannedFiles: GeneratedFile[];
+  issues: StabilityIssue[];
+  warnings: string[];
+};
+
 const repoRoot = process.cwd();
+const MAX_LLM_ATTEMPTS = 3;
 
 export async function generatePlaywrightWithLlm(
   rawInput: unknown,
@@ -51,40 +59,38 @@ export async function generatePlaywrightWithLlm(
   const source = resolveSource(input);
   const names = createFeatureNames(source.featureName, source.title);
   const provider = resolveLlmProvider(input.provider);
-  const prompt = buildPrompt(input, source, names);
-  const raw = await callLlmProvider(provider, prompt, input.model);
-  const llmFiles = parseLlmFiles(raw);
-  const plannedFiles = normalizeGeneratedFiles(llmFiles, names);
-  const warnings = collectWarnings(llmFiles, plannedFiles, raw);
-
-  if (input.options.updateFixtures) {
-    plannedFiles.push(buildPageFixtureFile(names));
-    plannedFiles.push(buildActionFixtureFile(names));
-  }
-
-  const issues = validateGeneratedFiles(plannedFiles);
-  const blocking = hasBlockingIssues(issues);
+  const requiredFiles = getRequiredFilePaths(names);
+  const prepared = await prepareLlmOutput(
+    input,
+    source,
+    names,
+    provider,
+    requiredFiles,
+  );
   const dryRun = input.options.dryRun;
 
-  if (blocking) {
+  if (hasBlockingIssues(prepared.issues)) {
     return {
       ok: false,
       dryRun,
       feature: names.featureName,
       provider,
       model: input.model,
-      files: plannedFiles.map((file) => ({ ...file, status: "preview" })),
-      issues,
-      warnings,
-      llmRawPreview: raw.slice(0, 2000),
+      files: prepared.plannedFiles.map((file) => ({
+        ...file,
+        status: "preview",
+      })),
+      issues: prepared.issues,
+      warnings: prepared.warnings,
+      llmRawPreview: prepared.raw.slice(0, 2000),
     };
   }
 
   const files = applyFileOperations(
-    plannedFiles,
+    prepared.plannedFiles,
     dryRun,
     input.options.overwrite,
-    warnings,
+    prepared.warnings,
   );
 
   return {
@@ -94,7 +100,98 @@ export async function generatePlaywrightWithLlm(
     provider,
     model: input.model,
     files,
-    issues,
+    issues: prepared.issues,
+    warnings: prepared.warnings,
+  };
+}
+
+async function prepareLlmOutput(
+  input: LlmPlaywrightInput,
+  source: ReturnType<typeof resolveSource>,
+  names: FeatureNames,
+  provider: ReturnType<typeof resolveLlmProvider>,
+  requiredFiles: string[],
+): Promise<PreparedLlmOutput> {
+  const warnings: string[] = [];
+  let prompt = buildPrompt(input, source, names, requiredFiles);
+  let lastRaw = "";
+  let lastError = "";
+
+  for (let attempt = 1; attempt <= MAX_LLM_ATTEMPTS; attempt += 1) {
+    const raw = await callLlmProvider(provider, prompt, input.model);
+    lastRaw = raw;
+
+    try {
+      const llmFiles = parseLlmFiles(raw);
+      const plannedFiles = normalizeGeneratedFiles(llmFiles, requiredFiles);
+      const attemptWarnings = collectWarnings(llmFiles, plannedFiles, raw);
+
+      if (input.options.updateFixtures) {
+        plannedFiles.push(buildPageFixtureFile(names));
+        plannedFiles.push(buildActionFixtureFile(names));
+      }
+
+      const issues = validateGeneratedFiles(plannedFiles);
+      if (!hasBlockingIssues(issues) || attempt === MAX_LLM_ATTEMPTS) {
+        return {
+          raw,
+          plannedFiles,
+          issues,
+          warnings: [
+            ...warnings,
+            ...attemptWarnings,
+            ...(!hasBlockingIssues(issues) && attempt > 1
+              ? [`LLM generation succeeded after ${attempt} attempts.`]
+              : hasBlockingIssues(issues)
+                ? [
+                    `LLM generation still failed stability validation after ${attempt} attempts.`,
+                  ]
+              : []),
+          ],
+        };
+      }
+
+      lastError = formatIssues(issues);
+      warnings.push(
+        `LLM attempt ${attempt} failed stability validation; retrying with repair instructions.`,
+      );
+      prompt = buildRepairPrompt(prompt, requiredFiles, lastError, raw);
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      if (attempt === MAX_LLM_ATTEMPTS) {
+        return {
+          raw,
+          plannedFiles: [],
+          issues: [
+            {
+              severity: "error",
+              file: "llm-response",
+              rule: "invalid-llm-output",
+              message: lastError,
+            },
+          ],
+          warnings,
+        };
+      }
+
+      warnings.push(
+        `LLM attempt ${attempt} returned incomplete or invalid output; retrying with repair instructions.`,
+      );
+      prompt = buildRepairPrompt(prompt, requiredFiles, lastError, raw);
+    }
+  }
+
+  return {
+    raw: lastRaw,
+    plannedFiles: [],
+    issues: [
+      {
+        severity: "error",
+        file: "llm-response",
+        rule: "invalid-llm-output",
+        message: lastError || "LLM did not produce usable Playwright files.",
+      },
+    ],
     warnings,
   };
 }
@@ -155,19 +252,14 @@ function buildPrompt(
   input: LlmPlaywrightInput,
   source: ReturnType<typeof resolveSource>,
   names: FeatureNames,
+  requiredFiles = getRequiredFilePaths(names),
 ): string {
-  const requiredFiles = [
-    `page_objects/${names.featureDir}/${names.pageClass}.ts`,
-    `actions/${names.featureDir}/${names.actionClass}.ts`,
-    `test-data/${names.featureDir}/${names.featureDir}.data.ts`,
-    `tests/${names.featureDir}/${names.featureDir}.spec.ts`,
-  ];
-
   return [
     "You are generating production Playwright TypeScript code inside an existing Page Object framework.",
     "Return ONLY valid JSON. Do not wrap it in markdown.",
     "The JSON shape must be:",
     '{"files":[{"path":"...","content":"..."}]}',
+    "The files array must contain exactly four entries.",
     "",
     "Required files, exactly these paths:",
     requiredFiles.map((file) => `- ${file}`).join("\n"),
@@ -179,13 +271,15 @@ function buildPrompt(
     "- Action classes accept Page in the constructor and instantiate the page object.",
     "- If login is needed, import LoginAction exactly as: import { LoginAction } from '../../actions/auth/LoginAction'; instantiate it in the action constructor with new LoginAction(page), then call this.loginAction.loginAndWaitForLoad().",
     "- Specs import test exactly as: import { test } from '../../fixtures/test.fixture';",
-    "- Specs must use generated fixtures, actions, and page objects; do not destructure page, do not instantiate actions manually, and do not call page.goto/page.click/page.fill in specs.",
+    "- Specs must use generated fixtures, actions, and page objects; do not destructure page, do not instantiate actions or page objects manually, and do not call page.goto/page.click/page.fill in specs.",
+    "- Specs must not import generated Action or Page classes. The fixtures already provide them.",
     "- Test data files export the exact const/type names listed below.",
     "- Use stable locators: getByRole, getByLabel, getByPlaceholder, getByTestId, getByText.",
     "- Do not use XPath.",
     "- Do not use waitForTimeout.",
     "- Do not read process.env in generated files.",
-    "- Every spec must include at least one assertion through a page object method.",
+    "- Every page-object assertion method must be named expectSomething, for example expectAssignedRoleVisible(). Do not name assertion methods verifySomething.",
+    "- Every spec must include at least one assertion by calling a page object method whose name starts with expect.",
     "- Prefer web-first assertions like await expect(locator).toBeVisible().",
     "- Put the final assertion in the spec by calling a page object assertion method after the action method.",
     "",
@@ -224,6 +318,31 @@ function buildPrompt(
   ].join("\n");
 }
 
+function buildRepairPrompt(
+  originalPrompt: string,
+  requiredFiles: string[],
+  failure: string,
+  previousRaw: string,
+): string {
+  return [
+    originalPrompt,
+    "",
+    "Your previous response failed validation.",
+    `Failure: ${failure}`,
+    "",
+    "Repair instruction:",
+    "Return a complete replacement JSON object with exactly these four files and no extra files:",
+    requiredFiles.map((file) => `- ${file}`).join("\n"),
+    "",
+    "Do not omit the action, test data, or spec files.",
+    "Do not change any required path.",
+    "Return only JSON with the files array.",
+    "",
+    "Previous response preview:",
+    previousRaw.slice(0, 1800),
+  ].join("\n");
+}
+
 function parseLlmFiles(raw: string): GeneratedFile[] {
   const cleaned = cleanJson(raw);
   let payload: LlmGeneratedPayload;
@@ -252,16 +371,11 @@ function parseLlmFiles(raw: string): GeneratedFile[] {
 
 function normalizeGeneratedFiles(
   files: GeneratedFile[],
-  names: FeatureNames,
+  requiredFiles: string[],
 ): GeneratedFile[] {
-  const allowed = new Set([
-    `page_objects/${names.featureDir}/${names.pageClass}.ts`,
-    `actions/${names.featureDir}/${names.actionClass}.ts`,
-    `test-data/${names.featureDir}/${names.featureDir}.data.ts`,
-    `tests/${names.featureDir}/${names.featureDir}.spec.ts`,
-  ]);
+  const allowed = new Set(requiredFiles);
   const byPath = new Map(files.map((file) => [file.path, file]));
-  const missing = [...allowed].filter((filePath) => !byPath.has(filePath));
+  const missing = requiredFiles.filter((filePath) => !byPath.has(filePath));
   if (missing.length) {
     throw new Error(`LLM response missed required files: ${missing.join(", ")}`);
   }
@@ -273,7 +387,22 @@ function normalizeGeneratedFiles(
         .join(", ")}`,
     );
   }
-  return [...allowed].map((filePath) => byPath.get(filePath)!);
+  return requiredFiles.map((filePath) => byPath.get(filePath)!);
+}
+
+function getRequiredFilePaths(names: FeatureNames): string[] {
+  return [
+    `page_objects/${names.featureDir}/${names.pageClass}.ts`,
+    `actions/${names.featureDir}/${names.actionClass}.ts`,
+    `test-data/${names.featureDir}/${names.featureDir}.data.ts`,
+    `tests/${names.featureDir}/${names.featureDir}.spec.ts`,
+  ];
+}
+
+function formatIssues(issues: StabilityIssue[]): string {
+  return issues
+    .map((issue) => `${issue.file}: ${issue.rule} - ${issue.message}`)
+    .join("; ");
 }
 
 function applyFileOperations(

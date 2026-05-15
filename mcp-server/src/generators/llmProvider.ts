@@ -51,6 +51,8 @@ async function callOpenAi(prompt: string, model: string): Promise<string> {
       model,
       messages: [{ role: "user", content: prompt }],
       temperature: 0.1,
+      max_tokens: 12000,
+      response_format: { type: "json_object" },
     }),
   });
   const data = (await response.json()) as {

@@ -49,6 +49,22 @@ const rules: Rule[] = [
     appliesTo: (file) => file.path.endsWith(".spec.ts"),
   },
   {
+    id: "no-generated-class-imports-in-spec",
+    severity: "error",
+    pattern: /from\s+['"`]\.\.\/\.\.\/(?:actions|page_objects)\//,
+    message:
+      "Specs should consume generated action/page fixtures instead of importing generated classes directly.",
+    appliesTo: (file) => file.path.endsWith(".spec.ts"),
+  },
+  {
+    id: "no-page-property-in-spec",
+    severity: "error",
+    pattern: /\.page\b/,
+    message:
+      "Specs should not access a Page object directly or through action/page internals.",
+    appliesTo: (file) => file.path.endsWith(".spec.ts"),
+  },
+  {
     id: "no-default-basepage-import",
     severity: "error",
     pattern: /import\s+BasePage\s+from\s+['"`].*BasePage['"`]/,
