@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   ArtifactInfo,
+  ArtifactLifecycleRequest,
   ChatRequest,
   ChatResponse,
   DiagnosticItem,
@@ -36,7 +37,8 @@ const api = {
     call: (request: ToolCallRequest) => ipcRenderer.invoke("tools:call", request) as Promise<ToolCallResult>
   },
   workflow: {
-    fullLifecycle: (request: WorkflowRequest) => ipcRenderer.invoke("workflow:fullLifecycle", request) as Promise<ToolCallResult>
+    fullLifecycle: (request: WorkflowRequest) => ipcRenderer.invoke("workflow:fullLifecycle", request) as Promise<ToolCallResult>,
+    artifactLifecycle: (request: ArtifactLifecycleRequest) => ipcRenderer.invoke("workflow:artifactLifecycle", request) as Promise<ToolCallResult>
   },
   chat: {
     send: (request: ChatRequest) => ipcRenderer.invoke("chat:send", request) as Promise<ChatResponse>

@@ -418,10 +418,22 @@ function WorkflowPanel({
   const [tableName, setTableName] = useState("test_data");
   const [autoPatch, setAutoPatch] = useState(false);
   const [result, setResult] = useState("");
+  const [scenariosCsvPath, setScenariosCsvPath] = useState("");
+  const [testDataJsonPath, setTestDataJsonPath] = useState("");
+  const [artifactBaseUrl, setArtifactBaseUrl] = useState("");
+  const [artifactOutputDir, setArtifactOutputDir] = useState(settings?.outputDir || "");
+  const [artifactEnv, setArtifactEnv] = useState("dev");
+  const [artifactHeaded, setArtifactHeaded] = useState(true);
+  const [artifactSuitability, setArtifactSuitability] = useState<"Yes" | "No" | "Partial" | "All">("Yes");
+  const [maxRepairAttempts, setMaxRepairAttempts] = useState(2);
+  const [stopOnFailure, setStopOnFailure] = useState(false);
+  const [artifactResult, setArtifactResult] = useState("");
+  const [artifactBusy, setArtifactBusy] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setOutputPath(settings?.outputDir || "");
+    setArtifactOutputDir(settings?.outputDir || "");
   }, [settings?.outputDir]);
 
   async function run() {
@@ -455,10 +467,159 @@ function WorkflowPanel({
     if (directory) setOutputPath(directory);
   }
 
+  async function chooseArtifactFile(field: "csv" | "json") {
+    const file = await window.orchestAI.dialog.selectFile();
+    if (!file) return;
+    if (field === "csv") {
+      setScenariosCsvPath(file);
+    } else {
+      setTestDataJsonPath(file);
+    }
+  }
+
+  async function chooseArtifactOutput() {
+    const directory = await window.orchestAI.dialog.selectDirectory();
+    if (directory) setArtifactOutputDir(directory);
+  }
+
+  async function runArtifactLifecycle() {
+    setArtifactBusy(true);
+    setArtifactResult("");
+    try {
+      const response = await window.orchestAI.workflow.artifactLifecycle({
+        scenariosCsvPath,
+        testDataJsonPath,
+        baseUrl: artifactBaseUrl,
+        outputDir: artifactOutputDir,
+        env: artifactEnv,
+        headed: artifactHeaded,
+        automationSuitability: artifactSuitability,
+        maxRepairAttempts,
+        stopOnFailure,
+      });
+      setArtifactResult(response.content);
+      await onArtifactsChanged();
+    } catch (error) {
+      setArtifactResult(errorMessage(error));
+    } finally {
+      setArtifactBusy(false);
+    }
+  }
+
   return (
     <section className="split">
       <div className="panel">
-        <h2>Run Full Lifecycle</h2>
+        <h2>Run Artifact Lifecycle</h2>
+        <label>Scenarios CSV</label>
+        <div className="input-row">
+          <input
+            value={scenariosCsvPath}
+            onChange={(event) => setScenariosCsvPath(event.target.value)}
+            placeholder="/path/to/scenarios_combined.csv"
+          />
+          <button
+            className="secondary icon-only"
+            onClick={() => void chooseArtifactFile("csv")}
+            aria-label="Choose scenarios CSV"
+          >
+            <FolderOpen size={16} />
+          </button>
+        </div>
+        <label>Test data JSON</label>
+        <div className="input-row">
+          <input
+            value={testDataJsonPath}
+            onChange={(event) => setTestDataJsonPath(event.target.value)}
+            placeholder="/path/to/test_data.json"
+          />
+          <button
+            className="secondary icon-only"
+            onClick={() => void chooseArtifactFile("json")}
+            aria-label="Choose test data JSON"
+          >
+            <FolderOpen size={16} />
+          </button>
+        </div>
+        <label>Base URL</label>
+        <input
+          value={artifactBaseUrl}
+          onChange={(event) => setArtifactBaseUrl(event.target.value)}
+          placeholder="https://adminportal.dev.eigen-dyne.com/login/"
+        />
+        <label>Output directory</label>
+        <div className="input-row">
+          <input
+            value={artifactOutputDir}
+            onChange={(event) => setArtifactOutputDir(event.target.value)}
+          />
+          <button
+            className="secondary icon-only"
+            onClick={() => void chooseArtifactOutput()}
+            aria-label="Choose lifecycle output directory"
+          >
+            <FolderOpen size={16} />
+          </button>
+        </div>
+        <div className="two-col">
+          <div>
+            <label>Environment</label>
+            <input
+              value={artifactEnv}
+              onChange={(event) => setArtifactEnv(event.target.value)}
+            />
+          </div>
+          <div>
+            <label>Suitability</label>
+            <select
+              value={artifactSuitability}
+              onChange={(event) =>
+                setArtifactSuitability(event.target.value as "Yes" | "No" | "Partial" | "All")
+              }
+            >
+              <option value="Yes">Yes</option>
+              <option value="All">All</option>
+              <option value="Partial">Partial</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+        </div>
+        <div className="two-col">
+          <div>
+            <label>Repair attempts</label>
+            <input
+              type="number"
+              min={0}
+              max={5}
+              value={maxRepairAttempts}
+              onChange={(event) => setMaxRepairAttempts(Number(event.target.value))}
+            />
+          </div>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={artifactHeaded}
+              onChange={(event) => setArtifactHeaded(event.target.checked)}
+            />
+            Show browser
+          </label>
+        </div>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={stopOnFailure}
+            onChange={(event) => setStopOnFailure(event.target.checked)}
+          />
+          Stop on first failed or blocked case
+        </label>
+        <button
+          onClick={() => void runArtifactLifecycle()}
+          disabled={artifactBusy || !scenariosCsvPath.trim() || !testDataJsonPath.trim()}
+        >
+          <Play size={16} />
+          Run Uploaded Cases
+        </button>
+        <hr />
+        <h2>Run QA Lifecycle</h2>
         <label>Requirements text, file path, or Figma URL</label>
         <textarea
           className="source-input"
@@ -523,7 +684,10 @@ function WorkflowPanel({
           Run Lifecycle
         </button>
       </div>
-      <ResultPanel title="Lifecycle Result" result={result} />
+      <div className="stacked-results">
+        <ResultPanel title="Artifact Lifecycle Result" result={artifactResult} />
+        <ResultPanel title="QA Lifecycle Result" result={result} />
+      </div>
     </section>
   );
 }

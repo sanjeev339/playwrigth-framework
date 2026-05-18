@@ -14,6 +14,18 @@ import {
   LlmPlaywrightInputSchema,
   generatePlaywrightWithLlm,
 } from "./tools/generatePlaywrightWithLlm";
+import {
+  LlmPlaywrightBatchInputSchema,
+  generatePlaywrightBatchWithLlm,
+} from "./tools/generatePlaywrightBatchWithLlm";
+import {
+  RunPlaywrightTestsInputSchema,
+  runPlaywrightTests,
+} from "./tools/runPlaywrightTests";
+import {
+  ArtifactLifecycleBatchInputSchema,
+  runArtifactLifecycleBatch,
+} from "./tools/runArtifactLifecycleBatch";
 
 async function main(): Promise<void> {
   const server = new McpServer({
@@ -97,6 +109,72 @@ async function main(): Promise<void> {
     },
     async (input) => {
       const result = await generatePlaywrightWithLlm(input);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "generate_playwright_batch_with_llm",
+    {
+      title: "Generate Playwright Batch With LLM",
+      description:
+        "Lists artifact scenarios, generates the first N Playwright tests with the configured LLM, validates each one, writes accepted files, and returns browser test commands.",
+      inputSchema: LlmPlaywrightBatchInputSchema,
+    },
+    async (input) => {
+      const result = await generatePlaywrightBatchWithLlm(input);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "run_playwright_tests",
+    {
+      title: "Run Playwright Tests",
+      description:
+        "Runs selected Playwright specs. Use headed=true to open Chromium visibly on the desktop while the tests execute.",
+      inputSchema: RunPlaywrightTestsInputSchema,
+    },
+    async (input) => {
+      const result = runPlaywrightTests(input);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "run_artifact_lifecycle_batch",
+    {
+      title: "Run Artifact Lifecycle Batch",
+      description:
+        "Reads uploaded scenario CSV and test data JSON once, then sequentially generates, validates, runs, repairs, reruns, and reports Playwright results for each scenario.",
+      inputSchema: ArtifactLifecycleBatchInputSchema,
+    },
+    async (input) => {
+      const result = await runArtifactLifecycleBatch(input);
 
       return {
         content: [

@@ -374,6 +374,16 @@ pre {
   grid-template-columns: minmax(380px, 0.85fr) minmax(0, 1.15fr);
 }
 
+.stacked-results {
+  display: grid;
+  gap: 14px;
+}
+
+.stacked-results .result-panel pre {
+  min-height: 250px;
+  max-height: 430px;
+}
+
 .tall {
   min-height: calc(100vh - 150px);
 }

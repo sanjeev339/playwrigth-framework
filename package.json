@@ -14,6 +14,8 @@
     "mcp:server": "tsx mcp-server/src/server.ts",
     "mcp:generate": "tsx mcp-server/src/cli.ts",
     "mcp:generate:artifacts": "tsx mcp-server/src/artifactCli.ts",
+    "test:first10": "ENV=dev playwright test tests/user-management-tc-um-001 tests/user-management-tc-um-002 tests/user-management-tc-um-003 tests/user-management-tc-um-004 tests/user-management-tc-um-005 tests/user-management-tc-um-006 tests/user-management-tc-um-007 tests/user-management-tc-um-008 tests/user-management-tc-um-009 tests/user-management-tc-um-010 --project=chromium",
+    "test:first10:headed": "ENV=dev playwright test tests/user-management-tc-um-001 tests/user-management-tc-um-002 tests/user-management-tc-um-003 tests/user-management-tc-um-004 tests/user-management-tc-um-005 tests/user-management-tc-um-006 tests/user-management-tc-um-007 tests/user-management-tc-um-008 tests/user-management-tc-um-009 tests/user-management-tc-um-010 --headed --project=chromium",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
     "allure:generate": "npx allure generate reports/allure-results -o reports/allure-report",

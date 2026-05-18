@@ -6,7 +6,7 @@ import { ChatAgent } from "./chatAgent";
 import { runDiagnostics } from "./diagnostics";
 import { listArtifacts, openArtifact } from "./artifacts";
 import { logger } from "./logger";
-import type { ChatRequest, SettingsUpdate, ToolCallRequest, WorkflowRequest } from "../shared/types";
+import type { ArtifactLifecycleRequest, ChatRequest, SettingsUpdate, ToolCallRequest, WorkflowRequest } from "../shared/types";
 
 let mainWindow: BrowserWindow | undefined;
 let settings: SettingsStore;
@@ -72,6 +72,28 @@ function registerIpc(): void {
         record_count: request.recordCount,
         table_name: request.tableName,
         auto_patch: request.autoPatch
+      }
+    });
+  });
+  ipcMain.handle("workflow:artifactLifecycle", async (_event, request: ArtifactLifecycleRequest) => {
+    const tools = await mcp.listTools();
+    const lifecycleTool = tools.find((tool) => tool.name === "run_artifact_lifecycle_batch");
+    if (!lifecycleTool) throw new Error("run_artifact_lifecycle_batch is not available. Start the Playwright MCP server first.");
+    return mcp.callTool({
+      serverId: lifecycleTool.serverId,
+      toolName: lifecycleTool.name,
+      args: {
+        scenariosCsvPath: request.scenariosCsvPath,
+        testDataJsonPath: request.testDataJsonPath,
+        baseUrl: request.baseUrl || undefined,
+        outputDir: request.outputDir || settings.getConfig().outputDir,
+        provider: request.provider || settings.getConfig().llmProvider,
+        model: request.model || undefined,
+        env: request.env || "dev",
+        headed: request.headed,
+        automationSuitability: request.automationSuitability || "Yes",
+        maxRepairAttempts: request.maxRepairAttempts,
+        stopOnFailure: request.stopOnFailure
       }
     });
   });

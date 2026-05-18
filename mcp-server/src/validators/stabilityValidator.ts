@@ -65,6 +65,30 @@ const rules: Rule[] = [
     appliesTo: (file) => file.path.endsWith(".spec.ts"),
   },
   {
+    id: "no-page-object-direct-actions-in-actions",
+    severity: "error",
+    pattern: /\.\w+\.(click|fill|selectOption|check|press)\s*\(/,
+    message:
+      "Action classes should call page-object workflow methods, not reach into locators or perform direct element actions.",
+    appliesTo: (file) => file.path.startsWith("actions/"),
+  },
+  {
+    id: "no-login-in-constructor",
+    severity: "error",
+    pattern: /constructor\s*\([^)]*\)\s*\{[^}]*loginAndWaitForLoad\s*\(/s,
+    message:
+      "Do not start async login in a constructor. Call loginAndWaitForLoad inside the action method with await.",
+    appliesTo: (file) => file.path.startsWith("actions/"),
+  },
+  {
+    id: "no-page-visibility-assertion",
+    severity: "error",
+    pattern: /expect\s*\(\s*this\.page\s*\)\.toBeVisible\s*\(/,
+    message:
+      "A Playwright Page is not a visible locator. Assert a heading, region, URL, or specific locator instead.",
+    appliesTo: (file) => file.path.startsWith("page_objects/"),
+  },
+  {
     id: "no-default-basepage-import",
     severity: "error",
     pattern: /import\s+BasePage\s+from\s+['"`].*BasePage['"`]/,

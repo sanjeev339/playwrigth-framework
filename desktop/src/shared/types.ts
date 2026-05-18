@@ -108,6 +108,20 @@ export interface WorkflowRequest {
   autoPatch: boolean;
 }
 
+export interface ArtifactLifecycleRequest {
+  scenariosCsvPath: string;
+  testDataJsonPath: string;
+  baseUrl?: string;
+  outputDir?: string;
+  provider?: LlmProvider;
+  model?: string;
+  env: string;
+  headed: boolean;
+  automationSuitability: "Yes" | "No" | "Partial" | "All";
+  maxRepairAttempts: number;
+  stopOnFailure: boolean;
+}
+
 export interface LogEntry {
   id: string;
   createdAt: string;

@@ -25,6 +25,7 @@ interface ManagedServer {
 }
 
 const REQUEST_TIMEOUT_MS = 120_000;
+const LONG_RUNNING_TOOL_TIMEOUT_MS = 1_800_000;
 const FAILED_RESTART_COOLDOWN_MS = 10_000;
 
 export class McpManager extends EventEmitter {
@@ -207,7 +208,7 @@ export class McpManager extends EventEmitter {
     const raw = await this.request(server, "tools/call", {
       name: request.toolName,
       arguments: request.args
-    }, REQUEST_TIMEOUT_MS);
+    }, toolTimeoutMs(request.toolName));
     return {
       serverId: request.serverId,
       toolName: request.toolName,
@@ -365,6 +366,12 @@ function classifyServerError(message: string): string {
     return "Missing API key for the selected LLM provider. Add it in Settings.";
   }
   return message;
+}
+
+function toolTimeoutMs(toolName: string): number {
+  return toolName === "run_artifact_lifecycle_batch"
+    ? LONG_RUNNING_TOOL_TIMEOUT_MS
+    : REQUEST_TIMEOUT_MS;
 }
 
 function appendStderr(server: ManagedServer, message: string): void {
