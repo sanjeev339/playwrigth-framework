@@ -70,6 +70,7 @@ export async function runArtifactLifecycleBatch(
   const input = ArtifactLifecycleBatchInputSchema.parse(rawInput);
   const outputDir = input.outputDir || path.join(repoRoot, "generated_output");
   fs.mkdirSync(outputDir, { recursive: true });
+  pruneMissingGeneratedFixtureEntries();
   const reportPath = path.join(
     outputDir,
     `playwright_batch_result_${new Date().toISOString().replace(/[:.]/g, "-")}.json`,
@@ -101,6 +102,69 @@ export async function runArtifactLifecycleBatch(
 
   writeLifecycleReport(reportPath, scenarioResults);
   return summarizeResults(reportPath, scenarioResults);
+}
+
+function pruneMissingGeneratedFixtureEntries(): void {
+  pruneFixtureFile({
+    fixturePath: "fixtures/page.fixture.ts",
+    importPattern:
+      /import\s+\{\s*(UserManagementTcUm\d+Page)\s*\}\s+from\s+['"`](\.\.\/page_objects\/user-management-tc-um-\d+\/UserManagementTcUm\d+Page)['"`];\n/g,
+    typePattern: /^\s*userManagementTcUm\d+Page:\s*UserManagementTcUm\d+Page;\n/gm,
+    blockPattern:
+      /^\s*userManagementTcUm\d+Page:\s*async\s*\(\{\s*page\s*\},\s*use\s*\)\s*=>\s*\{\n\s*await use\(new UserManagementTcUm\d+Page\(page\)\);\n\s*\},\n/gm,
+  });
+  pruneFixtureFile({
+    fixturePath: "fixtures/test.fixture.ts",
+    importPattern:
+      /import\s+\{\s*(UserManagementTcUm\d+Action)\s*\}\s+from\s+['"`](\.\.\/actions\/user-management-tc-um-\d+\/UserManagementTcUm\d+Action)['"`];\n/g,
+    typePattern: /^\s*userManagementTcUm\d+Action:\s*UserManagementTcUm\d+Action;\n/gm,
+    blockPattern:
+      /^\s*userManagementTcUm\d+Action:\s*async\s*\(\{\s*page\s*\},\s*use\s*\)\s*=>\s*\{\n\s*await use\(new UserManagementTcUm\d+Action\(page\)\);\n\s*\},\n/gm,
+  });
+}
+
+function pruneFixtureFile(options: {
+  fixturePath: string;
+  importPattern: RegExp;
+  typePattern: RegExp;
+  blockPattern: RegExp;
+}): void {
+  const absolutePath = path.join(repoRoot, options.fixturePath);
+  if (!fs.existsSync(absolutePath)) return;
+
+  let content = fs.readFileSync(absolutePath, "utf-8");
+  const missingClasses = new Set<string>();
+  content = content.replace(
+    options.importPattern,
+    (line: string, className: string, importPath: string) => {
+      const importedFile = path.join(repoRoot, `${importPath.replace("../", "")}.ts`);
+      if (fs.existsSync(importedFile)) return line;
+      missingClasses.add(className);
+      return "";
+    },
+  );
+
+  for (const className of missingClasses) {
+    const fixtureName =
+      className.charAt(0).toLowerCase() +
+      className.slice(1).replace(/(?:Page|Action)$/, "");
+    const memberName = className.endsWith("Page")
+      ? `${fixtureName}Page`
+      : `${fixtureName}Action`;
+    content = content.replace(
+      new RegExp(`^\\s*${memberName}:\\s*${className};\\n`, "gm"),
+      "",
+    );
+    content = content.replace(
+      new RegExp(
+        `^\\s*${memberName}:\\s*async\\s*\\(\\{\\s*page\\s*\\},\\s*use\\s*\\)\\s*=>\\s*\\{\\n\\s*await use\\(new ${className}\\(page\\)\\);\\n\\s*\\},\\n`,
+        "gm",
+      ),
+      "",
+    );
+  }
+
+  fs.writeFileSync(absolutePath, content);
 }
 
 async function runOneScenario(
