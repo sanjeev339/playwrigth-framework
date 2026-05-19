@@ -1,0 +1,18 @@
+{
+  "scenarioId": "TC-UM-010",
+  "capturedAt": "2026-05-19T04:42:47.210Z",
+  "url": "https://adminportal.dev.eigen-dyne.com/users/internal-user",
+  "title": "ROBOLAB",
+  "formElements": [],
+  "roleOptions": [
+    "New role",
+    "new role edited",
+    "Workflow Designer (Orchestrator Author)",
+    "New internal role",
+    "New internla role",
+    "Workflow Operators",
+    "New Client Role",
+    "New Role one"
+  ],
+  "screenshotPath": "/Users/pi-in-185/playwrigth-framework/generated_output/dom-recon/tc-um-010-add-user-form.png"
+}

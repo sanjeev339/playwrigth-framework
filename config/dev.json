@@ -15,8 +15,8 @@
 
   "users": {
     "admin": {
-      "username": "saikiranv@piraiinfo.com",
-      "password": "Rblb@123"
+      "username": "SET_IN_ENV_FILE",
+      "password": "SET_IN_ENV_FILE"
     }
   }
 }

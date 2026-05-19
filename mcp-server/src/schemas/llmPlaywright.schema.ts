@@ -20,6 +20,13 @@ export const LlmPlaywrightInputSchema = z
       .default({}),
     artifact: LlmPlaywrightArtifactSchema.optional(),
     loginBefore: z.boolean().optional(),
+    domRecon: z
+      .object({
+        enabled: z.boolean().default(true).optional(),
+        headed: z.boolean().default(true).optional(),
+        outputDir: z.string().optional(),
+      })
+      .optional(),
     provider: z.enum(["gemini", "openai", "anthropic"]).optional(),
     model: z.string().optional(),
     options: z

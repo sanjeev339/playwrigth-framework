@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 import { LoginPage } from '../../page_objects/auth/LoginPage';
 import { ConfigManager } from '../../core/config/ConfigManager';
 import { Logger } from '../../core/logger/Logger';
@@ -15,7 +15,7 @@ export class LoginAction {
         password = ConfigManager.PASSWORD,
     ): Promise<void> {
         Logger.info(`Performing login for user: ${username}`);
-        await this.loginPage.loginFlow(username, password);
+        await this.loginPage.loginFlow(username!, password!);
     }
 
     async loginAndWaitForLoad(
@@ -23,8 +23,16 @@ export class LoginAction {
         password = ConfigManager.PASSWORD,
     ): Promise<void> {
         Logger.info(`Performing login with post-load wait for user: ${username}`);
-        await this.loginPage.loginFlow(username, password);
+        await this.loginPage.loginFlow(username!, password!);
         await this.loginPage.waitForPostLoginReady();
         Logger.info('Post-login dashboard ready');
+    }
+
+    async verifyInvalidLoginShowsError(username: string, password: string): Promise<void> {
+        Logger.info(`Performing invalid login attempt for user: ${username}`);
+        await this.loginPage.loginFlow(username, password);
+        const errorMsg = await this.loginPage.getErrorMessage();
+        expect(errorMsg, 'Expected an error message for invalid credentials').toBeTruthy();
+        Logger.info(`Invalid login correctly showed error: "${errorMsg}"`);
     }
 }

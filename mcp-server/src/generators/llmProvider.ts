@@ -6,7 +6,7 @@ export async function callLlmProvider(
   model?: string,
 ): Promise<string> {
   if (provider === "openai") {
-    return callOpenAi(prompt, model || "gpt-4o-mini");
+    return callOpenAi(prompt, model || "gpt-4.1-mini");
   }
 
   if (provider === "anthropic") {

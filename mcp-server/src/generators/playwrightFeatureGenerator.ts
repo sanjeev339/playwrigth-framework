@@ -138,15 +138,25 @@ function buildPageObject(
   targets: TargetInfo[],
 ): string {
   const locatorFields = targets
-    .map((target) => `  readonly ${target.propertyName}: Locator;`)
+    .map(
+      (target) => `  /**
+   * ${target.name}
+   * Tier 1: semantic locator from DOM recon.
+   * Tier 2: scoped text/attribute fallback.
+   * Tier 3: XPath fallback only inside this candidate array.
+   */
+  readonly ${candidatePropertyName(target)}: Locator[];`,
+    )
     .join("\n");
 
   const locatorAssignments = targets
     .map(
       (target) =>
-        `    this.${target.propertyName} = ${locatorExpression(target.locator)};`,
+        `    this.${candidatePropertyName(target)} = [\n${locatorCandidateExpressions(target)
+          .map((candidate) => `      ${candidate},`)
+          .join("\n")}\n    ];`,
     )
-    .join("\n");
+    .join("\n\n");
 
   const methods = targets
     .flatMap((target) => buildPageMethodsForTarget(input.steps, target))
@@ -186,41 +196,49 @@ function buildPageMethodsForTarget(
 
   if (matchingSteps.some((step) => step.action === "fill")) {
     methods.push(`  async fill${baseName}(value: string): Promise<void> {
-    await expect(this.${target.propertyName}).toBeVisible();
-    await this.${target.propertyName}.fill(value);
+    const locator = await this.firstVisibleLocator(${quote(target.name)}, this.${candidatePropertyName(target)});
+    await locator.fill(value);
   }`);
   }
 
   if (matchingSteps.some((step) => step.action === "click")) {
     methods.push(`  async click${baseName}(): Promise<void> {
-    await expect(this.${target.propertyName}).toBeVisible();
-    await this.${target.propertyName}.click();
+    const locator = await this.firstVisibleLocator(${quote(target.name)}, this.${candidatePropertyName(target)});
+    await locator.click();
   }`);
   }
 
   if (matchingSteps.some((step) => step.action === "check")) {
     methods.push(`  async check${baseName}(): Promise<void> {
-    await expect(this.${target.propertyName}).toBeVisible();
-    await this.${target.propertyName}.check();
+    const locator = await this.firstVisibleLocator(${quote(target.name)}, this.${candidatePropertyName(target)});
+    await locator.check();
   }`);
   }
 
   if (matchingSteps.some((step) => step.action === "select")) {
     methods.push(`  async select${baseName}(value: string): Promise<void> {
-    await expect(this.${target.propertyName}).toBeVisible();
-    await this.${target.propertyName}.selectOption(value);
+    const locator = await this.firstVisibleLocator(${quote(target.name)}, this.${candidatePropertyName(target)});
+    const tagName = await locator.evaluate((element) => element.tagName.toLowerCase()).catch(() => "");
+    if (tagName === "select") {
+      await locator.selectOption(value);
+      return;
+    }
+    await locator.click();
+    await this.clickVisibleDropdownOption(value);
   }`);
   }
 
   if (matchingSteps.some((step) => step.action === "expectVisible")) {
     methods.push(`  async expect${baseName}Visible(): Promise<void> {
-    await expect(this.${target.propertyName}).toBeVisible();
+    const locator = await this.firstVisibleLocator(${quote(target.name)}, this.${candidatePropertyName(target)});
+    await expect(locator).toBeVisible();
   }`);
   }
 
   if (matchingSteps.some((step) => step.action === "expectText")) {
     methods.push(`  async expect${baseName}Text(expectedText: string | RegExp): Promise<void> {
-    await expect(this.${target.propertyName}).toContainText(expectedText);
+    const locator = await this.firstVisibleLocator(${quote(target.name)}, this.${candidatePropertyName(target)});
+    await expect(locator).toContainText(expectedText);
   }`);
   }
 
@@ -430,6 +448,120 @@ function collectTargets(steps: TestStepInput[]): TargetInfo[] {
   return Array.from(targets.values());
 }
 
+function candidatePropertyName(target: TargetInfo): string {
+  return `${target.propertyName}Candidates`;
+}
+
+function locatorCandidateExpressions(target: TargetInfo): string[] {
+  const primary = locatorExpression(target.locator);
+  const fallback = fallbackCandidateExpressions(target);
+  const candidates = shouldPreferKnownCandidates(target)
+    ? [...fallback, primary]
+    : [primary, ...fallback];
+  const unique = Array.from(new Set(candidates));
+
+  return [
+    ...unique.filter((candidate) => !candidate.includes("xpath=")),
+    ...unique.filter((candidate) => candidate.includes("xpath=")),
+  ];
+}
+
+function shouldPreferKnownCandidates(target: TargetInfo): boolean {
+  const normalizedTarget = target.name.toLowerCase();
+  return (
+    normalizedTarget.includes("user management navigation") ||
+    normalizedTarget.includes("add internal user") ||
+    normalizedTarget.includes("first name") ||
+    normalizedTarget.includes("last name") ||
+    normalizedTarget.includes("email address") ||
+    normalizedTarget.includes("role dropdown") ||
+    normalizedTarget.includes("save button")
+  );
+}
+
+function fallbackCandidateExpressions(target: TargetInfo): string[] {
+  const label = target.locator.value || target.locator.name || target.name;
+  const normalizedTarget = target.name.toLowerCase();
+  const candidates: string[] = [];
+
+  if (normalizedTarget.includes("user management") && normalizedTarget.includes("navigation")) {
+    candidates.push(
+      `page.getByRole("link", { name: /^${escapeRegExpLiteral("User Management")}$/ })`,
+      `page.getByRole("menuitem", { name: /^${escapeRegExpLiteral("User Management")}$/ })`,
+      `page.getByRole("button", { name: /^${escapeRegExpLiteral("User Management")}$/ })`,
+      `page.getByText("User Management", { exact: true })`,
+      `page.locator("[class*=sidebar]").getByText("User Management", { exact: true })`,
+      `page.locator(${quote('xpath=//*[contains(@class,"sidebar")]//*[normalize-space()="User Management"]')})`,
+    );
+  } else if (normalizedTarget.includes("add internal user")) {
+    candidates.push(
+      `page.getByText("Add Internal User", { exact: true })`,
+      `page.locator('[role="dialog"]').getByText("Add Internal User", { exact: true })`,
+      `page.locator(${quote('xpath=//*[@role="dialog"]//*[normalize-space()="Add Internal User"]')})`,
+    );
+  } else if (normalizedTarget.includes("first name")) {
+    candidates.push(
+      `page.getByPlaceholder("Enter first name")`,
+      `page.getByLabel(/^First Name/i)`,
+      `page.locator('input[name="firstName"]')`,
+      `page.locator(${quote('xpath=//input[@placeholder="Enter first name"]')})`,
+    );
+  } else if (normalizedTarget.includes("last name")) {
+    candidates.push(
+      `page.getByPlaceholder("Enter last name")`,
+      `page.getByLabel(/^Last Name/i)`,
+      `page.locator('input[name="lastName"]')`,
+      `page.locator(${quote('xpath=//input[@placeholder="Enter last name"]')})`,
+    );
+  } else if (normalizedTarget.includes("email address")) {
+    candidates.push(
+      `page.getByPlaceholder("Enter email address")`,
+      `page.getByLabel(/^Email Address/i)`,
+      `page.locator('input[type="email"]')`,
+      `page.locator(${quote('xpath=//input[@placeholder="Enter email address"]')})`,
+    );
+  } else if (normalizedTarget.includes("role") && normalizedTarget.includes("dropdown")) {
+    candidates.push(
+      `page.getByText("Select role", { exact: true })`,
+      `page.getByRole("combobox", { name: /role/i })`,
+      `page.locator('[class*=role]').getByText("Select role", { exact: true })`,
+      `page.locator(${quote('xpath=//*[normalize-space()="Role"]/ancestor::*[contains(@class,"field") or contains(@class,"form")]//*[normalize-space()="Select role"]')})`,
+    );
+  } else if (normalizedTarget.includes("save")) {
+    candidates.push(
+      `page.getByRole("button", { name: /^Save/i })`,
+      `page.locator('button[type="submit"]')`,
+      `page.locator(${quote('xpath=//button[starts-with(normalize-space(),"Save")]')})`,
+    );
+  } else if (normalizedTarget.includes("selected user row")) {
+    candidates.push(
+      `page.getByRole("table").getByRole("row", { name: /${escapeRegExpLiteral(label)}/ })`,
+      `page.locator("table").getByText(${quote(label)}, { exact: true })`,
+      `page.locator(${quote(`xpath=//table//tr[contains(normalize-space(),"${escapeXpathDouble(label)}")]`)})`,
+    );
+  } else if (target.locator.kind === "role" && target.locator.role === "button") {
+    candidates.push(
+      `page.getByRole("button", { name: /^${escapeRegExpLiteral(label)}$/i })`,
+      `page.locator(${quote(`xpath=//button[normalize-space()="${escapeXpathDouble(label)}"]`)})`,
+    );
+  } else if (target.locator.kind === "text") {
+    candidates.push(
+      `page.getByText(${quote(label)}, { exact: true })`,
+      `page.locator(${quote(`xpath=//*[normalize-space()="${escapeXpathDouble(label)}"]`)})`,
+    );
+  }
+
+  return candidates;
+}
+
+function escapeRegExpLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function escapeXpathDouble(value: string): string {
+  return value.replace(/"/g, '\\"');
+}
+
 function fallbackLocator(step: TestStepInput): LocatorInput {
   if (step.action === "fill") {
     return { kind: "label", value: step.target || "field" };
@@ -439,15 +571,19 @@ function fallbackLocator(step: TestStepInput): LocatorInput {
     return { kind: "role", role: "button", name: step.target || "button" };
   }
 
-  return { kind: "text", value: step.target || "text" };
+  if (step.action === "select") {
+    return { kind: "role", role: "combobox", name: step.target || "dropdown" };
+  }
+
+  return { kind: "text", value: step.target || "text", exact: true };
 }
 
 function locatorExpression(locator: LocatorInput): string {
   if (locator.kind === "role") {
     const role = locator.role || "button";
     const name = locator.name || locator.value || "";
-    const exact = locator.exact === false ? ", exact: false" : "";
-    return `page.getByRole(${quote(role)}, { name: ${quote(name)}${exact} })`;
+    const exact = locator.exact === false ? "false" : "true";
+    return `page.getByRole(${quote(role)}, { name: ${quote(name)}, exact: ${exact} })`;
   }
 
   if (locator.kind === "label") {
@@ -463,8 +599,8 @@ function locatorExpression(locator: LocatorInput): string {
   }
 
   if (locator.kind === "text") {
-    const exact = locator.exact === false ? ", { exact: false }" : "";
-    return `page.getByText(${quote(locator.value || locator.name || "")}${exact})`;
+    const exact = locator.exact === false ? "false" : "true";
+    return `page.getByText(${quote(locator.value || locator.name || "")}, { exact: ${exact} })`;
   }
 
   return `page.locator(${quote(locator.value || "")})`;
@@ -523,7 +659,38 @@ function stripComments(content: string): string {
 }
 
 function readProjectFile(relativePath: string): string {
-  return fs.readFileSync(path.join(repoRoot, relativePath), "utf-8");
+  const absolutePath = path.join(repoRoot, relativePath);
+  if (fs.existsSync(absolutePath)) {
+    return fs.readFileSync(absolutePath, "utf-8");
+  }
+
+  if (relativePath === "fixtures/page.fixture.ts") {
+    return `import { test as base } from '@playwright/test';
+
+type PageFixtures = {
+};
+
+export const test = base.extend<PageFixtures>({
+});
+
+export { expect } from '@playwright/test';
+`;
+  }
+
+  if (relativePath === "fixtures/test.fixture.ts") {
+    return `import { test as base } from './page.fixture';
+
+type ActionFixtures = {
+};
+
+export const test = base.extend<ActionFixtures>({
+});
+
+export { expect } from '@playwright/test';
+`;
+  }
+
+  throw new Error(`Required project file not found: ${relativePath}`);
 }
 
 function isFixtureFile(relativePath: string): boolean {
@@ -546,6 +713,18 @@ function collectInputWarnings(input: TestCaseInput): string[] {
     if (step.locator?.value?.includes("xpath=")) {
       warnings.push(
         `Step "${step.action}" for "${step.target}" uses XPath and may be flaky.`,
+      );
+    }
+
+    if (step.locator?.kind === "text" && step.locator.exact === false) {
+      warnings.push(
+        `Step "${step.action}" for "${step.target}" uses broad text matching. Scope it to a row, dialog, menu, or dropdown panel when possible.`,
+      );
+    }
+
+    if (!step.locator && step.target && !["login", "goto", "expectUrl"].includes(step.action)) {
+      warnings.push(
+        `Step "${step.action}" for "${step.target}" has no explicit locator. Generator used a fallback locator; replace it with a real UI locator for production.`,
       );
     }
   }

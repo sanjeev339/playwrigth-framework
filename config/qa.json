@@ -14,8 +14,8 @@
 
   "users": {
     "admin": {
-      "username": "ramabd17@gmail.com",
-      "password": "Zice@123"
+      "username": "SET_IN_ENV_FILE",
+      "password": "SET_IN_ENV_FILE"
     }
   }
 }

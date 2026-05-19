@@ -34,3 +34,7 @@ dist/
 scratch/
 
 archive
+
+# Runtime artifacts — generated on each MCP/batch run
+playwright_batch_result_*.json
+recon-output/

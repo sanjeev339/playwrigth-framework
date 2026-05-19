@@ -57,7 +57,7 @@ export type LlmBatchGenerationResult = {
 
 const DEFAULT_BATCH_PROMPT = [
   "Use the LLM to generate complete Playwright framework code from this artifact scenario.",
-  "Login using the existing LoginAction.loginAndWaitForLoad() helper if the scenario requires admin login, then follow the scenario steps.",
+  "Always login first using the existing LoginAction.loginAndWaitForLoad() helper, then follow the scenario steps.",
   "Generate exactly four files: Page Object, Action, test data, and spec.",
   "Use the existing fixture pattern.",
   "Do not use XPath, waitForTimeout, default imports, static LoginAction calls, direct page actions inside the spec, generated class imports inside the spec, or .page access inside the spec.",
@@ -107,7 +107,7 @@ export async function generatePlaywrightBatchWithLlm(
         testDataJsonPath: input.testDataJsonPath,
       },
       baseUrl: input.baseUrl,
-      loginBefore: input.loginBefore,
+      loginBefore: input.loginBefore ?? true,
       options: input.options,
     });
     const specPath = result.files.find((file) =>

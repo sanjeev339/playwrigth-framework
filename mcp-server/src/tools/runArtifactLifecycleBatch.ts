@@ -2,7 +2,10 @@ import { execFileSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { z } from "zod";
-import { listArtifactScenarios } from "../generators/artifactInputAdapter";
+import {
+  getArtifactScenarioBlock,
+  listArtifactScenarios,
+} from "../generators/artifactInputAdapter";
 import { generatePlaywrightWithLlm } from "../generators/llmPlaywrightGenerator";
 
 export const ArtifactLifecycleBatchInputSchema = z.object({
@@ -176,31 +179,47 @@ async function runOneScenario(
   const generatedFiles: string[] = [];
   const attempts: LifecycleAttempt[] = [];
   const emailBlockReason = classifyEmailLinkBlock(scenario);
+  const visibleIdentifierBlock = getArtifactScenarioBlock({
+    scenarioId,
+    scenariosCsvPath: input.scenariosCsvPath,
+    testDataJsonPath: input.testDataJsonPath,
+    baseUrl: input.baseUrl,
+    loginBefore: true,
+    options: {
+      dryRun: true,
+      overwrite: false,
+      updateFixtures: true,
+    },
+  });
+
+  if (visibleIdentifierBlock) {
+    return {
+      scenarioId,
+      title,
+      generatedFiles,
+      attempts: [
+        {
+          attempt: 1,
+          generationOk: false,
+          failureReason: visibleIdentifierBlock.message,
+        },
+      ],
+      finalStatus: "blocked",
+      failureReason: visibleIdentifierBlock.reason,
+    };
+  }
 
   let repairPrompt = baseLifecyclePrompt();
-  const maxAttempts = (input.maxRepairAttempts || 2) + 1;
+  const maxAttempts = (input.maxRepairAttempts ?? 2) + 1;
   let lastFailure = "";
   let lastArtifacts: FailureArtifacts = {};
   let runCommand = "";
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const generation = await generatePlaywrightWithLlm({
+    const generation = await generateScenarioWithFailureCapture({
       prompt: repairPrompt,
-      provider: input.provider,
-      model: input.model,
-      featureName: `User Management ${scenarioId}`,
-      artifact: {
-        scenarioId,
-        scenariosCsvPath: input.scenariosCsvPath,
-        testDataJsonPath: input.testDataJsonPath,
-      },
-      baseUrl: input.baseUrl,
-      loginBefore: true,
-      options: {
-        dryRun: false,
-        overwrite: true,
-        updateFixtures: true,
-      },
+      input,
+      scenarioId,
     });
     generatedFiles.splice(
       0,
@@ -217,14 +236,18 @@ async function runOneScenario(
         generationOk: false,
         failureReason: lastFailure,
       });
-      if (emailBlockReason) {
+      if (
+        generation.issues.some(
+          (issue) => issue.rule === "visible_user_identifier_required",
+        )
+      ) {
         return {
           scenarioId,
           title,
           generatedFiles,
           attempts,
           finalStatus: "blocked",
-          failureReason: emailBlockReason,
+          failureReason: "visible_user_identifier_required",
         };
       }
       repairPrompt = repairPromptWithFailure(repairPrompt, lastFailure);
@@ -294,12 +317,102 @@ async function runOneScenario(
     generatedFiles,
     runCommand,
     attempts,
-    finalStatus: generatedFiles.length ? "failed" : "generated_only",
+    finalStatus: lastFailure ? "failed" : "generated_only",
     failureReason: lastFailure || "Scenario did not pass.",
     screenshotPath: lastArtifacts.screenshotPath,
     videoPath: lastArtifacts.videoPath,
     reportPath: "reports/playwright-report/index.html",
   };
+}
+
+async function generateScenarioWithFailureCapture(options: {
+  prompt: string;
+  input: ArtifactLifecycleBatchInput;
+  scenarioId: string;
+}): Promise<Awaited<ReturnType<typeof generatePlaywrightWithLlm>>> {
+  const missingKey = missingProviderKey(options.input.provider);
+  if (missingKey) {
+    return {
+      ok: false,
+      dryRun: false,
+      feature: `User Management ${options.scenarioId}`,
+      provider: options.input.provider || process.env.LLM_PROVIDER || "gemini",
+      model: options.input.model,
+      files: [],
+      issues: [
+        {
+          severity: "error",
+          file: "llm-provider",
+          rule: "llm-provider-error",
+          message: `Missing ${missingKey}. Add the API key in Desktop Settings and restart the Playwright MCP server.`,
+        },
+      ],
+      warnings: [],
+    };
+  }
+
+  try {
+    return await generatePlaywrightWithLlm({
+      prompt: options.prompt,
+      provider: options.input.provider,
+      model: options.input.model,
+      featureName: `User Management ${options.scenarioId}`,
+      artifact: {
+        scenarioId: options.scenarioId,
+        scenariosCsvPath: options.input.scenariosCsvPath,
+        testDataJsonPath: options.input.testDataJsonPath,
+      },
+      baseUrl: options.input.baseUrl,
+      loginBefore: true,
+      domRecon: {
+        enabled: true,
+        headed: options.input.headed ?? true,
+        outputDir: path.join(
+          options.input.outputDir || path.join(repoRoot, "generated_output"),
+          "dom-recon",
+        ),
+      },
+      options: {
+        dryRun: false,
+        overwrite: true,
+        updateFixtures: true,
+      },
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      dryRun: false,
+      feature: `User Management ${options.scenarioId}`,
+      provider: options.input.provider || process.env.LLM_PROVIDER || "gemini",
+      model: options.input.model,
+      files: [],
+      issues: [
+        {
+          severity: "error",
+          file: "llm-provider",
+          rule: "llm-provider-error",
+          message: error instanceof Error ? error.message : String(error),
+        },
+      ],
+      warnings: [],
+    };
+  }
+}
+
+function missingProviderKey(provider?: string): string {
+  const resolved = (provider || process.env.LLM_PROVIDER || "gemini")
+    .toLowerCase()
+    .trim();
+  if (resolved === "openai" && !process.env.OPENAI_API_KEY) {
+    return "OPENAI_API_KEY";
+  }
+  if (resolved === "anthropic" && !process.env.ANTHROPIC_API_KEY) {
+    return "ANTHROPIC_API_KEY";
+  }
+  if (resolved === "gemini" && !process.env.GEMINI_API_KEY) {
+    return "GEMINI_API_KEY";
+  }
+  return "";
 }
 
 function baseLifecyclePrompt(): string {
@@ -308,6 +421,7 @@ function baseLifecyclePrompt(): string {
     "Follow the project skill rules and existing layered structure.",
     "Use Page Object, Action, test data, spec, and fixture updates.",
     "The spec must use generated fixtures only.",
+    "Use tiered Locator[] candidates with firstVisibleLocator. Do not use locator.or(...). XPath is only a Tier 3 fallback candidate.",
     "If runtime failure context is provided, repair locators, navigation steps, and action ordering based on that context.",
   ].join(" ");
 }
@@ -333,7 +447,11 @@ function classifyEmailLinkBlock(scenario: Record<string, unknown>): string {
     .join(" ")
     .toLowerCase();
 
-  if (/\b(email|invite|invitation|reset link|forgot password|password reset)\b/.test(text)) {
+  if (
+    /\b(invite|invitation|invite\s+email|invitation\s+email|email\s+link|open\s+email|registration\s+link|reset\s+link|forgot\s+password|password\s+reset)\b/.test(
+      text,
+    )
+  ) {
     return "email_link_required";
   }
   return "";

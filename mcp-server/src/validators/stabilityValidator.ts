@@ -28,10 +28,17 @@ const rules: Rule[] = [
   },
   {
     id: "avoid-xpath",
-    severity: "error",
+    severity: "warning",
     pattern: /locator\s*\(\s*['"`]xpath=/,
     message:
-      "Avoid XPath locators in generated framework code unless no stable strategy exists.",
+      "XPath locator generated. Keep XPath only as a Tier 3 fallback inside a locator candidate array.",
+  },
+  {
+    id: "no-locator-or-chain",
+    severity: "error",
+    pattern: /\.or\s*\(/,
+    message:
+      "Do not use locator.or(...). Use firstVisibleLocator() with tiered candidates so strict mode cannot match multiple elements.",
   },
   {
     id: "avoid-first-heading",
@@ -86,6 +93,15 @@ const rules: Rule[] = [
     pattern: /expect\s*\(\s*this\.page\s*\)\.toBeVisible\s*\(/,
     message:
       "A Playwright Page is not a visible locator. Assert a heading, region, URL, or specific locator instead.",
+    appliesTo: (file) => file.path.startsWith("page_objects/"),
+  },
+  {
+    id: "no-user-dropdown-guess",
+    severity: "error",
+    pattern:
+      /getByLabel\s*\(\s*['"`][Uu]ser['"`]\s*\)|userDropdown\s*=\s*this\.page\.getByLabel\s*\(/,
+    message:
+      "Do not guess a User Management user dropdown. Select users from the visible list/table/search row using stable text or row/action locators.",
     appliesTo: (file) => file.path.startsWith("page_objects/"),
   },
   {
@@ -155,7 +171,42 @@ export function validateGeneratedFiles(
         message: rule.message,
       });
     }
+
+    issues.push(...validateTieredLocatorUsage(file));
   }
+
+  return issues;
+}
+
+function validateTieredLocatorUsage(file: GeneratedFile): StabilityIssue[] {
+  const issues: StabilityIssue[] = [];
+  const lines = file.content.split("\n");
+
+  lines.forEach((line, index) => {
+    if (!/xpath=/.test(line)) return;
+
+    if (/\breadonly\s+\w+Candidates\s*:\s*Locator\[\]/.test(line)) return;
+
+    const isPrimaryAssignment =
+      /=\s*(?:this\.)?\w+\s*=\s*(?:this\.)?page\.locator\s*\(\s*['"`]xpath=/.test(
+        line,
+      ) || /=\s*page\.locator\s*\(\s*['"`]xpath=/.test(line);
+
+    const isCandidateArrayLine =
+      /^\s*(?:this\.)?page\.locator\s*\(\s*['"`]xpath=/.test(line) &&
+      /,\s*$/.test(line);
+
+    if (!isPrimaryAssignment && isCandidateArrayLine) return;
+
+    issues.push({
+      severity: "error",
+      file: file.path,
+      rule: "xpath-tier3-only",
+      message: `XPath may only appear as a Tier 3 locator candidate array entry, not as the primary locator. Check line ${
+        index + 1
+      }.`,
+    });
+  });
 
   return issues;
 }

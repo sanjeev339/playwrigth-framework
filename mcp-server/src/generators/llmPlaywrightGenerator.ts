@@ -21,8 +21,15 @@ import {
   buildPageFixtureFile,
   generatePlaywrightFeature,
 } from "./playwrightFeatureGenerator";
-import { buildTestCaseInputFromArtifacts } from "./artifactInputAdapter";
+import {
+  buildTestCaseInputFromArtifacts,
+  getArtifactScenarioBlock,
+} from "./artifactInputAdapter";
 import { callLlmProvider, resolveLlmProvider } from "./llmProvider";
+import {
+  runUserManagementAddUserDomRecon,
+  shouldRunUserManagementDomRecon,
+} from "./userManagementDomRecon";
 
 type FileOperation = GeneratedFile & {
   status: "created" | "updated" | "skipped" | "preview";
@@ -62,6 +69,11 @@ type PreparedLlmOutput = {
   warnings: string[];
 };
 
+type ResolvedSource = ReturnType<typeof resolveSource> & {
+  domReconMarkdown?: string;
+  domReconWarnings?: string[];
+};
+
 const repoRoot = process.cwd();
 const MAX_LLM_ATTEMPTS = 5;
 const PLAYWRIGHT_SKILL_PATH = "playwright_automation_framework_SKILL.md";
@@ -71,7 +83,39 @@ export async function generatePlaywrightWithLlm(
   rawInput: unknown,
 ): Promise<LlmGenerationResult> {
   const input = LlmPlaywrightInputSchema.parse(rawInput);
-  const source = resolveSource(input);
+  const artifactBlock = input.artifact
+    ? getArtifactScenarioBlock({
+        scenarioId: input.artifact.scenarioId,
+        scenariosCsvPath: input.artifact.scenariosCsvPath,
+        testDataJsonPath: input.artifact.testDataJsonPath,
+        baseUrl: input.baseUrl,
+        featureName: input.featureName,
+        loginBefore: input.loginBefore ?? true,
+        options: input.options,
+      })
+    : undefined;
+
+  if (artifactBlock) {
+    return {
+      ok: false,
+      dryRun: input.options.dryRun,
+      feature: artifactBlock.featureName,
+      provider: resolveLlmProvider(input.provider),
+      model: input.model,
+      files: [],
+      issues: [
+        {
+          severity: "error",
+          file: "artifact-input",
+          rule: artifactBlock.reason,
+          message: artifactBlock.message,
+        },
+      ],
+      warnings: [],
+    };
+  }
+
+  const source = await enrichSourceWithDomRecon(input, resolveSource(input));
   const names = createFeatureNames(source.featureName, source.title);
   const provider = resolveLlmProvider(input.provider);
   const requiredFiles = getRequiredFilePaths(names);
@@ -145,12 +189,12 @@ export async function generatePlaywrightWithLlm(
 
 async function prepareLlmOutput(
   input: LlmPlaywrightInput,
-  source: ReturnType<typeof resolveSource>,
+  source: ResolvedSource,
   names: FeatureNames,
   provider: ReturnType<typeof resolveLlmProvider>,
   requiredFiles: string[],
 ): Promise<PreparedLlmOutput> {
-  const warnings: string[] = [];
+  const warnings: string[] = [...(source.domReconWarnings || [])];
   let prompt = buildPrompt(input, source, names, requiredFiles);
   let lastRaw = "";
   let lastError = "";
@@ -255,7 +299,7 @@ function resolveSource(input: LlmPlaywrightInput): {
       testDataJsonPath: input.artifact.testDataJsonPath,
       baseUrl: input.baseUrl,
       featureName: input.featureName,
-      loginBefore: input.loginBefore,
+      loginBefore: input.loginBefore ?? true,
       options: {
         dryRun: true,
         overwrite: false,
@@ -289,9 +333,52 @@ function resolveSource(input: LlmPlaywrightInput): {
   };
 }
 
-async function tryDeterministicFrameworkFallback(
+async function enrichSourceWithDomRecon(
   input: LlmPlaywrightInput,
   source: ReturnType<typeof resolveSource>,
+): Promise<ResolvedSource> {
+  const domReconEnabled = input.domRecon?.enabled !== false;
+  if (
+    !input.artifact ||
+    !domReconEnabled ||
+    !shouldRunUserManagementDomRecon({
+      artifact: input.artifact,
+      title: source.title,
+      description: source.description,
+      steps: source.steps,
+    })
+  ) {
+    return source;
+  }
+
+  const recon = await runUserManagementAddUserDomRecon({
+    scenarioId: input.artifact.scenarioId,
+    headed: input.domRecon?.headed ?? true,
+    outputDir: input.domRecon?.outputDir,
+  });
+
+  if (!recon.ok) {
+    return {
+      ...source,
+      domReconWarnings: [
+        `DOM recon was attempted but failed: ${recon.reason || "unknown error"}`,
+      ],
+    };
+  }
+
+  return {
+    ...source,
+    domReconMarkdown: recon.markdown,
+    domReconWarnings: [
+      `DOM recon captured Add User form locator map: ${recon.markdownPath}`,
+      `DOM recon screenshot: ${recon.screenshotPath}`,
+    ],
+  };
+}
+
+async function tryDeterministicFrameworkFallback(
+  input: LlmPlaywrightInput,
+  source: ResolvedSource,
   names: FeatureNames,
   warnings: string[],
   raw: string,
@@ -361,7 +448,7 @@ async function tryDeterministicFrameworkFallback(
 
 function buildPrompt(
   input: LlmPlaywrightInput,
-  source: ReturnType<typeof resolveSource>,
+  source: ResolvedSource,
   names: FeatureNames,
   requiredFiles = getRequiredFilePaths(names),
 ): string {
@@ -388,13 +475,19 @@ function buildPrompt(
     "- Page object constructors must be constructor(page: Page) { super(page); ... }. Never use constructor() or super() without page.",
     "- Action classes accept Page in the constructor and instantiate the page object.",
     "- Action imports for generated page objects must use ../../page_objects/<feature-dir>/<PageClass> from actions/<feature-dir>.",
-    "- If login is needed, import LoginAction exactly as: import { LoginAction } from '../../actions/auth/LoginAction'; instantiate it in the action constructor with new LoginAction(page), then call this.loginAction.loginAndWaitForLoad().",
+    "- Artifact-generated portal tests must login at the start of every scenario because Playwright tests can run independently or in parallel.",
+    "- Import LoginAction exactly as: import { LoginAction } from '../../actions/auth/LoginAction'; instantiate it in the action constructor with new LoginAction(page), then call this.loginAction.loginAndWaitForLoad() as the first awaited step in the action method.",
     "- Specs import test exactly as: import { test } from '../../fixtures/test.fixture';",
     "- Specs must use generated fixtures, actions, and page objects; do not destructure page, do not instantiate actions or page objects manually, and do not call page.goto/page.click/page.fill in specs.",
     "- Specs must not import generated Action or Page classes. The fixtures already provide them.",
     "- Test data files export the exact const/type names listed below.",
     "- Use stable locators: getByRole, getByLabel, getByPlaceholder, getByTestId, getByText.",
-    "- Do not use XPath.",
+    "- Follow the team tiered locator standard safely: declare Locator[] candidate arrays with JSDoc comments for Tier 1 semantic, Tier 2 attribute/CSS, and Tier 3 XPath fallback, then resolve with this.firstVisibleLocator('purpose', candidates).",
+    "- Never use locator.or(...) for clickable elements. It causes strict mode violations when duplicate text exists.",
+    "- XPath is allowed only as the final Tier 3 fallback inside a locator candidate array. Never make XPath the primary locator.",
+    "- Do not use unscoped getByText(...) for dropdown options, role values, table row actions, or repeated labels.",
+    "- For PrimeReact dropdown/multiselect controls: click the combobox/control first, then scope option selection inside the visible overlay panel such as .p-multiselect-panel, .p-dropdown-panel, .p-select-panel, or [role=\"listbox\"].",
+    "- For table/list actions: first resolve the specific row using browser-visible data like email/fullName, then click the button/link inside that row. Do not click a global duplicate text match.",
     "- Do not use waitForTimeout.",
     "- Do not read process.env in generated files.",
     "- Every page-object assertion method must be named expectSomething, for example expectAssignedRoleVisible(). Do not name assertion methods verifySomething.",
@@ -402,6 +495,10 @@ function buildPrompt(
     "- Prefer web-first assertions like await expect(locator).toBeVisible().",
     "- Put the final assertion in the spec by calling a page object assertion method after the action method.",
     "- Include all action methods needed by the Action class inside the Page Object. Do not access private locators from Action classes.",
+    "- User Management TC-UM-001 real DOM facts: click Add Internal User as visible text/card, first name placeholder is 'Enter first name', last name placeholder is 'Enter last name', email placeholder is 'Enter email address', role opens from visible text 'Select role', Save is a button whose name starts with Save.",
+    "- User Management user selection is a list/table/search-row workflow, not a <select> labelled 'user'. Never generate getByLabel('user') or selectOption for selecting a user.",
+    "- For user selection, prefer browser-visible email address, full name, or first name + last name. Do not use hidden UUID/userId as row text unless DOM evidence proves it is visible.",
+    "- Use only data keys present in Scenario input.testData. Do not invent keys like firstNameAndLastName, existingEmailAddress, or selectedUser when equivalent keys already exist.",
     "",
     "Exact required skeleton pattern:",
     buildRequiredSkeleton(names),
@@ -432,13 +529,23 @@ function buildPrompt(
         description: source.description,
         expectedResult: source.expectedResult,
         baseUrl: source.baseUrl,
-        loginBefore: input.loginBefore,
+        loginBefore: input.loginBefore ?? true,
         steps: source.steps,
         testData: source.testData,
       },
       null,
       2,
     ),
+    "",
+    "Live DOM recon evidence captured before generation:",
+    source.domReconMarkdown ||
+      "No DOM recon was captured for this scenario. If locator evidence is missing, use the deterministic artifact mapping and validation rules.",
+    "",
+    "DOM recon usage rules:",
+    "- Treat this locator map as the source of truth over scenario wording.",
+    "- Use visible placeholders/text/roles from DOM recon before guessing labels.",
+    "- If test data contains a value not present in DOM options, normalize to a visible option only when project artifact mapping already did so.",
+    "- Keep Tier 1/Tier 2/Tier 3 locator candidate arrays and firstVisibleLocator.",
     "",
     "Final output checklist before responding:",
     `- files.length === ${requiredFiles.length}`,
@@ -497,7 +604,8 @@ function readPlaywrightSkillInstructions(): string {
     "- Specs use fixtures and test data only; no direct page usage or class construction.",
     "- Test data lives in test-data files; do not hardcode scenario payload in specs.",
     "- Prefer stable locators from live DOM evidence: role, label, placeholder, test id, text.",
-    "- Do not use XPath, waitForTimeout, process.env, or brittle CSS unless unavoidable.",
+    "- Use firstVisibleLocator with Tier 1 semantic, Tier 2 attribute/CSS, Tier 3 XPath fallback candidates when fallback locators are needed.",
+    "- Do not use primary XPath, waitForTimeout, process.env, or brittle CSS unless unavoidable.",
     "- Verify every project import path is valid for the file location.",
     "- Generate complete files, not partial snippets.",
     "",
@@ -534,7 +642,12 @@ function buildRepairPrompt(
     "Spec must not import the generated Action or Page classes.",
     "Action class must expose the exact action method requested in the original prompt.",
     "Test data file must export the exact const/type names requested in the original prompt.",
-    "No XPath, no waitForTimeout, no direct page actions in spec, no generated class imports in spec.",
+    "No primary XPath, no waitForTimeout, no direct page actions in spec, no generated class imports in spec.",
+    "For User Management, do not use getByLabel('user') or selectOption to select a user. Use row/search/list locators based on available test data.",
+    "Do not use locator.or(...) for click targets. Strict mode requires one resolved element. Use firstVisibleLocator with tiered Locator[] candidates instead.",
+    "XPath is allowed only as the final Tier 3 fallback inside a locator candidate array.",
+    "For dropdown options such as role names, scope the option inside the open dropdown/listbox panel before clicking.",
+    "Do not invent test data property names. Use only keys available in the original scenario testData.",
     "",
     "Original scenario and naming prompt excerpt:",
     originalPrompt.slice(0, 6500),
@@ -605,6 +718,26 @@ function validateLlmFrameworkContract(
   const actionFile = byPath.get(actionPath);
   const dataFile = byPath.get(dataPath);
   const specFile = byPath.get(specPath);
+
+  for (const file of files) {
+    if (/\.or\s*\(/.test(file.content)) {
+      issues.push({
+        severity: "error",
+        file: file.path,
+        rule: "no-locator-or",
+        message: "Generated code must not use locator.or(...). Use one scoped locator instead to avoid strict mode violations.",
+      });
+    }
+
+    if (/getByText\([^\n;]+\)\.click\s*\(/.test(file.content)) {
+      issues.push({
+        severity: "error",
+        file: file.path,
+        rule: "no-unscoped-text-click",
+        message: "Generated code must not click unscoped getByText(...). Scope it to a row, dialog, menu, or dropdown panel first.",
+      });
+    }
+  }
 
   if (pageFile) {
     expectContent(
