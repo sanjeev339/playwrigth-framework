@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { LoginAction } from "../../../actions/auth/LoginAction";
 import { quote, safeIdentifier } from "./names";
+import { McpConfig } from "../config/McpConfig";
 
 export type LocatorDiscoveryOptions = {
   scenarioId: string;
@@ -177,16 +178,20 @@ export async function resolveUserVisibleIdentifierFromPortal(options: {
   const browser = await chromium.launch({ headless: options.headed === false });
   const page = await browser.newPage();
   let discoveredUserListApiUrl = "";
+  const userListApiRegex = new RegExp(
+    McpConfig.discovery.userListApiPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b",
+    "i"
+  );
   let discoveredUserListHeaders: Record<string, string> = {};
   page.on("request", (request) => {
     const url = request.url();
-    if (/\/robolab\/api\/v1\/user\/list\b/i.test(url)) {
+    if (userListApiRegex.test(url)) {
       discoveredUserListHeaders = headersForReplay(request.headers());
     }
   });
   page.on("response", (response) => {
     const url = response.url();
-    if (/\/robolab\/api\/v1\/user\/list\b/i.test(url)) {
+    if (userListApiRegex.test(url)) {
       discoveredUserListApiUrl = url;
     }
   });
@@ -197,19 +202,19 @@ export async function resolveUserVisibleIdentifierFromPortal(options: {
     const apiUrl =
       discoveredUserListApiUrl || inferUserListApiUrlFromPortalUrl(page.url());
 
-    for (let pageNo = 0; pageNo < 50; pageNo += 1) {
+    for (let pageNo = 0; pageNo < McpConfig.discovery.userListMaxPages; pageNo += 1) {
       const response = await page.request.post(apiUrl, {
         headers: discoveredUserListHeaders,
         data: {
           pageNo,
-          pageSize: 100,
+          pageSize: McpConfig.discovery.userListPageSize,
           searchText: "",
           statuses: [],
           roleIds: [],
           startDate: "",
           endDate: "",
           creationType: "",
-          userType: "Backoffice",
+          userType: McpConfig.discovery.userType,
           organisationId: null,
         },
       });
@@ -268,7 +273,7 @@ function inferUserListApiUrlFromPortalUrl(portalUrl: string): string {
   if (url.hostname.startsWith("adminportal.")) {
     url.hostname = url.hostname.replace(/^adminportal\./, "api.");
   }
-  url.pathname = "/robolab/api/v1/user/list";
+  url.pathname = McpConfig.discovery.userListApiPath;
   url.search = "";
   url.hash = "";
   return url.toString();
@@ -286,17 +291,15 @@ function detectDiscoveryTarget(options: LocatorDiscoveryOptions): DiscoveryTarge
     .join(" ")
     .toLowerCase();
 
-  const isUserManagement =
-    /\btc-um\b/.test(text) || /\buser\s+management\b/.test(text);
+  const moduleMatchRegex = new RegExp(McpConfig.discovery.moduleMatchRegex, "i");
+  const opensAddUserFormRegex = new RegExp(McpConfig.discovery.opensAddUserFormRegex, "i");
+
+  const isUserManagement = moduleMatchRegex.test(text);
   const moduleLabel = isUserManagement
     ? "User Management"
     : inferModuleLabel(options.featureName || options.title || "Dashboard");
   const moduleKey = safeIdentifier(moduleLabel, "module").replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
-  const opensAddUserForm =
-    isUserManagement &&
-    /\b(add\s+user|internal\s+user|first\s+name|last\s+name|email\s+address|unique\s+user\s+email|duplicate|already\s+exists)\b/.test(
-      text,
-    );
+  const opensAddUserForm = isUserManagement && opensAddUserFormRegex.test(text);
 
   return {
     moduleKey,
@@ -506,19 +509,12 @@ async function captureRoleOptions(page: Page): Promise<string[]> {
   await roleControl.click();
 
   const panel = page
-    .locator(
-      [
-        ".p-multiselect-panel",
-        ".p-dropdown-panel",
-        ".p-select-panel",
-        '[role="listbox"]',
-      ].join(", "),
-    )
+    .locator(McpConfig.discovery.dropdownPanelSelectors.join(", "))
     .last();
   await panel.waitFor({ state: "visible", timeout: 5_000 });
 
   return panel
-    .locator("li, [role='option'], [role='checkbox'], label, .p-multiselect-item")
+    .locator(McpConfig.discovery.dropdownOptionSelectors)
     .evaluateAll((nodes) =>
       Array.from(
         new Set(

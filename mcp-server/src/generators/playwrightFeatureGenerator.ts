@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import { McpConfig } from "../config/McpConfig";
 import {
   LocatorInput,
   TestCaseInput,
@@ -468,14 +469,8 @@ function locatorCandidateExpressions(target: TargetInfo): string[] {
 
 function shouldPreferKnownCandidates(target: TargetInfo): boolean {
   const normalizedTarget = target.name.toLowerCase();
-  return (
-    normalizedTarget.includes("user management navigation") ||
-    normalizedTarget.includes("add internal user") ||
-    normalizedTarget.includes("first name") ||
-    normalizedTarget.includes("last name") ||
-    normalizedTarget.includes("email address") ||
-    normalizedTarget.includes("role dropdown") ||
-    normalizedTarget.includes("save button")
+  return McpConfig.locatorFallbacks.some((entry) =>
+    entry.matchKeywords.every((kw) => normalizedTarget.includes(kw.toLowerCase()))
   );
 }
 
@@ -484,62 +479,25 @@ function fallbackCandidateExpressions(target: TargetInfo): string[] {
   const normalizedTarget = target.name.toLowerCase();
   const candidates: string[] = [];
 
-  if (normalizedTarget.includes("user management") && normalizedTarget.includes("navigation")) {
-    candidates.push(
-      `page.getByRole("link", { name: /^${escapeRegExpLiteral("User Management")}$/ })`,
-      `page.getByRole("menuitem", { name: /^${escapeRegExpLiteral("User Management")}$/ })`,
-      `page.getByRole("button", { name: /^${escapeRegExpLiteral("User Management")}$/ })`,
-      `page.getByText("User Management", { exact: true })`,
-      `page.locator("[class*=sidebar]").getByText("User Management", { exact: true })`,
-      `page.locator(${quote('xpath=//*[contains(@class,"sidebar")]//*[normalize-space()="User Management"]')})`,
+  // Check config-driven fallbacks first
+  for (const entry of McpConfig.locatorFallbacks) {
+    const matches = entry.matchKeywords.every((kw) =>
+      normalizedTarget.includes(kw.toLowerCase())
     );
-  } else if (normalizedTarget.includes("add internal user")) {
-    candidates.push(
-      `page.getByText("Add Internal User", { exact: true })`,
-      `page.locator('[role="dialog"]').getByText("Add Internal User", { exact: true })`,
-      `page.locator(${quote('xpath=//*[@role="dialog"]//*[normalize-space()="Add Internal User"]')})`,
-    );
-  } else if (normalizedTarget.includes("first name")) {
-    candidates.push(
-      `page.getByPlaceholder("Enter first name")`,
-      `page.getByLabel(/^First Name/i)`,
-      `page.locator('input[name="firstName"]')`,
-      `page.locator(${quote('xpath=//input[@placeholder="Enter first name"]')})`,
-    );
-  } else if (normalizedTarget.includes("last name")) {
-    candidates.push(
-      `page.getByPlaceholder("Enter last name")`,
-      `page.getByLabel(/^Last Name/i)`,
-      `page.locator('input[name="lastName"]')`,
-      `page.locator(${quote('xpath=//input[@placeholder="Enter last name"]')})`,
-    );
-  } else if (normalizedTarget.includes("email address")) {
-    candidates.push(
-      `page.getByPlaceholder("Enter email address")`,
-      `page.getByLabel(/^Email Address/i)`,
-      `page.locator('input[type="email"]')`,
-      `page.locator(${quote('xpath=//input[@placeholder="Enter email address"]')})`,
-    );
-  } else if (normalizedTarget.includes("role") && normalizedTarget.includes("dropdown")) {
-    candidates.push(
-      `page.getByText("Select role", { exact: true })`,
-      `page.getByRole("combobox", { name: /role/i })`,
-      `page.locator('[class*=role]').getByText("Select role", { exact: true })`,
-      `page.locator(${quote('xpath=//*[normalize-space()="Role"]/ancestor::*[contains(@class,"field") or contains(@class,"form")]//*[normalize-space()="Select role"]')})`,
-    );
-  } else if (normalizedTarget.includes("save")) {
-    candidates.push(
-      `page.getByRole("button", { name: /^Save/i })`,
-      `page.locator('button[type="submit"]')`,
-      `page.locator(${quote('xpath=//button[starts-with(normalize-space(),"Save")]')})`,
-    );
-  } else if (normalizedTarget.includes("selected user row")) {
-    candidates.push(
-      `page.getByRole("table").getByRole("row", { name: /${escapeRegExpLiteral(label)}/ })`,
-      `page.locator("table").getByText(${quote(label)}, { exact: true })`,
-      `page.locator(${quote(`xpath=//table//tr[contains(normalize-space(),"${escapeXpathDouble(label)}")]`)})`,
-    );
-  } else if (target.locator.kind === "role" && target.locator.role === "button") {
+    if (matches) {
+      for (const pattern of entry.candidates) {
+        let expression = pattern;
+        if (pattern.includes("{label}")) {
+          expression = pattern.replace(/{label}/g, label);
+        }
+        candidates.push(expression);
+      }
+      return candidates;
+    }
+  }
+
+  // Fallback to default heuristic behaviors if no custom keywords match
+  if (target.locator.kind === "role" && target.locator.role === "button") {
     candidates.push(
       `page.getByRole("button", { name: /^${escapeRegExpLiteral(label)}$/i })`,
       `page.locator(${quote(`xpath=//button[normalize-space()="${escapeXpathDouble(label)}"]`)})`,

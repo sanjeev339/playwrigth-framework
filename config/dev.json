@@ -17,6 +17,96 @@
       "username": "SET_IN_ENV_FILE",
       "password": "SET_IN_ENV_FILE"
     }
+  },
+  "mcp": {
+    "llm": {
+      "provider": "openai",
+      "geminiModel": "gemini-2.5-flash",
+      "openAiModel": "gpt-4.1-mini",
+      "anthropicModel": "claude-3-5-sonnet-latest",
+      "temperature": 0.1,
+      "openAiMaxTokens": 12000,
+      "anthropicMaxTokens": 8000
+    },
+    "discovery": {
+      "userListApiPath": "/robolab/api/v1/user/list",
+      "userListPageSize": 100,
+      "userListMaxPages": 50,
+      "userType": "Backoffice"
+    },
+    "locatorFallbacks": [
+      {
+        "matchKeywords": ["user management", "navigation"],
+        "candidates": [
+          "page.getByRole(\"link\", { name: /^User Management$/ })",
+          "page.getByRole(\"menuitem\", { name: /^User Management$/ })",
+          "page.getByRole(\"button\", { name: /^User Management$/ })",
+          "page.getByText(\"User Management\", { exact: true })",
+          "page.locator(\"[class*=sidebar]\").getByText(\"User Management\", { exact: true })",
+          "page.locator('xpath=//*[contains(@class,\"sidebar\")]//*[normalize-space()=\"User Management\"]')"
+        ]
+      },
+      {
+        "matchKeywords": ["add internal user"],
+        "candidates": [
+          "page.getByText(\"Add Internal User\", { exact: true })",
+          "page.locator('[role=\"dialog\"]').getByText(\"Add Internal User\", { exact: true })",
+          "page.locator('xpath=//*[@role=\"dialog\"]//*[normalize-space()=\"Add Internal User\"]')"
+        ]
+      },
+      {
+        "matchKeywords": ["first name"],
+        "candidates": [
+          "page.getByPlaceholder(\"Enter first name\")",
+          "page.getByLabel(/^First Name/i)",
+          "page.locator('input[name=\"firstName\"]')",
+          "page.locator('xpath=//input[@placeholder=\"Enter first name\"]')"
+        ]
+      },
+      {
+        "matchKeywords": ["last name"],
+        "candidates": [
+          "page.getByPlaceholder(\"Enter last name\")",
+          "page.getByLabel(/^Last Name/i)",
+          "page.locator('input[name=\"lastName\"]')",
+          "page.locator('xpath=//input[@placeholder=\"Enter last name\"]')"
+        ]
+      },
+      {
+        "matchKeywords": ["email address"],
+        "candidates": [
+          "page.getByPlaceholder(\"Enter email address\")",
+          "page.getByLabel(/^Email Address/i)",
+          "page.locator('input[type=\"email\"]')",
+          "page.locator('xpath=//input[@placeholder=\"Enter email address\"]')"
+        ]
+      },
+      {
+        "matchKeywords": ["role", "dropdown"],
+        "candidates": [
+          "page.getByText(\"Select role\", { exact: true })",
+          "page.getByRole(\"combobox\", { name: /role/i })",
+          "page.locator('[class*=role]').getByText(\"Select role\", { exact: true })",
+          "page.locator('xpath=//*[normalize-space()=\"Role\"]/ancestor::*[contains(@class,\"field\") or contains(@class,\"form\")]//*[normalize-space()=\"Select role\"]')"
+        ]
+      },
+      {
+        "matchKeywords": ["save"],
+        "candidates": [
+          "page.getByRole(\"button\", { name: /^Save/i })",
+          "page.locator('button[type=\"submit\"]')",
+          "page.locator('xpath=//button[starts-with(normalize-space(),\"Save\")]')"
+        ]
+      },
+      {
+        "matchKeywords": ["selected user row"],
+        "candidates": [
+          "page.getByRole(\"table\").getByRole(\"row\", { name: /{label}/ })",
+          "page.locator(\"table\").getByText(\"{label}\", { exact: true })",
+          "page.locator('xpath=//table//tr[contains(normalize-space(),\"{label}\")]')"
+        ]
+      }
+    ]
   }
 }
  

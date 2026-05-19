@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { generatePlaywrightFromArtifacts } from "./tools/generatePlaywrightFromArtifacts";
 
 async function main(): Promise<void> {

@@ -1,3 +1,5 @@
+import { McpConfig } from "../config/McpConfig";
+
 export type LlmProvider = "gemini" | "openai" | "anthropic";
 
 export async function callLlmProvider(
@@ -6,18 +8,18 @@ export async function callLlmProvider(
   model?: string,
 ): Promise<string> {
   if (provider === "openai") {
-    return callOpenAi(prompt, model || "gpt-4.1-mini");
+    return callOpenAi(prompt, model || McpConfig.llm.openAiModel);
   }
 
   if (provider === "anthropic") {
-    return callAnthropic(prompt, model || "claude-3-5-sonnet-latest");
+    return callAnthropic(prompt, model || McpConfig.llm.anthropicModel);
   }
 
-  return callGemini(prompt, model || "gemini-2.5-flash");
+  return callGemini(prompt, model || McpConfig.llm.geminiModel);
 }
 
 export function resolveLlmProvider(provider?: string): LlmProvider {
-  const normalized = (provider || process.env.LLM_PROVIDER || "gemini")
+  const normalized = (provider || process.env.LLM_PROVIDER || McpConfig.llm.provider)
     .toLowerCase()
     .trim();
   if (
@@ -27,7 +29,7 @@ export function resolveLlmProvider(provider?: string): LlmProvider {
   ) {
     return normalized;
   }
-  return "gemini";
+  return McpConfig.llm.provider;
 }
 
 function requireApiKey(name: string): string {
@@ -50,8 +52,8 @@ async function callOpenAi(prompt: string, model: string): Promise<string> {
     body: JSON.stringify({
       model,
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.1,
-      max_tokens: 12000,
+      temperature: McpConfig.llm.temperature,
+      max_tokens: McpConfig.llm.openAiMaxTokens,
       response_format: { type: "json_object" },
     }),
   });
@@ -75,9 +77,9 @@ async function callAnthropic(prompt: string, model: string): Promise<string> {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 8000,
+      max_tokens: McpConfig.llm.anthropicMaxTokens,
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.1,
+      temperature: McpConfig.llm.temperature,
     }),
   });
   const data = (await response.json()) as {
@@ -100,7 +102,7 @@ async function callGemini(prompt: string, model: string): Promise<string> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1 },
+        generationConfig: { temperature: McpConfig.llm.temperature },
       }),
     },
   );
