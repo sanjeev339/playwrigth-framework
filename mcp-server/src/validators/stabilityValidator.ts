@@ -105,6 +105,15 @@ const rules: Rule[] = [
     appliesTo: (file) => file.path.startsWith("page_objects/"),
   },
   {
+    id: "no-basepage-helper-override",
+    severity: "error",
+    pattern:
+      /(?:^|[{\n;])\s*(?:public|private|protected)?\s*(?:async\s+)?(?:firstVisibleLocator|clickVisibleDropdownOption)\s*\(/,
+    message:
+      "Generated Page Objects must not redefine BasePage helpers. Use the inherited helper with await inside Page Object methods.",
+    appliesTo: (file) => file.path.startsWith("page_objects/"),
+  },
+  {
     id: "no-default-basepage-import",
     severity: "error",
     pattern: /import\s+BasePage\s+from\s+['"`].*BasePage['"`]/,
@@ -173,6 +182,7 @@ export function validateGeneratedFiles(
     }
 
     issues.push(...validateTieredLocatorUsage(file));
+    issues.push(...validateBasePageHelperUsage(file));
   }
 
   return issues;
@@ -206,6 +216,40 @@ function validateTieredLocatorUsage(file: GeneratedFile): StabilityIssue[] {
         index + 1
       }.`,
     });
+  });
+
+  return issues;
+}
+
+function validateBasePageHelperUsage(file: GeneratedFile): StabilityIssue[] {
+  if (!file.path.startsWith("page_objects/")) return [];
+
+  const issues: StabilityIssue[] = [];
+  const lines = file.content.split("\n");
+
+  lines.forEach((line, index) => {
+    if (!/this\.firstVisibleLocator\s*\(/.test(line)) return;
+
+    if (!/await\s+this\.firstVisibleLocator\s*\(/.test(line)) {
+      issues.push({
+        severity: "error",
+        file: file.path,
+        rule: "first-visible-locator-must-be-awaited",
+        message: `firstVisibleLocator returns Promise<Locator>; await it inside an async method before using the Locator. Check line ${
+          index + 1
+        }.`,
+      });
+    }
+
+    if (/\b(?:readonly|private|protected|public)?\s*\w+\s*:\s*Locator\s*=/.test(line)) {
+      issues.push({
+        severity: "error",
+        file: file.path,
+        rule: "no-first-visible-locator-field",
+        message:
+          "Do not assign firstVisibleLocator() to Locator fields. Store Locator[] candidates and resolve the visible locator inside each method.",
+      });
+    }
   });
 
   return issues;

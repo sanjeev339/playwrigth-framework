@@ -127,6 +127,8 @@ export function getArtifactScenarioBlock(
   if (!dataRecord) return undefined;
 
   const normalizedPayload = normalizePayload(dataRecord.payload || {});
+  Object.assign(normalizedPayload, input.testData || {});
+  addDerivedNameFields(normalizedPayload);
   const needsVisibleUser = splitNumberedText(scenario["Test Steps"]).some(
     (instruction) => isSelectUserInstruction(instruction),
   );
@@ -174,6 +176,8 @@ export function buildTestCaseInputFromArtifacts(
   }
 
   const normalizedPayload = normalizePayload(dataRecord.payload || {});
+  Object.assign(normalizedPayload, input.testData || {});
+  addDerivedNameFields(normalizedPayload);
   applyPortalDataNormalizations(scenario, normalizedPayload);
   if (input.baseUrl) {
     normalizedPayload.baseUrl = input.baseUrl;

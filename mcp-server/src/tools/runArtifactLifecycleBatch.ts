@@ -3,10 +3,12 @@ import * as fs from "fs";
 import * as path from "path";
 import { z } from "zod";
 import {
+  buildTestCaseInputFromArtifacts,
   getArtifactScenarioBlock,
   listArtifactScenarios,
 } from "../generators/artifactInputAdapter";
 import { generatePlaywrightWithLlm } from "../generators/llmPlaywrightGenerator";
+import { resolveUserVisibleIdentifierFromPortal } from "../generators/locatorDiscovery";
 
 export const ArtifactLifecycleBatchInputSchema = z.object({
   scenariosCsvPath: z.string().min(1),
@@ -36,6 +38,7 @@ type LifecycleAttempt = {
   generationOk: boolean;
   runOk?: boolean;
   failureReason?: string;
+  resolvedVisibleUserIdentifier?: string;
   screenshotPath?: string;
   videoPath?: string;
   errorContextPath?: string;
@@ -179,7 +182,8 @@ async function runOneScenario(
   const generatedFiles: string[] = [];
   const attempts: LifecycleAttempt[] = [];
   const emailBlockReason = classifyEmailLinkBlock(scenario);
-  const visibleIdentifierBlock = getArtifactScenarioBlock({
+  let resolvedTestData: Record<string, string | number | boolean> = {};
+  let visibleIdentifierBlock = getArtifactScenarioBlock({
     scenarioId,
     scenariosCsvPath: input.scenariosCsvPath,
     testDataJsonPath: input.testDataJsonPath,
@@ -193,20 +197,50 @@ async function runOneScenario(
   });
 
   if (visibleIdentifierBlock) {
-    return {
-      scenarioId,
-      title,
-      generatedFiles,
-      attempts: [
-        {
-          attempt: 1,
-          generationOk: false,
-          failureReason: visibleIdentifierBlock.message,
+    const resolution = await tryResolveVisibleUserIdentifier(input, scenarioId);
+    if (resolution.ok && resolution.testData) {
+      resolvedTestData = resolution.testData;
+      visibleIdentifierBlock = getArtifactScenarioBlock({
+        scenarioId,
+        scenariosCsvPath: input.scenariosCsvPath,
+        testDataJsonPath: input.testDataJsonPath,
+        baseUrl: input.baseUrl,
+        testData: resolvedTestData,
+        loginBefore: true,
+        options: {
+          dryRun: true,
+          overwrite: false,
+          updateFixtures: true,
         },
-      ],
-      finalStatus: "blocked",
-      failureReason: visibleIdentifierBlock.reason,
-    };
+      });
+      attempts.push({
+        attempt: 0,
+        generationOk: true,
+        resolvedVisibleUserIdentifier:
+          resolution.visibleIdentifier || "resolved from user list",
+      });
+    }
+
+    if (visibleIdentifierBlock) {
+      const detail = resolution.reason
+        ? `${visibleIdentifierBlock.message} (${resolution.reason})`
+        : visibleIdentifierBlock.message;
+      return {
+        scenarioId,
+        title,
+        generatedFiles,
+        attempts: [
+          ...attempts,
+          {
+            attempt: 1,
+            generationOk: false,
+            failureReason: detail,
+          },
+        ],
+        finalStatus: "blocked",
+        failureReason: resolution.reason || visibleIdentifierBlock.reason,
+      };
+    }
   }
 
   let repairPrompt = baseLifecyclePrompt();
@@ -220,6 +254,7 @@ async function runOneScenario(
       prompt: repairPrompt,
       input,
       scenarioId,
+      testData: resolvedTestData,
     });
     generatedFiles.splice(
       0,
@@ -329,6 +364,7 @@ async function generateScenarioWithFailureCapture(options: {
   prompt: string;
   input: ArtifactLifecycleBatchInput;
   scenarioId: string;
+  testData?: Record<string, string | number | boolean>;
 }): Promise<Awaited<ReturnType<typeof generatePlaywrightWithLlm>>> {
   const missingKey = missingProviderKey(options.input.provider);
   if (missingKey) {
@@ -363,13 +399,14 @@ async function generateScenarioWithFailureCapture(options: {
         testDataJsonPath: options.input.testDataJsonPath,
       },
       baseUrl: options.input.baseUrl,
+      testData: options.testData || {},
       loginBefore: true,
       domRecon: {
         enabled: true,
         headed: options.input.headed ?? true,
         outputDir: path.join(
           options.input.outputDir || path.join(repoRoot, "generated_output"),
-          "dom-recon",
+          "locator-registry",
         ),
       },
       options: {
@@ -397,6 +434,74 @@ async function generateScenarioWithFailureCapture(options: {
       warnings: [],
     };
   }
+}
+
+async function tryResolveVisibleUserIdentifier(
+  input: ArtifactLifecycleBatchInput,
+  scenarioId: string,
+): Promise<{
+  ok: boolean;
+  reason?: string;
+  visibleIdentifier?: string;
+  testData?: Record<string, string | number | boolean>;
+}> {
+  let testData: Record<string, string | number | boolean> = {};
+  try {
+    const artifactCase = buildTestCaseInputFromArtifacts({
+      scenarioId,
+      scenariosCsvPath: input.scenariosCsvPath,
+      testDataJsonPath: input.testDataJsonPath,
+      baseUrl: input.baseUrl,
+      loginBefore: true,
+      options: {
+        dryRun: true,
+        overwrite: false,
+        updateFixtures: false,
+      },
+    });
+    testData = artifactCase.testData;
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  const userId = String(testData.userId || testData.uuid || "").trim();
+  if (!userId) {
+    return { ok: false, reason: "missing_user_id" };
+  }
+
+  const resolution = await resolveUserVisibleIdentifierFromPortal({
+    userId,
+    headed: input.headed ?? true,
+    outputDir: path.join(
+      input.outputDir || path.join(repoRoot, "generated_output"),
+      "locator-registry",
+    ),
+  });
+
+  if (!resolution.ok || !resolution.resolved) {
+    return {
+      ok: false,
+      reason: resolution.reason || "uuid_not_found_in_user_list",
+    };
+  }
+
+  const merged = {
+    ...testData,
+    ...resolution.resolved,
+  };
+  return {
+    ok: true,
+    testData: merged,
+    visibleIdentifier: String(
+      resolution.resolved.resolvedVisibleUserIdentifier ||
+        resolution.resolved.emailAddress ||
+        resolution.resolved.fullName ||
+        "",
+    ),
+  };
 }
 
 function missingProviderKey(provider?: string): string {

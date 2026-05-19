@@ -27,9 +27,8 @@ import {
 } from "./artifactInputAdapter";
 import { callLlmProvider, resolveLlmProvider } from "./llmProvider";
 import {
-  runUserManagementAddUserDomRecon,
-  shouldRunUserManagementDomRecon,
-} from "./userManagementDomRecon";
+  discoverLocatorEvidence,
+} from "./locatorDiscovery";
 
 type FileOperation = GeneratedFile & {
   status: "created" | "updated" | "skipped" | "preview";
@@ -90,6 +89,7 @@ export async function generatePlaywrightWithLlm(
         testDataJsonPath: input.artifact.testDataJsonPath,
         baseUrl: input.baseUrl,
         featureName: input.featureName,
+        testData: input.testData,
         loginBefore: input.loginBefore ?? true,
         options: input.options,
       })
@@ -299,6 +299,7 @@ function resolveSource(input: LlmPlaywrightInput): {
       testDataJsonPath: input.artifact.testDataJsonPath,
       baseUrl: input.baseUrl,
       featureName: input.featureName,
+      testData: input.testData,
       loginBefore: input.loginBefore ?? true,
       options: {
         dryRun: true,
@@ -338,21 +339,17 @@ async function enrichSourceWithDomRecon(
   source: ReturnType<typeof resolveSource>,
 ): Promise<ResolvedSource> {
   const domReconEnabled = input.domRecon?.enabled !== false;
-  if (
-    !input.artifact ||
-    !domReconEnabled ||
-    !shouldRunUserManagementDomRecon({
-      artifact: input.artifact,
-      title: source.title,
-      description: source.description,
-      steps: source.steps,
-    })
-  ) {
+  if (!input.artifact || !domReconEnabled) {
     return source;
   }
 
-  const recon = await runUserManagementAddUserDomRecon({
+  const recon = await discoverLocatorEvidence({
     scenarioId: input.artifact.scenarioId,
+    featureName: source.featureName,
+    title: source.title,
+    description: source.description,
+    steps: source.steps,
+    testData: source.testData,
     headed: input.domRecon?.headed ?? true,
     outputDir: input.domRecon?.outputDir,
   });
@@ -370,8 +367,8 @@ async function enrichSourceWithDomRecon(
     ...source,
     domReconMarkdown: recon.markdown,
     domReconWarnings: [
-      `DOM recon captured Add User form locator map: ${recon.markdownPath}`,
-      `DOM recon screenshot: ${recon.screenshotPath}`,
+      `Locator discovery captured ${recon.moduleKey || "module"} / ${recon.screenKey || "screen"} map: ${recon.markdownPath}`,
+      ...(recon.screenshotPath ? [`Locator discovery screenshot: ${recon.screenshotPath}`] : []),
     ],
   };
 }
@@ -483,6 +480,8 @@ function buildPrompt(
     "- Test data files export the exact const/type names listed below.",
     "- Use stable locators: getByRole, getByLabel, getByPlaceholder, getByTestId, getByText.",
     "- Follow the team tiered locator standard safely: declare Locator[] candidate arrays with JSDoc comments for Tier 1 semantic, Tier 2 attribute/CSS, and Tier 3 XPath fallback, then resolve with this.firstVisibleLocator('purpose', candidates).",
+    "- firstVisibleLocator and clickVisibleDropdownOption are inherited from BasePage. Never redefine, override, or copy those helper methods in generated Page Objects.",
+    "- firstVisibleLocator is async. Only call it inside async methods as: const locator = await this.firstVisibleLocator('purpose', candidates). Never assign its Promise to a Locator field or constructor property.",
     "- Never use locator.or(...) for clickable elements. It causes strict mode violations when duplicate text exists.",
     "- XPath is allowed only as the final Tier 3 fallback inside a locator candidate array. Never make XPath the primary locator.",
     "- Do not use unscoped getByText(...) for dropdown options, role values, table row actions, or repeated labels.",
@@ -543,6 +542,8 @@ function buildPrompt(
     "",
     "DOM recon usage rules:",
     "- Treat this locator map as the source of truth over scenario wording.",
+    "- Choose locators only from the captured accessibility tree, interactive locator map, tables, role options, and DOM evidence.",
+    "- If a needed locator is absent from the locator map, fail generation by returning code that uses an explicit page-object assertion/action error rather than inventing a locator.",
     "- Use visible placeholders/text/roles from DOM recon before guessing labels.",
     "- If test data contains a value not present in DOM options, normalize to a visible option only when project artifact mapping already did so.",
     "- Keep Tier 1/Tier 2/Tier 3 locator candidate arrays and firstVisibleLocator.",
@@ -645,6 +646,8 @@ function buildRepairPrompt(
     "No primary XPath, no waitForTimeout, no direct page actions in spec, no generated class imports in spec.",
     "For User Management, do not use getByLabel('user') or selectOption to select a user. Use row/search/list locators based on available test data.",
     "Do not use locator.or(...) for click targets. Strict mode requires one resolved element. Use firstVisibleLocator with tiered Locator[] candidates instead.",
+    "Do not redefine BasePage helpers such as firstVisibleLocator or clickVisibleDropdownOption.",
+    "firstVisibleLocator returns Promise<Locator>; every call must be awaited inside an async Page Object method.",
     "XPath is allowed only as the final Tier 3 fallback inside a locator candidate array.",
     "For dropdown options such as role names, scope the option inside the open dropdown/listbox panel before clicking.",
     "Do not invent test data property names. Use only keys available in the original scenario testData.",

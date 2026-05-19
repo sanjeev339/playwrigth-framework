@@ -17,6 +17,10 @@ export const ArtifactInputSchema = z.object({
   scenarioId: z.string().min(1),
   baseUrl: z.string().optional(),
   featureName: z.string().optional(),
+  testData: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+    .default({})
+    .optional(),
   loginBefore: z.boolean().optional(),
   options: z
     .object({
