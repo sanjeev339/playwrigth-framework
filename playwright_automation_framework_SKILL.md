@@ -249,6 +249,83 @@ Playwright controls the page content — not the browser's own UI. DevTools is a
  
 ---
  
+#### Phase B — Option 4: Agent-Driven DOM Inspection (PREFERRED when MCP browser tools are connected)
+ 
+> ⚠ Prerequisite: This option requires `playwright:browser_navigate`, `playwright:browser_snapshot`, and `playwright:browser_run_code_unsafe` to be connected in the session. Verify the tools are present before using. If unavailable, fall back to Options 1–3.
+ 
+When MCP browser tools are available, Claude MUST use them to inspect the live DOM before writing any Page Object. This is the most complete method — Claude drives the full flow without any manual steps from the user.
+ 
+**Step-by-step workflow:**
+ 
+**Step 1 — Navigate** (`playwright:browser_navigate`)
+Go to the target page. If the page requires login, navigate to the login URL first and complete the login flow before navigating to the feature screen.
+ 
+**Step 2 — Snapshot** (`playwright:browser_snapshot`)
+Capture the full ARIA accessibility tree. This returns a yaml-like output listing all visible elements, their roles, labels, and interaction states (including `[disabled]` flags). Read it before writing any locator.
+ 
+**Step 3 — Extract raw HTML attributes** (`playwright:browser_run_code_unsafe`)
+The ARIA snapshot does NOT expose `id`, `name`, `data-pc-*`, or `class` attributes. Run this script in the page to extract them:
+ 
+```js
+// Run via playwright:browser_run_code_unsafe
+Array.from(document.querySelectorAll(
+  'input, button, select, [role="combobox"], [role="menuitem"], [role="option"]'
+)).map(el => ({
+  tag:           el.tagName,
+  id:            el.id || null,
+  name:          el.getAttribute('name'),
+  type:          el.getAttribute('type'),
+  placeholder:   el.getAttribute('placeholder'),
+  ariaLabel:     el.getAttribute('aria-label'),
+  dataPcName:    el.getAttribute('data-pc-name'),
+  dataPcSection: el.getAttribute('data-pc-section'),
+  ariaDisabled:  el.getAttribute('aria-disabled'),
+  disabled:      el.disabled,
+  classes:       el.className.trim().split(' ').slice(0, 5).join(' '),
+}));
+```
+ 
+**Step 4 — Output the Locator Map**
+Before writing any Page Object, produce a structured Locator Map (format in Rule 8 — Locator Map Output Format) for every interactive element found. This is mandatory — not optional.
+ 
+---
+ 
+#### Phase B — Reading the ARIA Snapshot (Required for Option 4)
+ 
+The `playwright:browser_snapshot` tool returns an ARIA tree in yaml-like notation. Know how to read it before writing any locator.
+ 
+**Disabled elements — two views of the same state:**
+ 
+| ARIA snapshot shows | Raw HTML contains | Playwright check |
+|---|---|---|
+| `combobox [disabled]` | `input[disabled]` or `aria-disabled="true"` | `await locator.isDisabled()` |
+| `menuitem "Edit" [disabled]` | `li[aria-disabled="true"]` + `data-p-disabled="true"` (PrimeVue) | `await locator.isDisabled()` |
+| `button "Save" [disabled]` | `button[disabled]` | `await locator.isEnabled()` |
+ 
+> ⚠ PrimeVue note: PrimeVue sets BOTH `aria-disabled="true"` (standard ARIA) AND `data-p-disabled="true"` (PrimeVue-specific). The ARIA snapshot shows `[disabled]`. Both mean the same thing — do not interact with the element.
+ 
+**Use `isDisabled()` / `isEnabled()` — most readable for junior devs:**
+```ts
+// ✅ Preferred
+const isDisabled = await locator.isDisabled();
+if (!isDisabled) { await locator.click(); }
+ 
+// ✅ Raw fallback when isDisabled() misses a custom attribute
+const ariaDisabled = await locator.getAttribute('aria-disabled'); // "true" or null
+ 
+// ❌ Never click a [disabled] element — it silently times out
+```
+ 
+**NEVER click a `[disabled]` menuitem or button.** If a menu item is disabled for a user's current status (e.g., Edit is disabled when the user is Suspended), document the pre-condition in a `⚠ Live-behaviour note` and implement an `ensureXxx` guard (see Rule 18).
+ 
+**Other ARIA snapshot notations:**
+- `[active]` → element has focus; safe to type
+- `[ref=e244]` → internal Playwright reference; do NOT use in selectors
+- `combobox` nested inside a `generic` → hidden input blocked by overlay div; click the overlay parent, not the combobox
+- `menu [active]` → contextual menu is open and visible
+ 
+---
+ 
 **Whichever option is used, Claude MUST output a "Recon Summary" before writing code:**
  
 ```
@@ -484,6 +561,48 @@ private readonly frameworkNameInput: Locator;
 - Use Playwright web-first assertions (`await expect(locator).toBeVisible()`).
 - No `expect` calls inside page objects.
 - Exception: actions MAY contain a `verify*` method that wraps assertions, used when a workflow's success is part of the workflow itself.
+ 
+### Component Library Locator Patterns — PrimeVue v3+ (Current Project Stack)
+ 
+Patterns where the obvious locator silently fails and the correct one is non-obvious. Extracted from live browser recon.
+ 
+| UI Element | ❌ Wrong locator | ✅ Correct locator | Notes |
+|---|---|---|---|
+| PrimeVue MultiSelect — open dropdown | `input[role="combobox"].click()` | `[data-pc-section="labelcontainer"].click()` | Hidden input is blocked by the label div overlay |
+| PrimeVue Menu overlay items | scope to parent element | `page.locator('[role="menuitem"]:has-text("Edit")')` | PrimeVue Menu appends to `<body>`, not the trigger's parent |
+| PrimeVue Drawer / Sidebar panel | `[role="dialog"]` | `[role="complementary"]` | Drawer uses `complementary` role. `[role="dialog"]` is for confirmation modals — see row below |
+| PrimeVue confirmation dialog (deactivate, delete) | `[role="complementary"]` | `[role="dialog"]` | Confirmation modals correctly use `dialog` role — do NOT confuse with Drawer |
+| Disabled menu item (any library) | click it directly | `await locator.isEnabled()` → only click if `true` | Clicking a disabled item silently times out |
+| Table row scoped by email | `getByText(email)` | `[role="row"]:has(p:text-is("email"))` | Email lives inside a `<p>` inside a cell; `getByText` matches too broadly |
+| Status badge in table row | `getByText(status)` | `row.locator('[role="cell"]').last()` | Status is always the last cell in the row |
+ 
+> This table covers PrimeVue v3+ (current UI library in this project). Add rows for other component libraries when the project introduces them.
+ 
+### Locator Map Output Format (Mandatory before writing any Page Object)
+ 
+After Phase B recon, output this structure for every interactive element before writing code:
+ 
+```markdown
+### [Element Name] — [page/module name] — verified [YYYY-MM-DD]
+ 
+| Attribute      | Value                          |
+|----------------|--------------------------------|
+| tag            | input / button / li / etc.    |
+| id             | value or —                    |
+| name           | value or —                    |
+| role           | ARIA role                      |
+| aria-label     | value or —                    |
+| data-pc-name   | PrimeVue component or —       |
+| data-pc-section| PrimeVue section or —         |
+| placeholder    | value or —                    |
+| type           | text / email / submit / etc.  |
+| disabled       | true / false                   |
+ 
+Primary locator  : `page.locator('[data-pc-name="..."]')`
+Fallback 1       : `page.getByRole('...', { name: '...' })`
+Fallback 2       : `page.locator('input#...')`
+⚠ Notes          : e.g. hidden input — click label container instead
+```
 ---
  
 ## Rule 9 — Code Quality Standards
@@ -503,6 +622,24 @@ private readonly frameworkNameInput: Locator;
 | `waitForTimeout(1000)` after tab click | `await page.waitForURL(/\?selectedTab=X/, { timeout })`     | URL update is the reliable signal         |
 | `waitForTimeout(5000)` after form save | `await page.waitForURL(/\/list-path\/?$/, { timeout })`     | Redirect is the reliable post-save signal |
 | `waitForTimeout(2000)` for toast       | `await toastLocator.waitFor({ state: 'visible', timeout })` | Element visibility is the reliable signal |
+ 
+### Debounce Waits — The One Legitimate Exception
+ 
+Some search and filter inputs debounce keystrokes before firing a network request. There is no DOM event emitted between the keystroke and the debounce delay, so a downstream-signal wait is not always possible.
+ 
+```ts
+// ✅ Preferred: wait for a downstream DOM signal (result counter, row count)
+await page.locator('p').filter({ hasText: /Showing \d+ of/ }).waitFor({ state: 'visible' });
+ 
+// ✅ Acceptable when no downstream signal exists — MUST include an explaining comment
+// ⚠ 400ms debounce on search input — no DOM event to wait for; platform-specific
+await page.waitForTimeout(400);
+ 
+// ❌ Forbidden — silent, unexplained wait with no justification
+await page.waitForTimeout(3000);
+```
+ 
+> Rule: `waitForTimeout` is not banned outright. It MUST appear at most once per interaction, MUST have a comment explaining the specific debounce/platform reason, and MUST use the shortest value that works (usually 300–500ms).
  
 ---
  
@@ -740,6 +877,9 @@ Before returning code, Claude MUST internally answer YES to all of these. Any NO
 17. For email/URL fields, have I generated: valid format ✅, invalid format ❌, empty ❌ test cases?
 18. For required fields, have I covered: whitespace-only ❌ (not just empty)?
 19. Are all boundary values sourced from test-data factory helpers, not inline strings?
+20. Did I use Phase B Option 4 (agent DOM inspection via MCP browser tools) and output a Locator Map before writing the Page Object? If MCP tools were unavailable, did I fall back to Options 1–3?
+21. For every contextual action (Edit, Deactivate, Delete menu items), did I verify via `isEnabled()` that the item is NOT disabled for the target record's current state before clicking?
+22. For every test that changes an existing record's state in a shared environment, did I implement an `ensureXxx` guard in the Action layer (Rule 18)?
 ---
  
 ## Rule 13 — Suggestions Policy
@@ -805,6 +945,78 @@ Test case specs (Excel, CSV, Jira, Confluence) are written at design time. The l
 •   Avoid over-engineering, unnecessary abstractions, or complex design patterns unless absolutely required by the requirement.
 •   Any developer with 1+ years of experience should be able to understand and modify the code without additional explanation.
 •   Keep logic as straightforward and linear as possible.
+
+---
+
+## Rule 18 — Shared Environment State Management (Mandatory — scoped)
+
+### Decision Gate — Apply this rule ONLY when ALL three conditions are true:
+
+1. The test **changes the state** of an existing record (status, role, archive, delete, deactivate)
+2. The test runs in a **shared environment** (dev / QA — not a per-test isolated DB)
+3. The test does **NOT create the target record itself** within the same test run
+
+> If your test creates its own record → no `ensureXxx` needed (you control the initial state from creation).
+> This scopes the rule to exactly the cases where it matters: TC-UM-003 / TC-UM-004 class tests on pre-existing shared records.
+
+---
+
+### The `ensureXxx` Pattern
+
+In shared environments, a target record may have been left in an unexpected state by a previous test run. For example, deactivating a user in TC-UM-004 leaves them `Suspended` — the next run cannot deactivate them again without first reactivating.
+
+**Solution: write an idempotent pre-condition guard before any state-changing step.**
+
+#### Layer placement (MANDATORY — Rule 2 applies)
+
+`ensureXxx` methods are **multi-step business workflows** (search → check state → click menu → confirm → wait for result). They MUST live in the **Action layer**, not the Page Object.
+
+| Layer | ensureXxx? | Why |
+|---|---|---|
+| **Action** (`*Action.ts`) | ✅ YES — belongs here | Composes multiple POM calls into a guard workflow |
+| Page Object (`*Page.ts`) | ❌ NO | Page Objects are single-screen UI primitives, not workflows |
+| Test (`*.spec.ts`) | ❌ NO | Tests must not contain multi-step orchestration logic |
+
+#### Naming and calling convention
+
+```ts
+// In the Action class — Step 1.5 pattern (between search and the action under test)
+async deactivateUser(targetEmail: string): Promise<void> {
+  await test.step('Step 1 — Search for target user', async () => {
+    await this.umPage.searchUser(targetEmail);
+  });
+
+  await test.step('Step 1.5 — Ensure user is Active (shared env guard)', async () => {
+    // Guard: reactivates the user if a previous run left them Suspended
+    await this.ensureUserIsActive(targetEmail);
+  });
+
+  await test.step('Step 2 — Open Deactivate dialog', async () => {
+    await this.umPage.openDeactivateForUser(targetEmail);
+  });
+}
+
+/** Idempotent guard — reactivates the user if not already Active. */
+async ensureUserIsActive(email: string): Promise<void> {
+  const status = await this.umPage.getUserStatus(email);
+  if (['Active', 'Password Not Set', 'Pending'].includes(status)) return; // already correct
+
+  // Compose POM calls to perform reactivation workflow
+  await this.umPage.clickActionMenuForUser(email);
+  await this.umPage.clickReactivateMenuItem();
+  await this.umPage.confirmReactivationIfDialogAppears();
+  await this.umPage.waitForUserStatus(email, ['Active', 'Password Not Set']);
+}
+```
+
+#### Rules for `ensureXxx` methods
+
+1. **Idempotent** — calling it twice produces the same result; it is safe to call even when no guard is needed.
+2. **Named `ensureXxx`** — the `ensure` prefix signals it is a pre-condition guard, not a feature workflow.
+3. **Step number** — use a `.5` suffix on the step number (e.g., `Step 1.5`) to signal it is a guard between steps, not a test step.
+4. **Wait for state** — use `waitFor` or `waitForFunction` to confirm the state change. Never use `waitForTimeout`.
+5. **Action layer only** — the guard composes Page Object calls; it does NOT contain raw locators.
+6. **Match guard** — every `ensureXxx` should have a corresponding cleanup or counter-state: if you write `ensureUserIsActive`, also write `ensureUserIsSuspended` for tests that require a suspended user.
 
 ---
 
