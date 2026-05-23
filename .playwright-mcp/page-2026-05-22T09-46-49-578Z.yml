@@ -1,0 +1,144 @@
+- generic [ref=e1072]:
+  - generic [ref=e1073]:
+    - generic [ref=e1075]:
+      - img "Organization Logo" [ref=e1077]
+      - button "Toggle" [ref=e1078]:
+        - img "Toggle" [ref=e1079] [cursor=pointer]
+    - generic [ref=e1080]:
+      - heading "Main Menu" [level=3] [ref=e1081]
+      - generic [ref=e1082]:
+        - button "Dashboard" [ref=e1085]:
+          - img [ref=e1088]
+          - text: Dashboard
+        - button "Organizations" [ref=e1095]:
+          - img [ref=e1098]
+          - text: Organizations
+        - button "Subscription" [ref=e1119]:
+          - img [ref=e1122]
+          - text: Subscription
+        - generic [ref=e1124]:
+          - generic [ref=e1125]:
+            - button "Indicator Repository" [ref=e1126]:
+              - img [ref=e1130]
+              - text: Indicator Repository
+            - generic:
+              - generic:
+                - img
+          - generic [ref=e1143]:
+            - button "Pillars" [ref=e1146]: Pillars
+            - button "Topics" [ref=e1149]: Topics
+            - button "Disclosure" [ref=e1152]: Disclosure
+            - button "Metrics" [ref=e1155]: Metrics
+            - button "Data Points" [ref=e1158]: Data Points
+        - generic [ref=e1160]:
+          - generic [ref=e1161]:
+            - button "Peoples" [ref=e1162]:
+              - img [ref=e1165]
+              - text: Peoples
+            - generic:
+              - generic:
+                - img
+          - button "Internal User" [ref=e1171]: Internal User
+        - generic [ref=e1173]:
+          - generic [ref=e1174]:
+            - button "Roles & Permissions" [ref=e1175]:
+              - img [ref=e1178]
+              - text: Roles & Permissions
+            - generic:
+              - generic:
+                - img
+          - generic [ref=e1180]:
+            - button "Internal Roles" [ref=e1182]: Internal Roles
+            - button "External Roles" [ref=e1185]: External Roles
+        - generic [ref=e1187]:
+          - generic [ref=e1188]:
+            - button "Configuration" [ref=e1189]:
+              - img [ref=e1192]
+              - text: Configuration
+            - generic:
+              - generic:
+                - img
+          - generic [ref=e1197]:
+            - button "Branding & Theme" [ref=e1199]: Branding & Theme
+            - button "Control Center" [ref=e1202]: Control Center
+            - button "Unit Of Measurement" [ref=e1205]: Unit Of Measurement
+            - button "Formula Builder" [ref=e1208]: Formula Builder
+            - button "Framework Templates" [ref=e1211]: Framework Templates
+    - generic [ref=e1213]:
+      - button "Logout" [ref=e1217]:
+        - img [ref=e1220]
+        - text: Logout
+      - generic [ref=e1224]:
+        - paragraph [ref=e1226]: S
+        - generic [ref=e1227]:
+          - paragraph [ref=e1228]: SUPER ADMIN
+          - paragraph [ref=e1229]: saikirrug9+123@gmail.com
+  - generic [ref=e1230]:
+    - banner [ref=e1232]:
+      - generic [ref=e1234]:
+        - heading "Indicator Repository" [level=1] [ref=e1235]
+        - paragraph [ref=e1236]: Central registry for Indicator Repository items, evidence and framework mappings.
+    - main [ref=e1237]:
+      - generic [ref=e1238]:
+        - generic [ref=e1242]:
+          - button "Back" [ref=e1243] [cursor=pointer]:
+            - img [ref=e1245]
+            - generic [ref=e1247]: Back
+          - generic [ref=e1248]:
+            - img [ref=e1251]
+            - generic [ref=e1253] [cursor=pointer]: Disclosures
+            - generic [ref=e1254]: /
+            - generic [ref=e1255]: Create New Disclosure
+        - generic [ref=e1256]:
+          - generic [ref=e1257]:
+            - heading "Create New Disclosure" [level=1] [ref=e1259]
+            - paragraph [ref=e1260]: Define and add a new ESG disclosure to track and manage related metrics.
+          - generic [ref=e1261]:
+            - generic [ref=e1262]:
+              - generic [ref=e1263]:
+                - text: Pillar Name
+                - text: "*"
+              - generic [ref=e1266] [cursor=pointer]:
+                - generic:
+                  - textbox "Pillar Name *"
+                - generic:
+                  - combobox:
+                    - option "Pillar Name" [selected]
+                - generic [ref=e1269]: Pillar Name
+                - button "Pillar Name" [ref=e1270]:
+                  - generic [ref=e1271]: 
+            - generic [ref=e1272]:
+              - generic [ref=e1273]:
+                - text: Disclosure Name
+                - text: "*"
+              - textbox "Disclosure Name *" [ref=e1275]:
+                - /placeholder: Disclosure Name
+            - generic [ref=e1276]:
+              - generic [ref=e1277]: Disclosure Icon
+              - generic [ref=e1278]:
+                - generic [ref=e1281] [cursor=pointer]:
+                  - generic [ref=e1282]: Upload Image
+                  - generic [ref=e1283]:
+                    - img [ref=e1284]
+                    - generic [ref=e1286]: Upload
+                - generic [ref=e1287]:
+                  - img [ref=e1289]
+                  - paragraph [ref=e1294]: Upload only SVG file
+            - generic [ref=e1296]:
+              - generic [ref=e1297]: Primary Color
+              - textbox "Enter color code" [ref=e1303]: "#2563EB"
+            - generic [ref=e1305] [cursor=pointer]:
+              - generic [ref=e1306]:
+                - checkbox "Add Next Disclosure" [ref=e1307]
+                - img
+                - img
+              - generic [ref=e1308]: Add Next Disclosure
+          - generic [ref=e1309]:
+            - button "Cancel" [ref=e1311] [cursor=pointer]:
+              - generic [ref=e1312]:
+                - img [ref=e1315]
+                - generic [ref=e1317]: Cancel
+            - button "Save" [ref=e1319] [cursor=pointer]:
+              - generic [ref=e1320]:
+                - img [ref=e1323]
+                - generic [ref=e1326]: Save

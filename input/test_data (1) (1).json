@@ -1,0 +1,44 @@
+[
+  {
+    "scenario_id": "TC-PF-001",
+    "execution_order": 1,
+    "data_strategy": "positive_valid_create",
+    "edge_case_type": null,
+    "payload": {
+      "Pillar Name": "Environmental Impact",
+      "Pillar Description": "Tracks environmental impacts..",
+      "Status": "Active"
+    }
+  },
+  {
+    "scenario_id": "TC-TO-002",
+    "execution_order": 2,
+    "data_strategy": "positive_valid_create",
+    "edge_case_type": null,
+    "depends_on": [
+      "TC-PF-001"
+    ],
+    "payload": {
+      "Pillar": "Environmental Impact",
+      "Topic Name": "Climate Change",
+      "Framework Name": "Climate Change",
+      "Status": "Active"
+    }
+  },
+  {
+    "scenario_id": "TC-DM-003",
+    "execution_order": 3,
+    "data_strategy": "positive_valid_create",
+    "edge_case_type": null,
+    "depends_on": [
+      "TC-TO-002"
+    ],
+    "payload": {
+      "Pillar": "Environmental Impact",
+      "Topic": "Climate Change",
+      "Disclosure Code": "DISC-2025-001",
+      "Disclosure Name": "Direct GHG Emissions",
+      "Status": "Active"
+    }
+  }
+]

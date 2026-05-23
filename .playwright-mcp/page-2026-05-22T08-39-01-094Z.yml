@@ -1,0 +1,179 @@
+- generic [ref=e36]:
+  - generic [ref=e37]:
+    - generic [ref=e38]:
+      - generic [ref=e40]:
+        - img "Organization Logo" [ref=e42]
+        - button "Toggle" [ref=e43]:
+          - img "Toggle" [ref=e44] [cursor=pointer]
+      - generic [ref=e45]:
+        - heading "Main Menu" [level=3] [ref=e46]
+        - generic [ref=e47]:
+          - button "Dashboard" [ref=e50]:
+            - img [ref=e54]
+            - text: Dashboard
+          - button "Organizations" [ref=e61]:
+            - img [ref=e64]
+            - text: Organizations
+          - button "Subscription" [ref=e85]:
+            - img [ref=e88]
+            - text: Subscription
+          - generic [ref=e90]:
+            - generic [ref=e91]:
+              - button "Indicator Repository" [ref=e92]:
+                - img [ref=e95]
+                - text: Indicator Repository
+              - generic:
+                - generic:
+                  - img
+            - generic [ref=e107]:
+              - button "Pillars" [ref=e109]: Pillars
+              - button "Topics" [ref=e112]: Topics
+              - button "Disclosure" [ref=e115]: Disclosure
+              - button "Metrics" [ref=e118]: Metrics
+              - button "Data Points" [ref=e121]: Data Points
+          - generic [ref=e123]:
+            - generic [ref=e124]:
+              - button "Peoples" [ref=e125]:
+                - img [ref=e128]
+                - text: Peoples
+              - generic:
+                - generic:
+                  - img
+            - button "Internal User" [ref=e134]: Internal User
+          - generic [ref=e136]:
+            - generic [ref=e137]:
+              - button "Roles & Permissions" [ref=e138]:
+                - img [ref=e141]
+                - text: Roles & Permissions
+              - generic:
+                - generic:
+                  - img
+            - generic [ref=e143]:
+              - button "Internal Roles" [ref=e145]: Internal Roles
+              - button "External Roles" [ref=e148]: External Roles
+          - generic [ref=e150]:
+            - generic [ref=e151]:
+              - button "Configuration" [ref=e152]:
+                - img [ref=e155]
+                - text: Configuration
+              - generic:
+                - generic:
+                  - img
+            - generic [ref=e160]:
+              - button "Branding & Theme" [ref=e162]: Branding & Theme
+              - button "Control Center" [ref=e165]: Control Center
+              - button "Unit Of Measurement" [ref=e168]: Unit Of Measurement
+              - button "Formula Builder" [ref=e171]: Formula Builder
+              - button "Framework Templates" [ref=e174]: Framework Templates
+      - generic [ref=e176]:
+        - button "Logout" [ref=e180]:
+          - img [ref=e183]
+          - text: Logout
+        - generic [ref=e187]:
+          - paragraph [ref=e189]: S
+          - generic [ref=e190]:
+            - paragraph [ref=e191]: SUPER ADMIN
+            - paragraph [ref=e192]: saikirrug9+123@gmail.com
+    - generic [ref=e193]:
+      - banner [ref=e195]:
+        - generic [ref=e197]:
+          - heading "Dashboard" [level=1] [ref=e198]
+          - paragraph [ref=e199]: Overview of your dashboard and key metrics.
+      - main [ref=e200]:
+        - generic [ref=e201]:
+          - generic [ref=e202]:
+            - generic [ref=e204]:
+              - heading "Indicator Repository" [level=2] [ref=e205]
+              - paragraph [ref=e206]: An overview of all your ESG reporting elements, including pillars, topics, metrics, and data points.
+            - generic [ref=e208]:
+              - generic [ref=e210]:
+                - generic [ref=e211]:
+                  - heading "29" [level=3] [ref=e212]
+                  - paragraph [ref=e213]: Pillars
+                - img [ref=e216]
+              - generic [ref=e219]:
+                - generic [ref=e220]:
+                  - heading "29" [level=3] [ref=e221]
+                  - paragraph [ref=e222]: Topics
+                - img [ref=e225]
+              - generic [ref=e228]:
+                - generic [ref=e229]:
+                  - heading "35" [level=3] [ref=e230]
+                  - paragraph [ref=e231]: Disclosure
+                - img [ref=e234]
+              - generic [ref=e237]:
+                - generic [ref=e238]:
+                  - heading "29" [level=3] [ref=e239]
+                  - paragraph [ref=e240]: Metrics
+                - img [ref=e243]
+              - generic [ref=e246]:
+                - generic [ref=e247]:
+                  - heading "13" [level=3] [ref=e248]
+                  - paragraph [ref=e249]: Data Points
+                - img [ref=e253]
+          - generic [ref=e255]:
+            - generic [ref=e257]:
+              - heading "Organizations Details & Status" [level=2] [ref=e258]
+              - paragraph [ref=e259]: Track the total number of organizations, and monitor their current onboarding statuses.
+            - generic [ref=e260]:
+              - generic [ref=e262]:
+                - generic [ref=e264]:
+                  - generic [ref=e265]:
+                    - application [ref=e268]
+                    - generic:
+                      - paragraph: Organizations Status
+                  - generic [ref=e282]:
+                    - heading "Organizations Status" [level=3] [ref=e283]
+                    - generic [ref=e284]:
+                      - generic [ref=e287]: Active
+                      - generic [ref=e288]: "416"
+                    - generic [ref=e289]:
+                      - generic [ref=e292]: Pending
+                      - generic [ref=e293]: "151"
+                    - generic [ref=e294]:
+                      - generic [ref=e297]: Inactive
+                      - generic [ref=e298]: "39"
+                - generic [ref=e300]:
+                  - generic [ref=e301]:
+                    - heading "606" [level=3] [ref=e302]
+                    - paragraph [ref=e303]: Total Organizations
+                  - img [ref=e306]
+              - separator [ref=e308]
+          - generic [ref=e309]:
+            - generic [ref=e310]:
+              - generic [ref=e311]:
+                - heading "Recent FrameWorks" [level=2] [ref=e312]
+                - paragraph [ref=e313]: View and access the most recently created or updated reporting frameworks.
+              - link "View more frameworks" [ref=e315] [cursor=pointer]:
+                - /url: /configuration/framework
+                - text: View more frameworks
+                - img [ref=e316]
+            - generic [ref=e319]:
+              - generic [ref=e320]:
+                - generic [ref=e321]:
+                  - generic [ref=e322]: T
+                  - generic [ref=e323]: Active
+                - generic [ref=e324]:
+                  - heading "Time Check 01" [level=4] [ref=e326]
+                  - paragraph [ref=e327]: Custom
+              - generic [ref=e328]:
+                - generic [ref=e329]:
+                  - generic [ref=e330]: T
+                  - generic [ref=e331]: Active
+                - generic [ref=e332]:
+                  - heading "Time Check 02" [level=4] [ref=e334]
+                  - paragraph [ref=e335]: Custom
+              - generic [ref=e336]:
+                - generic [ref=e337]:
+                  - generic [ref=e338]: T
+                  - generic [ref=e339]: Active
+                - generic [ref=e340]:
+                  - heading "Test 01" [level=4] [ref=e342]
+                  - paragraph [ref=e343]: Custom
+  - alert [ref=e345]:
+    - button "Close notification" [ref=e346] [cursor=pointer]:
+      - img [ref=e348]
+    - img [ref=e352]
+    - generic [ref=e358]:
+      - generic [ref=e359]: Login successful
+      - generic [ref=e360]: Success

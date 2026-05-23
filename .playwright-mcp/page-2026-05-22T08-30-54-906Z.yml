@@ -1,0 +1,15 @@
+- generic [ref=e3]:
+  - generic:
+    - generic: "!"
+    - generic: "!"
+  - generic [ref=e4]:
+    - img [ref=e7]
+    - heading "Something went wrong" [level=1] [ref=e12]
+    - generic [ref=e13]:
+      - paragraph [ref=e14]: We're having a little trouble loading this page right now.
+      - paragraph [ref=e15]: Don’t worry — you can try again or go back to your previous page.
+      - paragraph [ref=e16]: Redirecting you automatically in 9 seconds...
+    - generic [ref=e17]:
+      - button "Try Again" [ref=e18]
+      - button "Go Back" [ref=e19]
+  - generic [ref=e20]: System Interruption • 500

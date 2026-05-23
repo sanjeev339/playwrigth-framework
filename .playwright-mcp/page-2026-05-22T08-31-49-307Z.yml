@@ -1,0 +1,526 @@
+- generic [ref=e1]:
+  - generic [ref=e319]:
+    - generic [ref=e320]:
+      - generic [ref=e322]:
+        - img "Organization Logo" [ref=e324]
+        - button "Toggle" [ref=e325]:
+          - img "Toggle" [ref=e326] [cursor=pointer]
+      - generic [ref=e327]:
+        - heading "Main Menu" [level=3] [ref=e328]
+        - generic [ref=e329]:
+          - button "Dashboard" [ref=e332]:
+            - img [ref=e335]
+            - text: Dashboard
+          - button "Organizations" [ref=e342]:
+            - img [ref=e345]
+            - text: Organizations
+          - button "Subscription" [ref=e366]:
+            - img [ref=e369]
+            - text: Subscription
+          - generic [ref=e371]:
+            - generic [ref=e372]:
+              - button "Indicator Repository" [ref=e373]:
+                - img [ref=e377]
+                - text: Indicator Repository
+              - generic:
+                - generic:
+                  - img
+            - generic [ref=e390]:
+              - button "Pillars" [ref=e393]: Pillars
+              - button "Topics" [ref=e396]: Topics
+              - button "Disclosure" [ref=e399]: Disclosure
+              - button "Metrics" [ref=e402]: Metrics
+              - button "Data Points" [ref=e405]: Data Points
+          - generic [ref=e407]:
+            - generic [ref=e408]:
+              - button "Peoples" [ref=e409]:
+                - img [ref=e412]
+                - text: Peoples
+              - generic:
+                - generic:
+                  - img
+            - button "Internal User" [ref=e418]: Internal User
+          - generic [ref=e420]:
+            - generic [ref=e421]:
+              - button "Roles & Permissions" [ref=e422]:
+                - img [ref=e425]
+                - text: Roles & Permissions
+              - generic:
+                - generic:
+                  - img
+            - generic [ref=e427]:
+              - button "Internal Roles" [ref=e429]: Internal Roles
+              - button "External Roles" [ref=e432]: External Roles
+          - generic [ref=e434]:
+            - generic [ref=e435]:
+              - button "Configuration" [ref=e436]:
+                - img [ref=e439]
+                - text: Configuration
+              - generic:
+                - generic:
+                  - img
+            - generic [ref=e444]:
+              - button "Branding & Theme" [ref=e446]: Branding & Theme
+              - button "Control Center" [ref=e449]: Control Center
+              - button "Unit Of Measurement" [ref=e452]: Unit Of Measurement
+              - button "Formula Builder" [ref=e455]: Formula Builder
+              - button "Framework Templates" [ref=e458]: Framework Templates
+      - generic [ref=e460]:
+        - button "Logout" [ref=e464]:
+          - img [ref=e467]
+          - text: Logout
+        - generic [ref=e471]:
+          - paragraph [ref=e473]: S
+          - generic [ref=e474]:
+            - paragraph [ref=e475]: SUPER ADMIN
+            - paragraph [ref=e476]: saikirrug9+123@gmail.com
+    - generic [ref=e477]:
+      - banner [ref=e479]:
+        - generic [ref=e481]:
+          - heading "Indicator Repository" [level=1] [ref=e482]
+          - paragraph [ref=e483]: Central registry for Indicator Repository items, evidence and framework mappings.
+      - main [ref=e484]:
+        - generic [ref=e485]:
+          - generic [ref=e489]:
+            - button "Pillars" [ref=e490] [cursor=pointer]
+            - button "Audit Log" [ref=e491] [cursor=pointer]
+          - generic [ref=e492]:
+            - generic [ref=e493]:
+              - heading "Catalog and manage Indicator Repository items" [level=1] [ref=e494]
+              - generic [ref=e495]:
+                - button " Manage List" [ref=e497] [cursor=pointer]:
+                  - generic [ref=e498]:
+                    - generic [ref=e500]: 
+                    - generic [ref=e501]: Manage List
+                - button " New Pillar" [active] [ref=e503] [cursor=pointer]:
+                  - generic [ref=e504]:
+                    - generic [ref=e506]: 
+                    - generic [ref=e507]: New Pillar
+            - generic [ref=e509]:
+              - generic [ref=e512]:
+                - generic [ref=e513]:
+                  - generic [ref=e514]: 
+                  - searchbox "Search by Pillar Name" [ref=e515]
+                - generic [ref=e516]: 0/50
+              - generic [ref=e517]:
+                - generic [ref=e521] [cursor=pointer]:
+                  - generic:
+                    - textbox
+                  - generic:
+                    - combobox:
+                      - option "Filter" [selected]
+                  - generic [ref=e523]:
+                    - img [ref=e526]
+                    - generic [ref=e528]: Filter
+                  - button "Filter" [ref=e529]:
+                    - generic [ref=e1016]: 
+                - button "Reset" [ref=e532] [cursor=pointer]:
+                  - generic [ref=e533]:
+                    - img [ref=e536]
+                    - generic [ref=e539]: Reset
+            - generic [ref=e540]:
+              - generic [ref=e541]:
+                - button "View P1619 pillar details" [ref=e543] [cursor=pointer]:
+                  - generic [ref=e544]:
+                    - generic [ref=e545]:
+                      - generic [ref=e547]: P
+                      - generic [ref=e548]:
+                        - heading "P1619" [level=3] [ref=e549]: P1619
+                        - paragraph [ref=e551]: 0 Topics
+                    - button "" [ref=e552]:
+                      - button "" [ref=e554]:
+                        - generic [ref=e557]: 
+                  - generic [ref=e558]:
+                    - generic [ref=e559]:
+                      - generic [ref=e560]: Active
+                      - generic [ref=e561]: System
+                    - generic [ref=e562]:
+                      - paragraph [ref=e563]: "Updated:"
+                      - paragraph [ref=e564]: 2026-05-11, 14:38
+                - button "View P5163 pillar details" [ref=e566] [cursor=pointer]:
+                  - generic [ref=e567]:
+                    - generic [ref=e568]:
+                      - generic [ref=e570]: P
+                      - generic [ref=e571]:
+                        - heading "P5163" [level=3] [ref=e572]: P5163
+                        - paragraph [ref=e574]: 0 Topics
+                    - button "" [ref=e575]:
+                      - button "" [ref=e577]:
+                        - generic [ref=e580]: 
+                  - generic [ref=e581]:
+                    - generic [ref=e582]:
+                      - generic [ref=e583]: Active
+                      - generic [ref=e584]: System
+                    - generic [ref=e585]:
+                      - paragraph [ref=e586]: "Updated:"
+                      - paragraph [ref=e587]: 2026-05-11, 14:37
+                - button "View P4778 pillar details" [ref=e589] [cursor=pointer]:
+                  - generic [ref=e590]:
+                    - generic [ref=e591]:
+                      - generic [ref=e593]: P
+                      - generic [ref=e594]:
+                        - heading "P4778" [level=3] [ref=e595]: P4778
+                        - paragraph [ref=e597]: 0 Topics
+                    - button "" [ref=e598]:
+                      - button "" [ref=e600]:
+                        - generic [ref=e603]: 
+                  - generic [ref=e604]:
+                    - generic [ref=e605]:
+                      - generic [ref=e606]: Active
+                      - generic [ref=e607]: System
+                    - generic [ref=e608]:
+                      - paragraph [ref=e609]: "Updated:"
+                      - paragraph [ref=e610]: 2026-05-08, 15:37
+                - button "View P3581 pillar details" [ref=e612] [cursor=pointer]:
+                  - generic [ref=e613]:
+                    - generic [ref=e614]:
+                      - generic [ref=e616]: P
+                      - generic [ref=e617]:
+                        - heading "P3581" [level=3] [ref=e618]: P3581
+                        - paragraph [ref=e620]: 0 Topics
+                    - button "" [ref=e621]:
+                      - button "" [ref=e623]:
+                        - generic [ref=e626]: 
+                  - generic [ref=e627]:
+                    - generic [ref=e628]:
+                      - generic [ref=e629]: Active
+                      - generic [ref=e630]: System
+                    - generic [ref=e631]:
+                      - paragraph [ref=e632]: "Updated:"
+                      - paragraph [ref=e633]: 2026-05-08, 15:36
+                - button "View P8065 pillar details" [ref=e635] [cursor=pointer]:
+                  - generic [ref=e636]:
+                    - generic [ref=e637]:
+                      - generic [ref=e639]: P
+                      - generic [ref=e640]:
+                        - heading "P8065" [level=3] [ref=e641]: P8065
+                        - paragraph [ref=e643]: 0 Topics
+                    - button "" [ref=e644]:
+                      - button "" [ref=e646]:
+                        - generic [ref=e649]: 
+                  - generic [ref=e650]:
+                    - generic [ref=e651]:
+                      - generic [ref=e652]: Active
+                      - generic [ref=e653]: System
+                    - generic [ref=e654]:
+                      - paragraph [ref=e655]: "Updated:"
+                      - paragraph [ref=e656]: 2026-05-08, 15:29
+                - button "View 4 chars pillar details" [ref=e658] [cursor=pointer]:
+                  - generic [ref=e659]:
+                    - generic [ref=e660]:
+                      - generic [ref=e662]: "4"
+                      - generic [ref=e663]:
+                        - heading "4 chars" [level=3] [ref=e664]: 4 chars
+                        - paragraph [ref=e666]: 1 Topics
+                    - button "" [ref=e667]:
+                      - button "" [ref=e669]:
+                        - generic [ref=e672]: 
+                  - generic [ref=e673]:
+                    - generic [ref=e674]:
+                      - generic [ref=e675]: Active
+                      - generic [ref=e676]: System
+                    - generic [ref=e677]:
+                      - paragraph [ref=e678]: "Updated:"
+                      - paragraph [ref=e679]: 2026-05-08, 11:26
+                - button "View fff pillar details" [ref=e681] [cursor=pointer]:
+                  - generic [ref=e682]:
+                    - generic [ref=e683]:
+                      - generic [ref=e685]: F
+                      - generic [ref=e686]:
+                        - heading "fff" [level=3] [ref=e687]: fff
+                        - paragraph [ref=e689]: 0 Topics
+                    - button "" [ref=e690]:
+                      - button "" [ref=e692]:
+                        - generic [ref=e695]: 
+                  - generic [ref=e696]:
+                    - generic [ref=e697]:
+                      - generic [ref=e698]: Active
+                      - generic [ref=e699]: System
+                    - generic [ref=e700]:
+                      - paragraph [ref=e701]: "Updated:"
+                      - paragraph [ref=e702]: 2026-04-17, 10:13
+                - button "View karupuu pillar details" [ref=e704] [cursor=pointer]:
+                  - generic [ref=e705]:
+                    - generic [ref=e706]:
+                      - img "karupuu" [ref=e708]
+                      - generic [ref=e709]:
+                        - heading "karupuu" [level=3] [ref=e710]: karupuu
+                        - paragraph [ref=e712]: 0 Topics
+                    - button "" [ref=e713]:
+                      - button "" [ref=e715]:
+                        - generic [ref=e718]: 
+                  - generic [ref=e719]:
+                    - generic [ref=e720]:
+                      - generic [ref=e721]: Active
+                      - generic [ref=e722]: System
+                    - generic [ref=e723]:
+                      - paragraph [ref=e724]: "Updated:"
+                      - paragraph [ref=e725]: 2026-03-24, 13:49
+                - button "View Comradxxxx pillar details" [ref=e727] [cursor=pointer]:
+                  - generic [ref=e728]:
+                    - generic [ref=e729]:
+                      - img "Comradxxxx" [ref=e731]
+                      - generic [ref=e732]:
+                        - heading "Comradxxxx" [level=3] [ref=e733]: Comradxxxx
+                        - paragraph [ref=e735]: 0 Topics
+                    - button "" [ref=e736]:
+                      - button "" [ref=e738]:
+                        - generic [ref=e741]: 
+                  - generic [ref=e742]:
+                    - generic [ref=e743]:
+                      - generic [ref=e744]: Active
+                      - generic [ref=e745]: System
+                    - generic [ref=e746]:
+                      - paragraph [ref=e747]: "Updated:"
+                      - paragraph [ref=e748]: 2026-03-24, 13:35
+                - button "View acddddzzz pillar details" [ref=e750] [cursor=pointer]:
+                  - generic [ref=e751]:
+                    - generic [ref=e752]:
+                      - img "acddddzzz" [ref=e754]
+                      - generic [ref=e755]:
+                        - heading "acddddzzz" [level=3] [ref=e756]: acddddzzz
+                        - paragraph [ref=e758]: 0 Topics
+                    - button "" [ref=e759]:
+                      - button "" [ref=e761]:
+                        - generic [ref=e764]: 
+                  - generic [ref=e765]:
+                    - generic [ref=e766]:
+                      - generic [ref=e767]: Active
+                      - generic [ref=e768]: System
+                    - generic [ref=e769]:
+                      - paragraph [ref=e770]: "Updated:"
+                      - paragraph [ref=e771]: 2026-03-24, 13:30
+                - button "View abcddddd pillar details" [ref=e773] [cursor=pointer]:
+                  - generic [ref=e774]:
+                    - generic [ref=e775]:
+                      - img "abcddddd" [ref=e777]
+                      - generic [ref=e778]:
+                        - heading "abcddddd" [level=3] [ref=e779]: abcddddd
+                        - paragraph [ref=e781]: 0 Topics
+                    - button "" [ref=e782]:
+                      - button "" [ref=e784]:
+                        - generic [ref=e787]: 
+                  - generic [ref=e788]:
+                    - generic [ref=e789]:
+                      - generic [ref=e790]: Active
+                      - generic [ref=e791]: System
+                    - generic [ref=e792]:
+                      - paragraph [ref=e793]: "Updated:"
+                      - paragraph [ref=e794]: 2026-03-24, 13:03
+                - button "View amss pillar details" [ref=e796] [cursor=pointer]:
+                  - generic [ref=e797]:
+                    - generic [ref=e798]:
+                      - img "amss" [ref=e800]
+                      - generic [ref=e801]:
+                        - heading "amss" [level=3] [ref=e802]: amss
+                        - paragraph [ref=e804]: 0 Topics
+                    - button "" [ref=e805]:
+                      - button "" [ref=e807]:
+                        - generic [ref=e810]: 
+                  - generic [ref=e811]:
+                    - generic [ref=e812]:
+                      - generic [ref=e813]: Active
+                      - generic [ref=e814]: System
+                    - generic [ref=e815]:
+                      - paragraph [ref=e816]: "Updated:"
+                      - paragraph [ref=e817]: 2026-03-18, 14:13
+                - button "View Mohan@1 pillar details" [ref=e819] [cursor=pointer]:
+                  - generic [ref=e820]:
+                    - generic [ref=e821]:
+                      - img "Mohan@1" [ref=e823]
+                      - generic [ref=e824]:
+                        - heading "Mohan@1" [level=3] [ref=e825]: Mohan@1
+                        - paragraph [ref=e827]: 0 Topics
+                    - button "" [ref=e828]:
+                      - button "" [ref=e830]:
+                        - generic [ref=e833]: 
+                  - generic [ref=e834]:
+                    - generic [ref=e835]:
+                      - generic [ref=e836]: Active
+                      - generic [ref=e837]: System
+                    - generic [ref=e838]:
+                      - paragraph [ref=e839]: "Updated:"
+                      - paragraph [ref=e840]: 2026-03-18, 14:13
+                - button "View aad pillar details" [ref=e842] [cursor=pointer]:
+                  - generic [ref=e843]:
+                    - generic [ref=e844]:
+                      - img "aad" [ref=e846]
+                      - generic [ref=e847]:
+                        - heading "aad" [level=3] [ref=e848]: aad
+                        - paragraph [ref=e850]: 0 Topics
+                    - button "" [ref=e851]:
+                      - button "" [ref=e853]:
+                        - generic [ref=e856]: 
+                  - generic [ref=e857]:
+                    - generic [ref=e858]:
+                      - generic [ref=e859]: Active
+                      - generic [ref=e860]: System
+                    - generic [ref=e861]:
+                      - paragraph [ref=e862]: "Updated:"
+                      - paragraph [ref=e863]: 2026-03-18, 14:04
+                - button "View ghfh pillar details" [ref=e865] [cursor=pointer]:
+                  - generic [ref=e866]:
+                    - generic [ref=e867]:
+                      - img "ghfh" [ref=e869]
+                      - generic [ref=e870]:
+                        - heading "ghfh" [level=3] [ref=e871]: ghfh
+                        - paragraph [ref=e873]: 0 Topics
+                    - button "" [ref=e874]:
+                      - button "" [ref=e876]:
+                        - generic [ref=e879]: 
+                  - generic [ref=e880]:
+                    - generic [ref=e881]:
+                      - generic [ref=e882]: Active
+                      - generic [ref=e883]: System
+                    - generic [ref=e884]:
+                      - paragraph [ref=e885]: "Updated:"
+                      - paragraph [ref=e886]: 2026-03-18, 14:01
+                - button "View pillar og pillar details" [ref=e888] [cursor=pointer]:
+                  - generic [ref=e889]:
+                    - generic [ref=e890]:
+                      - img "pillar og" [ref=e892]
+                      - generic [ref=e893]:
+                        - heading "pillar og" [level=3] [ref=e894]: pillar og
+                        - paragraph [ref=e896]: 0 Topics
+                    - button "" [ref=e897]:
+                      - button "" [ref=e899]:
+                        - generic [ref=e902]: 
+                  - generic [ref=e903]:
+                    - generic [ref=e904]:
+                      - generic [ref=e905]: Active
+                      - generic [ref=e906]: System
+                    - generic [ref=e907]:
+                      - paragraph [ref=e908]: "Updated:"
+                      - paragraph [ref=e909]: 2026-03-18, 13:48
+                - button "View Environmental pillar details" [ref=e911] [cursor=pointer]:
+                  - generic [ref=e912]:
+                    - generic [ref=e913]:
+                      - generic [ref=e915]: E
+                      - generic [ref=e916]:
+                        - heading "Environmental" [level=3] [ref=e917]: Environmental
+                        - paragraph [ref=e919]: 5 Topics
+                    - button "" [ref=e920]:
+                      - button "" [ref=e922]:
+                        - generic [ref=e925]: 
+                  - generic [ref=e926]:
+                    - generic [ref=e927]:
+                      - generic [ref=e928]: Active
+                      - generic [ref=e929]: Custom
+                    - generic [ref=e930]:
+                      - paragraph [ref=e931]: "Updated:"
+                      - paragraph [ref=e932]: "-"
+                - button "View pillar details" [ref=e934] [cursor=pointer]:
+                  - button "" [ref=e939]:
+                    - button "" [ref=e941]:
+                      - generic [ref=e944]: 
+                  - generic [ref=e945]:
+                    - generic [ref=e946]:
+                      - generic [ref=e947]: Active
+                      - generic [ref=e948]: Custom
+                    - generic [ref=e949]:
+                      - paragraph [ref=e950]: "Updated:"
+                      - paragraph [ref=e951]: "-"
+                - button "View Governance pillar details" [ref=e953] [cursor=pointer]:
+                  - generic [ref=e954]:
+                    - generic [ref=e955]:
+                      - img "Governance" [ref=e957]
+                      - generic [ref=e958]:
+                        - heading "Governance" [level=3] [ref=e959]: Governance
+                        - paragraph [ref=e961]: 12 Topics
+                    - button "" [ref=e962]:
+                      - button "" [ref=e964]:
+                        - generic [ref=e967]: 
+                  - generic [ref=e968]:
+                    - generic [ref=e969]:
+                      - generic [ref=e970]: Active
+                      - generic [ref=e971]: System
+                    - generic [ref=e972]:
+                      - paragraph [ref=e973]: "Updated:"
+                      - paragraph [ref=e974]: 2026-03-18, 13:45
+                - button "View Environment pillar details" [ref=e976] [cursor=pointer]:
+                  - generic [ref=e977]:
+                    - generic [ref=e978]:
+                      - generic [ref=e980]: E
+                      - generic [ref=e981]:
+                        - heading "Environment" [level=3] [ref=e982]: Environment
+                        - paragraph [ref=e984]: 2 Topics
+                    - button "" [ref=e985]:
+                      - button "" [ref=e987]:
+                        - generic [ref=e990]: 
+                  - generic [ref=e991]:
+                    - generic [ref=e992]:
+                      - generic [ref=e993]: Active
+                      - generic [ref=e994]: Custom
+                    - generic [ref=e995]:
+                      - paragraph [ref=e996]: "Updated:"
+                      - paragraph [ref=e997]: "-"
+              - generic [ref=e999]:
+                - generic [ref=e1000]:
+                  - paragraph [ref=e1001]: Showing 20 of 26 Results
+                  - generic [ref=e1002] [cursor=pointer]:
+                    - generic:
+                      - textbox: 20/Page
+                    - generic:
+                      - combobox:
+                        - option "20/Page" [selected]
+                    - generic [ref=e1003]: 20/Page
+                    - button "" [ref=e1004]:
+                      - generic [ref=e1017]: 
+                - generic [ref=e1006]:
+                  - button "First Page" [disabled]:
+                    - img
+                  - button "Previous Page" [disabled]:
+                    - img
+                  - generic [ref=e1007]:
+                    - button "Page 1" [ref=e1008] [cursor=pointer]: "1"
+                    - button "Page 2" [ref=e1009] [cursor=pointer]: "2"
+                  - button "Next Page" [ref=e1010] [cursor=pointer]:
+                    - img [ref=e1011]
+                  - button "Last Page" [ref=e1013] [cursor=pointer]:
+                    - img [ref=e1014]
+  - complementary [ref=e1019]:
+    - generic [ref=e1021]:
+      - button "Back" [ref=e1022] [cursor=pointer]:
+        - img [ref=e1024]
+        - generic [ref=e1026]: Back
+      - heading "Add New Pillar" [level=2] [ref=e1029]
+    - generic [ref=e1030]:
+      - generic [ref=e1032]:
+        - generic [ref=e1033]:
+          - generic [ref=e1034]:
+            - text: Pillar Name
+            - text: "*"
+          - textbox "Pillar Name *" [ref=e1036]:
+            - /placeholder: Pillar Name
+        - generic [ref=e1037]:
+          - generic [ref=e1038]: Description
+          - textbox "Type..." [ref=e1039]
+        - generic [ref=e1040]:
+          - generic [ref=e1041]: Pillar Icon
+          - generic [ref=e1042]:
+            - generic [ref=e1045] [cursor=pointer]:
+              - generic [ref=e1046]: Upload Image
+              - generic [ref=e1047]:
+                - img [ref=e1048]
+                - generic [ref=e1050]: Upload
+            - generic [ref=e1051]:
+              - img [ref=e1053]
+              - generic [ref=e1058]: Upload only SVG file
+        - generic [ref=e1060]:
+          - generic [ref=e1061]: Primary Color
+          - textbox "Enter color code" [ref=e1067]: "#2563EB"
+        - generic [ref=e1069] [cursor=pointer]:
+          - generic [ref=e1070]:
+            - checkbox "Add Next Pillar" [ref=e1071]
+            - img
+            - img
+          - generic [ref=e1072]: Add Next Pillar
+      - generic [ref=e1075]:
+        - button "Cancel" [ref=e1076] [cursor=pointer]:
+          - generic [ref=e1077]:
+            - img [ref=e1080]
+            - generic [ref=e1082]: Cancel
+        - button "Save " [ref=e1083] [cursor=pointer]:
+          - generic [ref=e1084]:
+            - generic [ref=e1085]: Save
+            - generic [ref=e1087]: 

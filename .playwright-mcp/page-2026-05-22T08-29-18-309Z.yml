@@ -1,0 +1,30 @@
+- generic [ref=e3]:
+  - img "Robotic Arm" [ref=e6]
+  - generic [ref=e9]:
+    - generic [ref=e10]:
+      - img [ref=e13]
+      - generic [ref=e16]: ROBOLAB
+    - generic [ref=e17]:
+      - heading "Welcome Back!" [level=1] [ref=e18]
+      - paragraph [ref=e19]: Please enter your Details to Login
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - text: Email Address
+          - text: "*"
+        - textbox "Email Address *" [ref=e25]:
+          - /placeholder: Enter your Email
+      - generic [ref=e26]:
+        - generic [ref=e27]:
+          - text: Password
+          - text: "*"
+        - generic [ref=e29]:
+          - textbox "Password *" [ref=e30]:
+            - /placeholder: Enter your Password
+          - img [ref=e33] [cursor=pointer]
+      - link "Forgot Password?" [ref=e36] [cursor=pointer]:
+        - /url: /login/forgot-password
+      - button "Login" [ref=e38] [cursor=pointer]:
+        - generic [ref=e39]:
+          - generic [ref=e40]: Login
+          - img [ref=e43]

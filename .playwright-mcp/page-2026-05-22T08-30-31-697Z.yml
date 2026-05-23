@@ -1,0 +1,83 @@
+- generic [ref=e36]:
+  - generic [ref=e37]:
+    - generic [ref=e38]:
+      - generic [ref=e40]:
+        - img "Toggle" [ref=e42] [cursor=pointer]
+        - button "Toggle" [ref=e43]:
+          - img "Toggle" [ref=e44] [cursor=pointer]
+      - generic [ref=e45]:
+        - heading "Main Menu" [level=3] [ref=e46]
+        - button "Dashboard" [ref=e50]:
+          - img [ref=e54]
+          - text: Dashboard
+      - generic [ref=e59]:
+        - button "Logout" [ref=e63]:
+          - img [ref=e66]
+          - text: Logout
+        - generic [ref=e70]:
+          - paragraph [ref=e72]: S
+          - generic [ref=e73]:
+            - paragraph [ref=e74]: SUPER ADMIN
+            - paragraph [ref=e75]: saikirrug9+123@gmail.com
+    - generic [ref=e76]:
+      - banner [ref=e78]:
+        - generic [ref=e80]:
+          - heading "Dashboard" [level=1] [ref=e81]
+          - paragraph [ref=e82]: Overview of your dashboard and key metrics.
+      - main [ref=e83]:
+        - generic [ref=e84]:
+          - generic [ref=e85]:
+            - generic [ref=e87]:
+              - heading "Indicator Repository" [level=2] [ref=e88]
+              - paragraph [ref=e89]: An overview of all your ESG reporting elements, including pillars, topics, metrics, and data points.
+            - generic [ref=e91]:
+              - generic [ref=e93]:
+                - generic [ref=e94]:
+                  - heading "0" [level=3] [ref=e95]
+                  - paragraph [ref=e96]: Pillars
+                - img [ref=e99]
+              - generic [ref=e102]:
+                - generic [ref=e103]:
+                  - heading "0" [level=3] [ref=e104]
+                  - paragraph [ref=e105]: Topics
+                - img [ref=e108]
+              - generic [ref=e111]:
+                - generic [ref=e112]:
+                  - heading "0" [level=3] [ref=e113]
+                  - paragraph [ref=e114]: Disclosure
+                - img [ref=e117]
+              - generic [ref=e120]:
+                - generic [ref=e121]:
+                  - heading "0" [level=3] [ref=e122]
+                  - paragraph [ref=e123]: Metrics
+                - img [ref=e126]
+              - generic [ref=e129]:
+                - generic [ref=e130]:
+                  - heading "0" [level=3] [ref=e131]
+                  - paragraph [ref=e132]: Data Points
+                - img [ref=e136]
+          - generic [ref=e138]:
+            - generic [ref=e140]:
+              - heading "Organizations Details & Status" [level=2] [ref=e141]
+              - paragraph [ref=e142]: Track the total number of organizations, and monitor their current onboarding statuses.
+            - generic [ref=e143]:
+              - generic [ref=e145]:
+                - generic [ref=e146]: No organization status data available
+                - generic [ref=e148]:
+                  - generic [ref=e149]:
+                    - heading "0" [level=3] [ref=e150]
+                    - paragraph [ref=e151]: Total Organizations
+                  - img [ref=e154]
+              - separator [ref=e156]
+          - generic [ref=e157]:
+            - generic [ref=e159]:
+              - heading "Recent FrameWorks" [level=2] [ref=e160]
+              - paragraph [ref=e161]: View and access the most recently created or updated reporting frameworks.
+            - paragraph [ref=e165]: No Framework Published Yet
+  - alert [ref=e167]:
+    - button "Close notification" [ref=e168] [cursor=pointer]:
+      - img [ref=e170]
+    - img [ref=e174]
+    - generic [ref=e180]:
+      - generic [ref=e181]: Login successful
+      - generic [ref=e182]: Success

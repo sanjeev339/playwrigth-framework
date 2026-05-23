@@ -18,10 +18,10 @@ try {
 
 export class ConfigManager {
     static readonly ENV = ENV;
-    static readonly BASE_URL = jsonConfig.baseUrl || process.env.BASE_URL;
-    static readonly USERNAME = jsonConfig.users?.admin?.username || process.env.USERNAME;
-    static readonly PASSWORD = jsonConfig.users?.admin?.password || process.env.PASSWORD;
-    static readonly TIMEOUT = jsonConfig.timeouts?.default || parseInt(process.env.TIMEOUT || '30000');
+    static readonly BASE_URL = process.env.BASE_URL || jsonConfig.baseUrl;
+    static readonly USERNAME = process.env.USERNAME || jsonConfig.users?.admin?.username;
+    static readonly PASSWORD = process.env.PASSWORD || jsonConfig.users?.admin?.password;
+    static readonly TIMEOUT = parseInt(process.env.TIMEOUT || '', 10) || jsonConfig.timeouts?.default || 30000;
 
     static getEnvConfig() {
         return jsonConfig;

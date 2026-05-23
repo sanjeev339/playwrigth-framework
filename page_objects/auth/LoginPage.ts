@@ -16,8 +16,7 @@ export class LoginPage extends BasePage {
         this.passwordInput = page.locator('input[name="password"]');
         this.loginButton   = page.locator('button').filter({ hasText: /^Login$/ });
         this.errorToast    = page.locator('[class*="z-[10000]"]');
-        // h1 "Dashboard" is visible immediately after successful login
-        this.dashboardHeading = page.locator('h1').first();
+        this.dashboardHeading = page.getByRole('heading', { name: 'Dashboard' });
     }
 
     async goto(): Promise<void> {
@@ -53,10 +52,10 @@ export class LoginPage extends BasePage {
     }
 
     /**
-     * Waits up to 20 s for the post-login dashboard h1 to be visible.
-     * Uses a web-first assertion — no hard sleep required.
+     * Waits for a real authenticated shell signal after login.
      */
     async waitForPostLoginReady(): Promise<void> {
-        await this.dashboardHeading.waitFor({ state: 'visible', timeout: 20_000 });
+        await this.page.waitForURL(/\/dashboard\/?$/, { timeout: 30_000 });
+        await this.page.getByRole('button', { name: 'Logout' }).waitFor({ state: 'visible', timeout: 20_000 });
     }
 }

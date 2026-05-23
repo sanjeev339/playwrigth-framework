@@ -1,0 +1,531 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - img "Organization Logo" [ref=e8]
+      - button "Toggle" [ref=e9]:
+        - img "Toggle" [ref=e10] [cursor=pointer]
+    - generic [ref=e11]:
+      - heading "Main Menu" [level=3] [ref=e12]
+      - generic [ref=e13]:
+        - button "Dashboard" [ref=e16]:
+          - img [ref=e19]
+          - text: Dashboard
+        - button "Organizations" [ref=e26]:
+          - img [ref=e29]
+          - text: Organizations
+        - button "Subscription" [ref=e50]:
+          - img [ref=e53]
+          - text: Subscription
+        - generic [ref=e55]:
+          - generic [ref=e56]:
+            - button "Indicator Repository" [ref=e57]:
+              - img [ref=e61]
+              - text: Indicator Repository
+            - generic:
+              - generic:
+                - img
+          - generic [ref=e74]:
+            - button "Pillars" [ref=e77]: Pillars
+            - button "Topics" [ref=e80]: Topics
+            - button "Disclosure" [ref=e83]: Disclosure
+            - button "Metrics" [ref=e86]: Metrics
+            - button "Data Points" [ref=e89]: Data Points
+        - generic [ref=e91]:
+          - generic [ref=e92]:
+            - button "Peoples" [ref=e93]:
+              - img [ref=e96]
+              - text: Peoples
+            - generic:
+              - generic:
+                - img
+          - button "Internal User" [ref=e102]: Internal User
+        - generic [ref=e104]:
+          - generic [ref=e105]:
+            - button "Roles & Permissions" [ref=e106]:
+              - img [ref=e109]
+              - text: Roles & Permissions
+            - generic:
+              - generic:
+                - img
+          - generic [ref=e111]:
+            - button "Internal Roles" [ref=e113]: Internal Roles
+            - button "External Roles" [ref=e116]: External Roles
+        - generic [ref=e118]:
+          - generic [ref=e119]:
+            - button "Configuration" [ref=e120]:
+              - img [ref=e123]
+              - text: Configuration
+            - generic:
+              - generic:
+                - img
+          - generic [ref=e128]:
+            - button "Branding & Theme" [ref=e130]: Branding & Theme
+            - button "Control Center" [ref=e133]: Control Center
+            - button "Unit Of Measurement" [ref=e136]: Unit Of Measurement
+            - button "Formula Builder" [ref=e139]: Formula Builder
+            - button "Framework Templates" [ref=e142]: Framework Templates
+    - generic [ref=e144]:
+      - button "Logout" [ref=e148]:
+        - img [ref=e151]
+        - text: Logout
+      - generic [ref=e155]:
+        - paragraph [ref=e157]: S
+        - generic [ref=e158]:
+          - paragraph [ref=e159]: SUPER ADMIN
+          - paragraph [ref=e160]: saikirrug9+123@gmail.com
+  - generic [ref=e161]:
+    - banner [ref=e163]:
+      - generic [ref=e165]:
+        - heading "Disclosure" [level=1] [ref=e166]
+        - paragraph [ref=e167]: Central registry for Indicator Repository items, evidence and framework mappings.
+    - main [ref=e168]:
+      - generic [ref=e169]:
+        - generic [ref=e173]:
+          - button "Disclosures" [ref=e174] [cursor=pointer]
+          - button "Audit Log" [ref=e175] [cursor=pointer]
+        - generic [ref=e177]:
+          - generic [ref=e180]:
+            - generic [ref=e181]:
+              - generic [ref=e182]: 
+              - searchbox "Search by Disclosure Name" [ref=e183]
+            - generic [ref=e184]: 0/50
+          - generic [ref=e185]:
+            - button "Filters" [ref=e187] [cursor=pointer]:
+              - generic [ref=e188]:
+                - img [ref=e191]
+                - generic [ref=e193]: Filters
+            - button "Reset" [ref=e195] [cursor=pointer]:
+              - generic [ref=e196]:
+                - img [ref=e199]
+                - generic [ref=e202]: Reset
+            - button " Add New Disclosure" [ref=e204] [cursor=pointer]:
+              - generic [ref=e205]:
+                - generic [ref=e207]: 
+                - generic [ref=e208]: Add New Disclosure
+        - generic [ref=e210]:
+          - table [ref=e214]:
+            - rowgroup [ref=e215]:
+              - row "Action Disclosure Name Status Metrics Created At Last Modified Type" [ref=e216]:
+                - columnheader "Action" [ref=e217]:
+                  - generic [ref=e219]: Action
+                - columnheader "Disclosure Name" [ref=e220] [cursor=pointer]:
+                  - generic [ref=e221]:
+                    - generic [ref=e222]: Disclosure Name
+                    - img [ref=e225]
+                - columnheader "Status" [ref=e228]:
+                  - generic [ref=e230]: Status
+                - columnheader "Metrics" [ref=e231]:
+                  - generic [ref=e233]: Metrics
+                - columnheader "Created At" [ref=e234] [cursor=pointer]:
+                  - generic [ref=e235]:
+                    - generic [ref=e236]: Created At
+                    - img [ref=e239]
+                - columnheader "Last Modified" [ref=e242] [cursor=pointer]:
+                  - generic [ref=e243]:
+                    - generic [ref=e244]: Last Modified
+                    - img [ref=e247]
+                - columnheader "Type" [ref=e250]:
+                  - generic [ref=e252]: Type
+            - rowgroup [ref=e253]:
+              - row " 4th site 4th char Active 0 2026-05-08, 11:27 2026-05-08, 11:27 Custom" [ref=e254] [cursor=pointer]:
+                - cell "" [ref=e255]:
+                  - button "" [ref=e259]:
+                    - button "" [ref=e261]:
+                      - generic [ref=e264]: 
+                - cell "4th site 4th char" [ref=e265]:
+                  - generic [ref=e269]:
+                    - generic [ref=e273]: 4th site
+                    - generic [ref=e275]: 4th char
+                - cell "Active" [ref=e276]:
+                  - generic [ref=e278]: Active
+                - cell "0" [ref=e279]:
+                  - generic [ref=e282]: "0"
+                - cell "2026-05-08, 11:27" [ref=e283]:
+                  - generic [ref=e286]: 2026-05-08, 11:27
+                - cell "2026-05-08, 11:27" [ref=e287]:
+                  - generic [ref=e290]: 2026-05-08, 11:27
+                - cell "Custom" [ref=e291]:
+                  - generic [ref=e294]: Custom
+              - row " Address Location Active 1 - - Custom" [ref=e295] [cursor=pointer]:
+                - cell "" [ref=e296]:
+                  - button "" [ref=e300]:
+                    - button "" [ref=e302]:
+                      - generic [ref=e305]: 
+                - cell "Address Location" [ref=e306]:
+                  - generic [ref=e310]:
+                    - generic [ref=e313]: Address
+                    - generic [ref=e315]: Location
+                - cell "Active" [ref=e316]:
+                  - generic [ref=e318]: Active
+                - cell "1" [ref=e319]:
+                  - generic [ref=e322]: "1"
+                - cell "-" [ref=e323]:
+                  - generic [ref=e326]: "-"
+                - cell "-" [ref=e327]:
+                  - generic [ref=e330]: "-"
+                - cell "Custom" [ref=e331]:
+                  - generic [ref=e334]: Custom
+              - row " Audit Trail Audit Active 1 - - Custom" [ref=e335] [cursor=pointer]:
+                - cell "" [ref=e336]:
+                  - button "" [ref=e340]:
+                    - button "" [ref=e342]:
+                      - generic [ref=e345]: 
+                - cell "Audit Trail Audit" [ref=e346]:
+                  - generic [ref=e350]:
+                    - generic [ref=e353]: Audit Trail
+                    - generic [ref=e355]: Audit
+                - cell "Active" [ref=e356]:
+                  - generic [ref=e358]: Active
+                - cell "1" [ref=e359]:
+                  - generic [ref=e362]: "1"
+                - cell "-" [ref=e363]:
+                  - generic [ref=e366]: "-"
+                - cell "-" [ref=e367]:
+                  - generic [ref=e370]: "-"
+                - cell "Custom" [ref=e371]:
+                  - generic [ref=e374]: Custom
+              - row " Bands Energy Active 1 - 2026-03-18, 15:13 Custom" [ref=e375] [cursor=pointer]:
+                - cell "" [ref=e376]:
+                  - button "" [ref=e380]:
+                    - button "" [ref=e382]:
+                      - generic [ref=e385]: 
+                - cell "Bands Energy" [ref=e386]:
+                  - generic [ref=e390]:
+                    - generic [ref=e394]: Bands
+                    - generic [ref=e396]: Energy
+                - cell "Active" [ref=e397]:
+                  - generic [ref=e399]: Active
+                - cell "1" [ref=e400]:
+                  - generic [ref=e403]: "1"
+                - cell "-" [ref=e404]:
+                  - generic [ref=e407]: "-"
+                - cell "2026-03-18, 15:13" [ref=e408]:
+                  - generic [ref=e411]: 2026-03-18, 15:13
+                - cell "Custom" [ref=e412]:
+                  - generic [ref=e415]: Custom
+              - row " Board Composition Board Structure Active 0 - - Custom" [ref=e416] [cursor=pointer]:
+                - cell "" [ref=e417]:
+                  - button "" [ref=e421]:
+                    - button "" [ref=e423]:
+                      - generic [ref=e426]: 
+                - cell "Board Composition Board Structure" [ref=e427]:
+                  - generic [ref=e431]:
+                    - generic [ref=e434]: Board Composition
+                    - generic [ref=e436]: Board Structure
+                - cell "Active" [ref=e437]:
+                  - generic [ref=e439]: Active
+                - cell "0" [ref=e440]:
+                  - generic [ref=e443]: "0"
+                - cell "-" [ref=e444]:
+                  - generic [ref=e447]: "-"
+                - cell "-" [ref=e448]:
+                  - generic [ref=e451]: "-"
+                - cell "Custom" [ref=e452]:
+                  - generic [ref=e455]: Custom
+              - row " Carbon Emissions Active 1 - - Custom" [ref=e456] [cursor=pointer]:
+                - cell "" [ref=e457]:
+                  - button "" [ref=e461]:
+                    - button "" [ref=e463]:
+                      - generic [ref=e466]: 
+                - cell "Carbon Emissions" [ref=e467]:
+                  - generic [ref=e471]:
+                    - generic [ref=e474]: Carbon
+                    - generic [ref=e476]: Emissions
+                - cell "Active" [ref=e477]:
+                  - generic [ref=e479]: Active
+                - cell "1" [ref=e480]:
+                  - generic [ref=e483]: "1"
+                - cell "-" [ref=e484]:
+                  - generic [ref=e487]: "-"
+                - cell "-" [ref=e488]:
+                  - generic [ref=e491]: "-"
+                - cell "Custom" [ref=e492]:
+                  - generic [ref=e495]: Custom
+              - row " Charts Analytics Active 0 - - Custom" [ref=e496] [cursor=pointer]:
+                - cell "" [ref=e497]:
+                  - button "" [ref=e501]:
+                    - button "" [ref=e503]:
+                      - generic [ref=e506]: 
+                - cell "Charts Analytics" [ref=e507]:
+                  - generic [ref=e511]:
+                    - generic [ref=e514]: Charts
+                    - generic [ref=e516]: Analytics
+                - cell "Active" [ref=e517]:
+                  - generic [ref=e519]: Active
+                - cell "0" [ref=e520]:
+                  - generic [ref=e523]: "0"
+                - cell "-" [ref=e524]:
+                  - generic [ref=e527]: "-"
+                - cell "-" [ref=e528]:
+                  - generic [ref=e531]: "-"
+                - cell "Custom" [ref=e532]:
+                  - generic [ref=e535]: Custom
+              - row " Charts _________ Active 1 - - Custom" [ref=e536] [cursor=pointer]:
+                - cell "" [ref=e537]:
+                  - button "" [ref=e541]:
+                    - button "" [ref=e543]:
+                      - generic [ref=e546]: 
+                - cell "Charts _________" [ref=e547]:
+                  - generic [ref=e551]:
+                    - generic [ref=e554]: Charts
+                    - generic [ref=e556]: _________
+                - cell "Active" [ref=e557]:
+                  - generic [ref=e559]: Active
+                - cell "1" [ref=e560]:
+                  - generic [ref=e563]: "1"
+                - cell "-" [ref=e564]:
+                  - generic [ref=e567]: "-"
+                - cell "-" [ref=e568]:
+                  - generic [ref=e571]: "-"
+                - cell "Custom" [ref=e572]:
+                  - generic [ref=e575]: Custom
+              - row " CSR Investment Community Impact Active 1 - - Custom" [ref=e576] [cursor=pointer]:
+                - cell "" [ref=e577]:
+                  - button "" [ref=e581]:
+                    - button "" [ref=e583]:
+                      - generic [ref=e586]: 
+                - cell "CSR Investment Community Impact" [ref=e587]:
+                  - generic [ref=e591]:
+                    - generic [ref=e594]: CSR Investment
+                    - generic [ref=e596]: Community Impact
+                - cell "Active" [ref=e597]:
+                  - generic [ref=e599]: Active
+                - cell "1" [ref=e600]:
+                  - generic [ref=e603]: "1"
+                - cell "-" [ref=e604]:
+                  - generic [ref=e607]: "-"
+                - cell "-" [ref=e608]:
+                  - generic [ref=e611]: "-"
+                - cell "Custom" [ref=e612]:
+                  - generic [ref=e615]: Custom
+              - row " CSR Investment Community Active 1 - - Custom" [ref=e616] [cursor=pointer]:
+                - cell "" [ref=e617]:
+                  - button "" [ref=e621]:
+                    - button "" [ref=e623]:
+                      - generic [ref=e626]: 
+                - cell "CSR Investment Community" [ref=e627]:
+                  - generic [ref=e631]:
+                    - generic [ref=e634]: CSR Investment
+                    - generic [ref=e636]: Community
+                - cell "Active" [ref=e637]:
+                  - generic [ref=e639]: Active
+                - cell "1" [ref=e640]:
+                  - generic [ref=e643]: "1"
+                - cell "-" [ref=e644]:
+                  - generic [ref=e647]: "-"
+                - cell "-" [ref=e648]:
+                  - generic [ref=e651]: "-"
+                - cell "Custom" [ref=e652]:
+                  - generic [ref=e655]: Custom
+              - row " Data Protection Privacy Active 1 - - Custom" [ref=e656] [cursor=pointer]:
+                - cell "" [ref=e657]:
+                  - button "" [ref=e661]:
+                    - button "" [ref=e663]:
+                      - generic [ref=e666]: 
+                - cell "Data Protection Privacy" [ref=e667]:
+                  - generic [ref=e671]:
+                    - generic [ref=e674]: Data Protection
+                    - generic [ref=e676]: Privacy
+                - cell "Active" [ref=e677]:
+                  - generic [ref=e679]: Active
+                - cell "1" [ref=e680]:
+                  - generic [ref=e683]: "1"
+                - cell "-" [ref=e684]:
+                  - generic [ref=e687]: "-"
+                - cell "-" [ref=e688]:
+                  - generic [ref=e691]: "-"
+                - cell "Custom" [ref=e692]:
+                  - generic [ref=e695]: Custom
+              - row " Data Table Digital Active 1 - - Custom" [ref=e696] [cursor=pointer]:
+                - cell "" [ref=e697]:
+                  - button "" [ref=e701]:
+                    - button "" [ref=e703]:
+                      - generic [ref=e706]: 
+                - cell "Data Table Digital" [ref=e707]:
+                  - generic [ref=e711]:
+                    - generic [ref=e714]: Data Table
+                    - generic [ref=e716]: Digital
+                - cell "Active" [ref=e717]:
+                  - generic [ref=e719]: Active
+                - cell "1" [ref=e720]:
+                  - generic [ref=e723]: "1"
+                - cell "-" [ref=e724]:
+                  - generic [ref=e727]: "-"
+                - cell "-" [ref=e728]:
+                  - generic [ref=e731]: "-"
+                - cell "Custom" [ref=e732]:
+                  - generic [ref=e735]: Custom
+              - row " Direct GHG Emissions 4th char Active 0 2026-05-20, 13:58 2026-05-20, 13:58 Custom" [ref=e736] [cursor=pointer]:
+                - cell "" [ref=e737]:
+                  - button "" [ref=e741]:
+                    - button "" [ref=e743]:
+                      - generic [ref=e746]: 
+                - cell "Direct GHG Emissions 4th char" [ref=e747]:
+                  - generic [ref=e751]:
+                    - generic [ref=e755]: Direct GHG Emissions
+                    - generic [ref=e757]: 4th char
+                - cell "Active" [ref=e758]:
+                  - generic [ref=e760]: Active
+                - cell "0" [ref=e761]:
+                  - generic [ref=e764]: "0"
+                - cell "2026-05-20, 13:58" [ref=e765]:
+                  - generic [ref=e768]: 2026-05-20, 13:58
+                - cell "2026-05-20, 13:58" [ref=e769]:
+                  - generic [ref=e772]: 2026-05-20, 13:58
+                - cell "Custom" [ref=e773]:
+                  - generic [ref=e776]: Custom
+              - row " Disclosure Topics Active 0 - - Custom" [ref=e777] [cursor=pointer]:
+                - cell "" [ref=e778]:
+                  - button "" [ref=e782]:
+                    - button "" [ref=e784]:
+                      - generic [ref=e787]: 
+                - cell "Disclosure Topics" [ref=e788]:
+                  - generic [ref=e792]:
+                    - generic [ref=e795]: Disclosure
+                    - generic [ref=e797]: Topics
+                - cell "Active" [ref=e798]:
+                  - generic [ref=e800]: Active
+                - cell "0" [ref=e801]:
+                  - generic [ref=e804]: "0"
+                - cell "-" [ref=e805]:
+                  - generic [ref=e808]: "-"
+                - cell "-" [ref=e809]:
+                  - generic [ref=e812]: "-"
+                - cell "Custom" [ref=e813]:
+                  - generic [ref=e816]: Custom
+              - row " Diversity Workforce Active 1 - - Custom" [ref=e817] [cursor=pointer]:
+                - cell "" [ref=e818]:
+                  - button "" [ref=e822]:
+                    - button "" [ref=e824]:
+                      - generic [ref=e827]: 
+                - cell "Diversity Workforce" [ref=e828]:
+                  - generic [ref=e832]:
+                    - generic [ref=e835]: Diversity
+                    - generic [ref=e837]: Workforce
+                - cell "Active" [ref=e838]:
+                  - generic [ref=e840]: Active
+                - cell "1" [ref=e841]:
+                  - generic [ref=e844]: "1"
+                - cell "-" [ref=e845]:
+                  - generic [ref=e848]: "-"
+                - cell "-" [ref=e849]:
+                  - generic [ref=e852]: "-"
+                - cell "Custom" [ref=e853]:
+                  - generic [ref=e856]: Custom
+              - row " Emissions Climate & Energy Active 1 - - Custom" [ref=e857] [cursor=pointer]:
+                - cell "" [ref=e858]:
+                  - button "" [ref=e862]:
+                    - button "" [ref=e864]:
+                      - generic [ref=e867]: 
+                - cell "Emissions Climate & Energy" [ref=e868]:
+                  - generic [ref=e872]:
+                    - generic [ref=e875]: Emissions
+                    - generic [ref=e877]: Climate & Energy
+                - cell "Active" [ref=e878]:
+                  - generic [ref=e880]: Active
+                - cell "1" [ref=e881]:
+                  - generic [ref=e884]: "1"
+                - cell "-" [ref=e885]:
+                  - generic [ref=e888]: "-"
+                - cell "-" [ref=e889]:
+                  - generic [ref=e892]: "-"
+                - cell "Custom" [ref=e893]:
+                  - generic [ref=e896]: Custom
+              - row " Emissions Climate & Energy Active 1 - - Custom" [ref=e897] [cursor=pointer]:
+                - cell "" [ref=e898]:
+                  - button "" [ref=e902]:
+                    - button "" [ref=e904]:
+                      - generic [ref=e907]: 
+                - cell "Emissions Climate & Energy" [ref=e908]:
+                  - generic [ref=e912]:
+                    - generic [ref=e915]: Emissions
+                    - generic [ref=e917]: Climate & Energy
+                - cell "Active" [ref=e918]:
+                  - generic [ref=e920]: Active
+                - cell "1" [ref=e921]:
+                  - generic [ref=e924]: "1"
+                - cell "-" [ref=e925]:
+                  - generic [ref=e928]: "-"
+                - cell "-" [ref=e929]:
+                  - generic [ref=e932]: "-"
+                - cell "Custom" [ref=e933]:
+                  - generic [ref=e936]: Custom
+              - row " Emissions Active 1 - - Custom" [ref=e937] [cursor=pointer]:
+                - cell "" [ref=e938]:
+                  - button "" [ref=e942]:
+                    - button "" [ref=e944]:
+                      - generic [ref=e947]: 
+                - cell "Emissions" [ref=e948]:
+                  - generic [ref=e955]: Emissions
+                - cell "Active" [ref=e956]:
+                  - generic [ref=e958]: Active
+                - cell "1" [ref=e959]:
+                  - generic [ref=e962]: "1"
+                - cell "-" [ref=e963]:
+                  - generic [ref=e966]: "-"
+                - cell "-" [ref=e967]:
+                  - generic [ref=e970]: "-"
+                - cell "Custom" [ref=e971]:
+                  - generic [ref=e974]: Custom
+              - row " Energy Consumption Energy Active 1 - - Custom" [ref=e975] [cursor=pointer]:
+                - cell "" [ref=e976]:
+                  - button "" [ref=e980]:
+                    - button "" [ref=e982]:
+                      - generic [ref=e985]: 
+                - cell "Energy Consumption Energy" [ref=e986]:
+                  - generic [ref=e990]:
+                    - generic [ref=e993]: Energy Consumption
+                    - generic [ref=e995]: Energy
+                - cell "Active" [ref=e996]:
+                  - generic [ref=e998]: Active
+                - cell "1" [ref=e999]:
+                  - generic [ref=e1002]: "1"
+                - cell "-" [ref=e1003]:
+                  - generic [ref=e1006]: "-"
+                - cell "-" [ref=e1007]:
+                  - generic [ref=e1010]: "-"
+                - cell "Custom" [ref=e1011]:
+                  - generic [ref=e1014]: Custom
+              - row " Energy Consumption Climate & Energy Active 1 - - Custom" [ref=e1015] [cursor=pointer]:
+                - cell "" [ref=e1016]:
+                  - button "" [ref=e1020]:
+                    - button "" [ref=e1022]:
+                      - generic [ref=e1025]: 
+                - cell "Energy Consumption Climate & Energy" [ref=e1026]:
+                  - generic [ref=e1030]:
+                    - generic [ref=e1033]: Energy Consumption
+                    - generic [ref=e1035]: Climate & Energy
+                - cell "Active" [ref=e1036]:
+                  - generic [ref=e1038]: Active
+                - cell "1" [ref=e1039]:
+                  - generic [ref=e1042]: "1"
+                - cell "-" [ref=e1043]:
+                  - generic [ref=e1046]: "-"
+                - cell "-" [ref=e1047]:
+                  - generic [ref=e1050]: "-"
+                - cell "Custom" [ref=e1051]:
+                  - generic [ref=e1054]: Custom
+          - generic [ref=e1055]:
+            - generic [ref=e1056]:
+              - paragraph [ref=e1057]: Showing 20 of 35 Results
+              - generic [ref=e1058] [cursor=pointer]:
+                - generic:
+                  - textbox: 20/Page
+                - generic:
+                  - combobox:
+                    - option "20/Page" [selected]
+                - generic [ref=e1059]: 20/Page
+                - button "" [ref=e1060]:
+                  - generic [ref=e1061]: 
+            - generic [ref=e1062]:
+              - button "First Page" [disabled]:
+                - img
+              - button "Previous Page" [disabled]:
+                - img
+              - generic [ref=e1063]:
+                - button "Page 1" [ref=e1064] [cursor=pointer]: "1"
+                - button "Page 2" [ref=e1065] [cursor=pointer]: "2"
+              - button "Next Page" [ref=e1066] [cursor=pointer]:
+                - img [ref=e1067]
+              - button "Last Page" [ref=e1069] [cursor=pointer]:
+                - img [ref=e1070]

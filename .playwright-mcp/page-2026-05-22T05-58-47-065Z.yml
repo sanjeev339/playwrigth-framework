@@ -1,0 +1,453 @@
+- generic [ref=e164]:
+  - generic [ref=e165]:
+    - generic [ref=e167]:
+      - generic [ref=e168]:
+        - img [ref=e170]
+        - generic [ref=e173]: ROBOLAB
+      - button [ref=e174]:
+        - img [ref=e176] [cursor=pointer]
+    - generic [ref=e179]:
+      - button "Dashboard" [ref=e182]:
+        - img [ref=e185]
+        - text: Dashboard
+      - button "Client Management" [ref=e192]:
+        - img [ref=e195]
+        - text: Client Management
+      - button "License Management" [ref=e201]:
+        - img [ref=e204]
+        - text: License Management
+      - button "User Management" [ref=e208]:
+        - img [ref=e212]
+        - text: User Management
+      - generic [ref=e215]:
+        - generic [ref=e216]:
+          - button "Role & Permissions" [ref=e217]:
+            - img [ref=e220]
+            - text: Role & Permissions
+          - generic:
+            - generic:
+              - generic:
+                - img
+        - generic [ref=e225]:
+          - button "Internal Roles" [ref=e227]: Internal Roles
+          - button "External Roles" [ref=e230]: External Roles
+      - button "Audit Log" [ref=e234]:
+        - img [ref=e237]
+        - text: Audit Log
+    - button "Logout" [ref=e244]:
+      - img [ref=e247]
+      - text: Logout
+  - generic [ref=e250]:
+    - generic [ref=e251]:
+      - banner [ref=e252]:
+        - generic [ref=e254] [cursor=pointer]:
+          - paragraph [ref=e256]: s
+          - generic [ref=e257]:
+            - paragraph [ref=e258]: sanjeev kumar
+            - paragraph [ref=e259]: sanjeevkumarm@piraiinfo.com
+      - generic [ref=e261]:
+        - heading "Internal Users" [level=1] [ref=e262]
+        - paragraph [ref=e263]: Manage internal user accounts, roles, and access controls within the system.
+    - main [ref=e264]:
+      - generic [ref=e265]:
+        - generic [ref=e268]:
+          - generic [ref=e269]:
+            - button "Internal Users" [ref=e270] [cursor=pointer]
+            - button "Invites" [ref=e271] [cursor=pointer]
+            - button "Audit Log" [ref=e272] [cursor=pointer]
+          - button " Add User" [ref=e274] [cursor=pointer]:
+            - generic [ref=e275]:
+              - generic [ref=e277]: 
+              - generic [ref=e278]: Add User
+        - generic [ref=e279]:
+          - generic [ref=e281]:
+            - generic [ref=e284]:
+              - generic [ref=e285]:
+                - generic [ref=e286]: 
+                - searchbox "Search by name or email" [ref=e287]
+              - generic [ref=e288]: 0/50
+            - generic [ref=e289]:
+              - generic [ref=e293] [cursor=pointer]:
+                - generic:
+                  - textbox
+                - generic:
+                  - combobox:
+                    - option "Select Date Range" [selected]
+                - generic [ref=e295]:
+                  - img [ref=e298]
+                  - generic [ref=e306]: Select Date Range
+                - button "Select Date Range" [ref=e307]:
+                  - generic [ref=e308]: 
+              - button "Filter" [ref=e310] [cursor=pointer]:
+                - generic [ref=e311]:
+                  - img [ref=e314]
+                  - generic [ref=e316]: Filter
+              - button " Reset" [ref=e318] [cursor=pointer]:
+                - generic [ref=e319]:
+                  - generic [ref=e321]: 
+                  - generic [ref=e322]: Reset
+          - table [ref=e327]:
+            - rowgroup [ref=e328]:
+              - row "Actions Name & Email ID Roles Phone Created At Status" [ref=e329]:
+                - columnheader "Actions" [ref=e330]:
+                  - generic [ref=e332]: Actions
+                - columnheader "Name & Email ID" [ref=e333] [cursor=pointer]:
+                  - generic [ref=e334]:
+                    - generic [ref=e335]: Name & Email ID
+                    - img [ref=e339]
+                - columnheader "Roles" [ref=e342]:
+                  - generic [ref=e344]: Roles
+                - columnheader "Phone" [ref=e345]:
+                  - generic [ref=e347]: Phone
+                - columnheader "Created At" [ref=e348] [cursor=pointer]:
+                  - generic [ref=e349]:
+                    - generic [ref=e350]: Created At
+                    - img [ref=e354]
+                - columnheader "Status" [ref=e357]:
+                  - generic [ref=e359]: Status
+            - rowgroup [ref=e360]:
+              - row " Priya Sharma priya.sharma+auto1779172206144728@piraiinfotech.com Workflow Operators - 2026-05-21, 11:24 Terminated" [ref=e361] [cursor=pointer]:
+                - cell "" [ref=e362]:
+                  - button "" [ref=e367]:
+                    - generic [ref=e370]: 
+                - cell "Priya Sharma priya.sharma+auto1779172206144728@piraiinfotech.com" [ref=e371]:
+                  - generic [ref=e375]:
+                    - paragraph [ref=e376]: Priya Sharma
+                    - paragraph [ref=e377]: priya.sharma+auto1779172206144728@piraiinfotech.com
+                - cell "Workflow Operators" [ref=e378]:
+                  - generic [ref=e381]: Workflow Operators
+                - cell "-" [ref=e382]:
+                  - generic [ref=e385]: "-"
+                - cell "2026-05-21, 11:24" [ref=e386]:
+                  - generic [ref=e389]: 2026-05-21, 11:24
+                - cell "Terminated" [ref=e390]:
+                  - generic [ref=e392]: Terminated
+              - row " Priya Sharma priya.sharma+subagent12@piraiinfotech.com Workflow Operators - 2026-05-21, 11:24 Terminated" [ref=e393] [cursor=pointer]:
+                - cell "" [ref=e394]:
+                  - button "" [ref=e399]:
+                    - generic [ref=e402]: 
+                - cell "Priya Sharma priya.sharma+subagent12@piraiinfotech.com" [ref=e403]:
+                  - generic [ref=e407]:
+                    - paragraph [ref=e408]: Priya Sharma
+                    - paragraph [ref=e409]: priya.sharma+subagent12@piraiinfotech.com
+                - cell "Workflow Operators" [ref=e410]:
+                  - generic [ref=e413]: Workflow Operators
+                - cell "-" [ref=e414]:
+                  - generic [ref=e417]: "-"
+                - cell "2026-05-21, 11:24" [ref=e418]:
+                  - generic [ref=e421]: 2026-05-21, 11:24
+                - cell "Terminated" [ref=e422]:
+                  - generic [ref=e424]: Terminated
+              - row " Priya Sharma user.management_1779256674679_995@testmail.dev Workflow Operators - 2026-05-21, 11:24 Terminated" [ref=e425] [cursor=pointer]:
+                - cell "" [ref=e426]:
+                  - button "" [ref=e431]:
+                    - generic [ref=e434]: 
+                - cell "Priya Sharma user.management_1779256674679_995@testmail.dev" [ref=e435]:
+                  - generic [ref=e439]:
+                    - paragraph [ref=e440]: Priya Sharma
+                    - paragraph [ref=e441]: user.management_1779256674679_995@testmail.dev
+                - cell "Workflow Operators" [ref=e442]:
+                  - generic [ref=e445]: Workflow Operators
+                - cell "-" [ref=e446]:
+                  - generic [ref=e449]: "-"
+                - cell "2026-05-21, 11:24" [ref=e450]:
+                  - generic [ref=e453]: 2026-05-21, 11:24
+                - cell "Terminated" [ref=e454]:
+                  - generic [ref=e456]: Terminated
+              - row " GAUTAM gautam zicetest780+1014@gmail.com new role edited +355 +919345451600 2026-05-21, 07:39 Active" [ref=e457] [cursor=pointer]:
+                - cell "" [ref=e458]:
+                  - button "" [ref=e463]:
+                    - generic [ref=e466]: 
+                - cell "GAUTAM gautam zicetest780+1014@gmail.com" [ref=e467]:
+                  - generic [ref=e471]:
+                    - paragraph [ref=e472]: GAUTAM gautam
+                    - paragraph [ref=e473]: zicetest780+1014@gmail.com
+                - cell "new role edited" [ref=e474]:
+                  - generic [ref=e477]: new role edited
+                - cell "+355 +919345451600" [ref=e478]:
+                  - generic [ref=e481]: +355 +919345451600
+                - cell "2026-05-21, 07:39" [ref=e482]:
+                  - generic [ref=e485]: 2026-05-21, 07:39
+                - cell "Active" [ref=e486]:
+                  - generic [ref=e488]: Active
+              - row " Test User zicetest780+99@gmail.com new role edited - 2026-05-20, 10:39 Active" [ref=e489] [cursor=pointer]:
+                - cell "" [ref=e490]:
+                  - button "" [ref=e495]:
+                    - generic [ref=e498]: 
+                - cell "Test User zicetest780+99@gmail.com" [ref=e499]:
+                  - generic [ref=e503]:
+                    - paragraph [ref=e504]: Test User
+                    - paragraph [ref=e505]: zicetest780+99@gmail.com
+                - cell "new role edited" [ref=e506]:
+                  - generic [ref=e509]: new role edited
+                - cell "-" [ref=e510]:
+                  - generic [ref=e513]: "-"
+                - cell "2026-05-20, 10:39" [ref=e514]:
+                  - generic [ref=e517]: 2026-05-20, 10:39
+                - cell "Active" [ref=e518]:
+                  - generic [ref=e520]: Active
+              - row " adithya j sanjeevkumar.m00@gmail.com Workflow Designer (Orchestrator Author) - 2026-05-20, 05:08 Active" [ref=e521] [cursor=pointer]:
+                - cell "" [ref=e522]:
+                  - button "" [ref=e527]:
+                    - generic [ref=e530]: 
+                - cell "adithya j sanjeevkumar.m00@gmail.com" [ref=e531]:
+                  - generic [ref=e535]:
+                    - paragraph [ref=e536]: adithya j
+                    - paragraph [ref=e537]: sanjeevkumar.m00@gmail.com
+                - cell "Workflow Designer (Orchestrator Author)" [ref=e538]:
+                  - generic [ref=e541]: Workflow Designer (Orchestrator Author)
+                - cell "-" [ref=e542]:
+                  - generic [ref=e545]: "-"
+                - cell "2026-05-20, 05:08" [ref=e546]:
+                  - generic [ref=e549]: 2026-05-20, 05:08
+                - cell "Active" [ref=e550]:
+                  - generic [ref=e552]: Active
+              - row " Priya Sharma priya.sharma+auto001@piraiinfotech.com Workflow Operators - 2026-05-19, 15:36 Terminated" [ref=e553] [cursor=pointer]:
+                - cell "" [ref=e554]:
+                  - button "" [ref=e559]:
+                    - generic [ref=e562]: 
+                - cell "Priya Sharma priya.sharma+auto001@piraiinfotech.com" [ref=e563]:
+                  - generic [ref=e567]:
+                    - paragraph [ref=e568]: Priya Sharma
+                    - paragraph [ref=e569]: priya.sharma+auto001@piraiinfotech.com
+                - cell "Workflow Operators" [ref=e570]:
+                  - generic [ref=e573]: Workflow Operators
+                - cell "-" [ref=e574]:
+                  - generic [ref=e577]: "-"
+                - cell "2026-05-19, 15:36" [ref=e578]:
+                  - generic [ref=e581]: 2026-05-19, 15:36
+                - cell "Terminated" [ref=e582]:
+                  - generic [ref=e584]: Terminated
+              - row " Priya Sharma priya.sharma+auto001@piraiinfotech.com Workflow Operators - 2026-05-19, 15:36 Terminated" [ref=e585] [cursor=pointer]:
+                - cell "" [ref=e586]:
+                  - button "" [ref=e591]:
+                    - generic [ref=e594]: 
+                - cell "Priya Sharma priya.sharma+auto001@piraiinfotech.com" [ref=e595]:
+                  - generic [ref=e599]:
+                    - paragraph [ref=e600]: Priya Sharma
+                    - paragraph [ref=e601]: priya.sharma+auto001@piraiinfotech.com
+                - cell "Workflow Operators" [ref=e602]:
+                  - generic [ref=e605]: Workflow Operators
+                - cell "-" [ref=e606]:
+                  - generic [ref=e609]: "-"
+                - cell "2026-05-19, 15:36" [ref=e610]:
+                  - generic [ref=e613]: 2026-05-19, 15:36
+                - cell "Terminated" [ref=e614]:
+                  - generic [ref=e616]: Terminated
+              - row " Priya Sharma priya.sharma+auto002@piraiinfotech.com Workflow Operators - 2026-05-19, 15:36 Terminated" [ref=e617] [cursor=pointer]:
+                - cell "" [ref=e618]:
+                  - button "" [ref=e623]:
+                    - generic [ref=e626]: 
+                - cell "Priya Sharma priya.sharma+auto002@piraiinfotech.com" [ref=e627]:
+                  - generic [ref=e631]:
+                    - paragraph [ref=e632]: Priya Sharma
+                    - paragraph [ref=e633]: priya.sharma+auto002@piraiinfotech.com
+                - cell "Workflow Operators" [ref=e634]:
+                  - generic [ref=e637]: Workflow Operators
+                - cell "-" [ref=e638]:
+                  - generic [ref=e641]: "-"
+                - cell "2026-05-19, 15:36" [ref=e642]:
+                  - generic [ref=e645]: 2026-05-19, 15:36
+                - cell "Terminated" [ref=e646]:
+                  - generic [ref=e648]: Terminated
+              - row " Priya Sharma priya.sharma+auto003@piraiinfotech.com Workflow Operators - 2026-05-19, 15:36 Terminated" [ref=e649] [cursor=pointer]:
+                - cell "" [ref=e650]:
+                  - button "" [ref=e655]:
+                    - generic [ref=e658]: 
+                - cell "Priya Sharma priya.sharma+auto003@piraiinfotech.com" [ref=e659]:
+                  - generic [ref=e663]:
+                    - paragraph [ref=e664]: Priya Sharma
+                    - paragraph [ref=e665]: priya.sharma+auto003@piraiinfotech.com
+                - cell "Workflow Operators" [ref=e666]:
+                  - generic [ref=e669]: Workflow Operators
+                - cell "-" [ref=e670]:
+                  - generic [ref=e673]: "-"
+                - cell "2026-05-19, 15:36" [ref=e674]:
+                  - generic [ref=e677]: 2026-05-19, 15:36
+                - cell "Terminated" [ref=e678]:
+                  - generic [ref=e680]: Terminated
+              - row " Priya Sharma priya.sharma+auto001+auto1779184640840905@piraiinfotech.com Workflow Operators - 2026-05-19, 15:36 Terminated" [ref=e681] [cursor=pointer]:
+                - cell "" [ref=e682]:
+                  - button "" [ref=e687]:
+                    - generic [ref=e690]: 
+                - cell "Priya Sharma priya.sharma+auto001+auto1779184640840905@piraiinfotech.com" [ref=e691]:
+                  - generic [ref=e695]:
+                    - paragraph [ref=e696]: Priya Sharma
+                    - paragraph [ref=e697]: priya.sharma+auto001+auto1779184640840905@piraiinfotech.com
+                - cell "Workflow Operators" [ref=e698]:
+                  - generic [ref=e701]: Workflow Operators
+                - cell "-" [ref=e702]:
+                  - generic [ref=e705]: "-"
+                - cell "2026-05-19, 15:36" [ref=e706]:
+                  - generic [ref=e709]: 2026-05-19, 15:36
+                - cell "Terminated" [ref=e710]:
+                  - generic [ref=e712]: Terminated
+              - row " @ssddd$% er4fdefd bfcpzn0rvg@bwmya.com New role - 2026-05-19, 10:17 Password Not Set" [ref=e713] [cursor=pointer]:
+                - cell "" [ref=e714]:
+                  - button "" [ref=e719]:
+                    - generic [ref=e722]: 
+                - cell "@ssddd$% er4fdefd bfcpzn0rvg@bwmya.com" [ref=e723]:
+                  - generic [ref=e727]:
+                    - paragraph [ref=e728]: "@ssddd$% er4fdefd"
+                    - paragraph [ref=e729]: bfcpzn0rvg@bwmya.com
+                - cell "New role" [ref=e730]:
+                  - generic [ref=e733]: New role
+                - cell "-" [ref=e734]:
+                  - generic [ref=e737]: "-"
+                - cell "2026-05-19, 10:17" [ref=e738]:
+                  - generic [ref=e741]: 2026-05-19, 10:17
+                - cell "Password Not Set" [ref=e742]:
+                  - generic [ref=e744]: Password Not Set
+              - row " arun arun bfcpzn0rvg@bwmyga.com New role - 2026-05-19, 10:14 Active" [ref=e745] [cursor=pointer]:
+                - cell "" [ref=e746]:
+                  - button "" [ref=e751]:
+                    - generic [ref=e754]: 
+                - cell "arun arun bfcpzn0rvg@bwmyga.com" [ref=e755]:
+                  - generic [ref=e759]:
+                    - paragraph [ref=e760]: arun arun
+                    - paragraph [ref=e761]: bfcpzn0rvg@bwmyga.com
+                - cell "New role" [ref=e762]:
+                  - generic [ref=e765]: New role
+                - cell "-" [ref=e766]:
+                  - generic [ref=e769]: "-"
+                - cell "2026-05-19, 10:14" [ref=e770]:
+                  - generic [ref=e773]: 2026-05-19, 10:14
+                - cell "Active" [ref=e774]:
+                  - generic [ref=e776]: Active
+              - row " qwert ertyu gerixe9951@hidevak.com New role - 2026-05-19, 10:09 Active" [ref=e777] [cursor=pointer]:
+                - cell "" [ref=e778]:
+                  - button "" [ref=e783]:
+                    - generic [ref=e786]: 
+                - cell "qwert ertyu gerixe9951@hidevak.com" [ref=e787]:
+                  - generic [ref=e791]:
+                    - paragraph [ref=e792]: qwert ertyu
+                    - paragraph [ref=e793]: gerixe9951@hidevak.com
+                - cell "New role" [ref=e794]:
+                  - generic [ref=e797]: New role
+                - cell "-" [ref=e798]:
+                  - generic [ref=e801]: "-"
+                - cell "2026-05-19, 10:09" [ref=e802]:
+                  - generic [ref=e805]: 2026-05-19, 10:09
+                - cell "Active" [ref=e806]:
+                  - generic [ref=e808]: Active
+              - row " Karthikeyan DD karthikeyand@piraiinfo.com Workflow Designer (Orchestrator Author) - 2026-05-19, 10:02 Active" [ref=e809] [cursor=pointer]:
+                - cell "" [ref=e810]:
+                  - button "" [ref=e815]:
+                    - generic [ref=e818]: 
+                - cell "Karthikeyan DD karthikeyand@piraiinfo.com" [ref=e819]:
+                  - generic [ref=e823]:
+                    - paragraph [ref=e824]: Karthikeyan DD
+                    - paragraph [ref=e825]: karthikeyand@piraiinfo.com
+                - cell "Workflow Designer (Orchestrator Author)" [ref=e826]:
+                  - generic [ref=e829]: Workflow Designer (Orchestrator Author)
+                - cell "-" [ref=e830]:
+                  - generic [ref=e833]: "-"
+                - cell "2026-05-19, 10:02" [ref=e834]:
+                  - generic [ref=e837]: 2026-05-19, 10:02
+                - cell "Active" [ref=e838]:
+                  - generic [ref=e840]: Active
+              - row " Tester New zicetest780+41@gmail.com new role edited +93 9345451600 2026-05-19, 09:36 Inactive" [ref=e841] [cursor=pointer]:
+                - cell "" [ref=e842]:
+                  - button "" [ref=e847]:
+                    - generic [ref=e850]: 
+                - cell "Tester New zicetest780+41@gmail.com" [ref=e851]:
+                  - generic [ref=e855]:
+                    - paragraph [ref=e856]: Tester New
+                    - paragraph [ref=e857]: zicetest780+41@gmail.com
+                - cell "new role edited" [ref=e858]:
+                  - generic [ref=e861]: new role edited
+                - cell "+93 9345451600" [ref=e862]:
+                  - generic [ref=e865]: +93 9345451600
+                - cell "2026-05-19, 09:36" [ref=e866]:
+                  - generic [ref=e869]: 2026-05-19, 09:36
+                - cell "Inactive" [ref=e870]:
+                  - generic [ref=e872]: Inactive
+              - row " Tester One zicetest780+25@gmail.com new role edited +91 6463467677 2026-05-19, 09:36 Inactive" [ref=e873] [cursor=pointer]:
+                - cell "" [ref=e874]:
+                  - button "" [ref=e879]:
+                    - generic [ref=e882]: 
+                - cell "Tester One zicetest780+25@gmail.com" [ref=e883]:
+                  - generic [ref=e887]:
+                    - paragraph [ref=e888]: Tester One
+                    - paragraph [ref=e889]: zicetest780+25@gmail.com
+                - cell "new role edited" [ref=e890]:
+                  - generic [ref=e893]: new role edited
+                - cell "+91 6463467677" [ref=e894]:
+                  - generic [ref=e897]: +91 6463467677
+                - cell "2026-05-19, 09:36" [ref=e898]:
+                  - generic [ref=e901]: 2026-05-19, 09:36
+                - cell "Inactive" [ref=e902]:
+                  - generic [ref=e904]: Inactive
+              - row " Gautam Anguraj Anguraj zicetest780+89@gmail.com New internla role +93 786898 2026-05-19, 09:32 Suspended" [ref=e905] [cursor=pointer]:
+                - cell "" [ref=e906]:
+                  - button "" [ref=e911]:
+                    - generic [ref=e914]: 
+                - cell "Gautam Anguraj Anguraj zicetest780+89@gmail.com" [ref=e915]:
+                  - generic [ref=e919]:
+                    - paragraph [ref=e920]: Gautam Anguraj Anguraj
+                    - paragraph [ref=e921]: zicetest780+89@gmail.com
+                - cell "New internla role" [ref=e922]:
+                  - generic [ref=e925]: New internla role
+                - cell "+93 786898" [ref=e926]:
+                  - generic [ref=e929]: +93 786898
+                - cell "2026-05-19, 09:32" [ref=e930]:
+                  - generic [ref=e933]: 2026-05-19, 09:32
+                - cell "Suspended" [ref=e934]:
+                  - generic [ref=e936]: Suspended
+              - row " Priya Sharma priya.sharma+auto177917662986353@piraiinfotech.com Workflow Operators - 2026-05-19, 07:44 Password Not Set" [ref=e937] [cursor=pointer]:
+                - cell "" [ref=e938]:
+                  - button "" [ref=e943]:
+                    - generic [ref=e946]: 
+                - cell "Priya Sharma priya.sharma+auto177917662986353@piraiinfotech.com" [ref=e947]:
+                  - generic [ref=e951]:
+                    - paragraph [ref=e952]: Priya Sharma
+                    - paragraph [ref=e953]: priya.sharma+auto177917662986353@piraiinfotech.com
+                - cell "Workflow Operators" [ref=e954]:
+                  - generic [ref=e957]: Workflow Operators
+                - cell "-" [ref=e958]:
+                  - generic [ref=e961]: "-"
+                - cell "2026-05-19, 07:44" [ref=e962]:
+                  - generic [ref=e965]: 2026-05-19, 07:44
+                - cell "Password Not Set" [ref=e966]:
+                  - generic [ref=e968]: Password Not Set
+              - row " Tester new zicetest780+43@gmail.com new role edited +93 86686969 2026-05-19, 07:37 Active" [ref=e969] [cursor=pointer]:
+                - cell "" [ref=e970]:
+                  - button "" [ref=e975]:
+                    - generic [ref=e978]: 
+                - cell "Tester new zicetest780+43@gmail.com" [ref=e979]:
+                  - generic [ref=e983]:
+                    - paragraph [ref=e984]: Tester new
+                    - paragraph [ref=e985]: zicetest780+43@gmail.com
+                - cell "new role edited" [ref=e986]:
+                  - generic [ref=e989]: new role edited
+                - cell "+93 86686969" [ref=e990]:
+                  - generic [ref=e993]: +93 86686969
+                - cell "2026-05-19, 07:37" [ref=e994]:
+                  - generic [ref=e997]: 2026-05-19, 07:37
+                - cell "Active" [ref=e998]:
+                  - generic [ref=e1000]: Active
+          - generic [ref=e1001]:
+            - generic [ref=e1002]:
+              - paragraph [ref=e1003]: Showing 20 of 47 Results
+              - generic [ref=e1004] [cursor=pointer]:
+                - generic:
+                  - textbox: 20/Page
+                - generic:
+                  - combobox:
+                    - option "20/Page" [selected]
+                - generic [ref=e1005]: 20/Page
+                - button "" [ref=e1006]:
+                  - generic [ref=e1007]: 
+            - generic [ref=e1008]:
+              - button "First Page" [disabled]:
+                - img
+              - button "Previous Page" [disabled]:
+                - img
+              - generic [ref=e1009]:
+                - button "Page 1" [ref=e1010] [cursor=pointer]: "1"
+                - button "Page 2" [ref=e1011] [cursor=pointer]: "2"
+                - button "Page 3" [ref=e1012] [cursor=pointer]: "3"
+              - button "Next Page" [ref=e1013] [cursor=pointer]:
+                - img [ref=e1014]
+              - button "Last Page" [ref=e1016] [cursor=pointer]:
+                - img [ref=e1017]

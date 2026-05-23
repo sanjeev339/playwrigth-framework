@@ -1,0 +1,91 @@
+- main [ref=e4]:
+  - generic [ref=e5]:
+    - navigation [ref=e7]:
+      - link "All4" [ref=e8] [cursor=pointer]:
+        - /url: "#?"
+      - link "Passed2" [ref=e9] [cursor=pointer]:
+        - /url: "#?q=s%3Apassed"
+        - img [ref=e10]
+        - text: Passed2
+      - link "Failed2" [ref=e12] [cursor=pointer]:
+        - /url: "#?q=s%3Afailed"
+        - img [ref=e13]
+        - text: Failed2
+      - link "Flaky0" [ref=e15] [cursor=pointer]:
+        - /url: "#?q=s%3Aflaky"
+      - link "Skipped0" [ref=e16] [cursor=pointer]:
+        - /url: "#?q=s%3Askipped"
+      - link "Speedboard" [ref=e17] [cursor=pointer]:
+        - /url: "#?speedboard"
+        - img [ref=e18]
+      - button "Settings" [ref=e20] [cursor=pointer]:
+        - img [ref=e21]
+    - generic [ref=e23]:
+      - img
+      - textbox "Search tests" [ref=e24]
+  - generic [ref=e26]:
+    - generic [ref=e28]: "Project: chromium"
+    - generic [ref=e30]: 22/05/2026, 11:58:09
+    - generic [ref=e31]: "Total time: 17.2s"
+  - generic [ref=e32]:
+    - button "user_management/userManagement.spec.ts" [expanded] [ref=e33] [cursor=pointer]:
+      - img [ref=e34]
+      - text: user_management/userManagement.spec.ts
+    - region [ref=e36]:
+      - list [ref=e37]:
+        - listitem [ref=e38]:
+          - generic [ref=e39]:
+            - generic [ref=e40]:
+              - img [ref=e42]
+              - generic [ref=e44]:
+                - link "User Management data-driven scenarios › TC-UM-002 - Validate unique user email constraint" [ref=e45] [cursor=pointer]:
+                  - /url: "#?testId=acb84ad6b94353a08fdd-c7959f2e39d77f68e9c3"
+                - generic [ref=e48] [cursor=pointer]: chromium
+            - generic [ref=e49]: 5.1s
+          - generic [ref=e51]:
+            - link "user_management/userManagement.spec.ts:24" [ref=e52] [cursor=pointer]:
+              - /url: "#?testId=acb84ad6b94353a08fdd-c7959f2e39d77f68e9c3"
+              - generic [ref=e53]: user_management/userManagement.spec.ts:24
+            - link "View video" [ref=e54] [cursor=pointer]:
+              - /url: "#?testId=acb84ad6b94353a08fdd-c7959f2e39d77f68e9c3&run=0&anchor=attachment-video"
+              - img [ref=e55]
+        - listitem [ref=e57]:
+          - generic [ref=e58]:
+            - generic [ref=e59]:
+              - img [ref=e61]
+              - generic [ref=e63]:
+                - link "User Management data-driven scenarios › TC-UM-003 - Verify role assignment to user" [ref=e64] [cursor=pointer]:
+                  - /url: "#?testId=acb84ad6b94353a08fdd-194df0969050aba97c68"
+                - generic [ref=e67] [cursor=pointer]: chromium
+            - generic [ref=e68]: 3.3s
+          - generic [ref=e70]:
+            - link "user_management/userManagement.spec.ts:24" [ref=e71] [cursor=pointer]:
+              - /url: "#?testId=acb84ad6b94353a08fdd-194df0969050aba97c68"
+              - generic [ref=e72]: user_management/userManagement.spec.ts:24
+            - link "View video" [ref=e73] [cursor=pointer]:
+              - /url: "#?testId=acb84ad6b94353a08fdd-194df0969050aba97c68&run=0&anchor=attachment-video"
+              - img [ref=e74]
+        - listitem [ref=e76]:
+          - generic [ref=e77]:
+            - generic [ref=e78]:
+              - img [ref=e80]
+              - generic [ref=e82]:
+                - link "User Management data-driven scenarios › TC-UM-001 - Verify successful manual user creation" [ref=e83] [cursor=pointer]:
+                  - /url: "#?testId=acb84ad6b94353a08fdd-98c451aaa95053c83ab1"
+                - generic [ref=e86] [cursor=pointer]: chromium
+            - generic [ref=e87]: 4.1s
+          - link "user_management/userManagement.spec.ts:24" [ref=e90] [cursor=pointer]:
+            - /url: "#?testId=acb84ad6b94353a08fdd-98c451aaa95053c83ab1"
+            - generic [ref=e91]: user_management/userManagement.spec.ts:24
+        - listitem [ref=e92]:
+          - generic [ref=e93]:
+            - generic [ref=e94]:
+              - img [ref=e96]
+              - generic [ref=e98]:
+                - link "User Management data-driven scenarios › TC-UM-004 - Verify deactivation of a user" [ref=e99] [cursor=pointer]:
+                  - /url: "#?testId=acb84ad6b94353a08fdd-ab8a53ad02895d86d028"
+                - generic [ref=e102] [cursor=pointer]: chromium
+            - generic [ref=e103]: 3.1s
+          - link "user_management/userManagement.spec.ts:24" [ref=e106] [cursor=pointer]:
+            - /url: "#?testId=acb84ad6b94353a08fdd-ab8a53ad02895d86d028"
+            - generic [ref=e107]: user_management/userManagement.spec.ts:24
