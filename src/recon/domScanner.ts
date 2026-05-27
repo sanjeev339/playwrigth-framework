@@ -64,6 +64,7 @@ export async function scanVisibleDom(page: Page): Promise<DomElementSnapshot[]> 
           text: truncate(text, 180) || undefined,
           role: element.getAttribute('role') || undefined,
           ariaLabel: element.getAttribute('aria-label') || undefined,
+          ariaLive: element.getAttribute('aria-live') || undefined,
           label: getLabelText(element) || undefined,
           placeholder: element.getAttribute('placeholder') || undefined,
           title: element.getAttribute('title') || undefined,

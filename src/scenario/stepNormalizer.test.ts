@@ -5,9 +5,9 @@ const input =
   '1. Navigate to User Management; 2. Click on Add User and click New Internal User; 3. Enter first Name and last Name; 4. Enter Email Address; 5. Select Role; 6. Click on Save';
 
 const payload = {
-  'First Name': 'Priya',
+  'First Name': 'Riya',
   'Last Name': 'Sharma',
-  'Email Address': 'priya.sharma@piraiinfotech.com',
+  'Email Address': 'Riya.sharma@piraiinfotech.com',
   Role: 'Executive'
 };
 

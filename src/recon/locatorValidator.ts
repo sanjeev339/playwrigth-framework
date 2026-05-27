@@ -9,11 +9,15 @@ const genericText = /^(add|edit|delete|save|submit|cancel|ok|yes|no|next|back|cl
 
 export async function validateGeneratedLocators(options: {
   generatedDir?: string;
+  healedDir?: string;
   outputPath?: string;
 } = {}): Promise<LocatorValidationReport> {
   const generatedDir = options.generatedDir ?? resolveFromRoot('tests', 'generated');
+  const healedDir = options.healedDir ?? resolveFromRoot('tests', 'healed');
   const outputPath = options.outputPath ?? resolveFromRoot('reports', 'locator-validation.json');
-  const testFiles = await listFiles(generatedDir, '.ts');
+  const generatedFiles = await listFiles(generatedDir, '.ts');
+  const healedFiles = await listFiles(healedDir, '.ts');
+  const testFiles = [...generatedFiles, ...healedFiles];
   const report: LocatorValidationReport = {
     generated_at: new Date().toISOString(),
     files: [],
@@ -73,6 +77,16 @@ function validateFile(file: string, code: string, locators: string[]): LocatorVa
     });
   }
 
+  if (hasNetworkIdleBeforeAlertAssertion(code)) {
+    warnings.push({
+      file: relativeFile,
+      severity: 'medium',
+      rule: 'networkidle-before-alert',
+      message:
+        "waitForLoadState('networkidle') appears before a getByRole('alert'...) assertion within the same region. Toasts often auto-dismiss during long waits; assert the alert immediately after the triggering action or use conditional visibility."
+    });
+  }
+
   for (const locator of locators) {
     if (/getByText/.test(locator)) {
       const text = firstStringArgument(locator);
@@ -109,6 +123,21 @@ function validateFile(file: string, code: string, locators: string[]): LocatorVa
   }
 
   return warnings;
+}
+
+/** Heuristic: networkidle in close proximity before an alert role assertion (toast flake risk). */
+function hasNetworkIdleBeforeAlertAssertion(code: string): boolean {
+  const re = /waitForLoadState\s*\(\s*['"]networkidle['"]\s*\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(code)) !== null) {
+    const from = match.index;
+    const windowEnd = Math.min(code.length, from + 1600);
+    const slice = code.slice(from, windowEnd);
+    if (/expect\s*\([^)]*getByRole\s*\(\s*['"]alert['"]/.test(slice)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function firstStringArgument(locator: string): string | null {

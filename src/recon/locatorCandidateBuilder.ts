@@ -10,16 +10,39 @@ const dynamicIdPatterns = [
   /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i
 ];
 
+/** Heuristic classification for LLM prompts — not a guarantee of runtime behavior. */
+export function inferUiStability(element: DomElementSnapshot): 'transient' | 'stable' | 'unknown' {
+  const role = (element.role || '').trim().toLowerCase();
+  if (role === 'alert' || role === 'status') {
+    return 'transient';
+  }
+
+  const live = (element.ariaLive || '').trim().toLowerCase();
+  if (live === 'polite' || live === 'assertive') {
+    return 'transient';
+  }
+
+  const haystack = `${element.className ?? ''} ${element.dataTestId ?? ''}`.toLowerCase();
+  const transientHints = ['toast', 'snackbar', 'sonner', 'notistack', 'react-hot-toast', 'mantine-notification'];
+  if (transientHints.some((hint) => haystack.includes(hint))) {
+    return 'transient';
+  }
+
+  return 'unknown';
+}
+
 export function addLocatorCandidates(elements: DomElementSnapshot[]): DomElementSnapshot[] {
   return elements.map((element) => {
     const structuredLocatorPriority = buildStructuredLocatorPriority(element);
     const locatorPriority = structuredLocatorPriority.map(locatorToString);
+    const uiStability = element.uiStability ?? inferUiStability(element);
 
     return {
       ...element,
       suggestedLocator: locatorPriority[0],
       locatorPriority,
-      structuredLocatorPriority
+      structuredLocatorPriority,
+      uiStability
     };
   });
 }

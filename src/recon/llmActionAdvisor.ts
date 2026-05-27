@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { DomElementSnapshot } from '../types';
-import { callLLM } from '../llm/openaiClient';
+import { callLLM } from '../llm/llmClient';
 import { truncate } from '../utils/fileUtils';
 import { logger, redactSecrets } from '../utils/logger';
 import { sanitizePayload } from './actionParser';
@@ -80,7 +80,7 @@ export async function askLLMForActionDecision(input: LLMAdvisorInput): Promise<L
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    logger.warn(`LLM action advisor failed: ${reason}`);
+    logger.warn('LLM action advisor failed.', error);
     return {
       actionType: 'error',
       target: input.parsedAction.target ?? '',

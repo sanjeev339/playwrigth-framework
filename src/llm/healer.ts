@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'fs-extra';
 import type { PlaywrightRunResult, ReconSnapshot, Scenario } from '../types';
+import { inferUiStability } from '../recon/locatorCandidateBuilder';
 import {
   listFiles,
   readJsonFile,
@@ -12,7 +13,8 @@ import {
   writeTextFile
 } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
-import { callLLM } from './openaiClient';
+import { normalizeNestedTestImports } from '../utils/specImportPaths';
+import { callLLM } from './llmClient';
 
 interface HealingResult {
   generated_at: string;
@@ -63,14 +65,17 @@ export async function healFailedTests(options: {
   const generatedFiles = await filesToHeal(generatedDir, runResult.failedTestFiles);
   const healedFiles: string[] = [];
 
+  logger.info(`Healing ${generatedFiles.length} failed test file(s) using LLM provider from env.`);
+
   for (const generatedFile of generatedFiles) {
     const scenarioId = path.basename(generatedFile).replace(/\.spec\.ts$/, '');
     const scenarioPath = path.join(scenarioDir, `${scenarioId}.json`);
     const scenario = (await fs.pathExists(scenarioPath)) ? await readJsonFile<Scenario>(scenarioPath) : undefined;
     const snapshots = await readReconSnapshots(path.join(reconDir, scenarioId));
     const generatedCode = await readTextFile(generatedFile);
+    logger.info(`Healing ${scenarioId} (${path.basename(generatedFile)}, ${snapshots.length} recon snapshot(s))...`);
     const prompt = buildHealerPrompt(generatedCode, runResult, snapshots, scenario);
-    const healedCode = stripCodeFence(await callLLM(prompt));
+    const healedCode = normalizeNestedTestImports(stripCodeFence(await callLLM(prompt)));
     const healedPath = path.join(outputDir, `${toSafeFileName(scenarioId)}.spec.ts`);
     await writeTextFile(healedPath, healedCode);
     healedFiles.push(healedPath);
@@ -110,12 +115,16 @@ function buildHealerPrompt(
     url: snapshot.url,
     action_error: snapshot.action_error,
     elements: snapshot.elements.map((element) => ({
+      tag: element.tag,
       text: element.text,
       role: element.role,
       label: element.label,
       placeholder: element.placeholder,
+      ariaLive: element.ariaLive,
+      className: element.className,
       suggestedLocator: element.suggestedLocator,
-      locatorPriority: element.locatorPriority
+      locatorPriority: element.locatorPriority,
+      uiStability: element.uiStability ?? inferUiStability(element)
     }))
   }));
 
@@ -128,9 +137,15 @@ function buildHealerPrompt(
       '- Do not change business flow.',
       '- Do not change test data.',
       '- Do not hardcode credentials.',
+      '- Prefer imports from @playwright/test only; inline locators instead of page objects when possible.',
+      '- If the input uses page objects or playwright.config, preserve them but fix paths: healed files live under tests/healed, so repo-root modules must be imported as ../../pages/..., ../../fixtures/..., ../../playwright.config — never ../pages/... or ../playwright.config (that resolves under tests/ and breaks).',
       '- Prefer recon locator candidates.',
       '- Fix strict mode violations by scoping locators.',
       '- Fix missing waits using Playwright auto-waiting patterns or expect.',
+      '- Transient UI / toasts: do not require mandatory expect(alert).toBeVisible() unless the scenario or plan explicitly requires proving that message. Prefer stable assertions (URL, headings). If a toast is asserted, do it immediately after the triggering action, before networkidle or long waits; use expect with timeout.',
+      '- Do not insert waitForLoadState("networkidle") before alert/toast assertions; remove or reorder if that pattern causes flakes.',
+      '- If the plan does not require the toast: use conditional visibility + dismiss (e.g. isVisible with short timeout then click close).',
+      '- Recon uiStability "transient": treat matching elements as optional for mandatory visibility unless the plan explicitly requires them.',
       '- Output code only, no Markdown fence.',
       '',
       'Scenario:',

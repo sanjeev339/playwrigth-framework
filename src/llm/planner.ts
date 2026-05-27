@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { Scenario } from '../types';
 import { listFiles, readJsonFile, resolveFromRoot, toSafeFileName, writeTextFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
-import { callLLM } from './openaiClient';
+import { callLLM } from './llmClient';
 
 export async function generatePlans(options: {
   scenarioDir?: string;
@@ -17,8 +17,11 @@ export async function generatePlans(options: {
     throw new Error(`No scenario files found in ${scenarioDir}. Run npm run build:scenarios first.`);
   }
 
+  logger.info(`Planning ${scenarioFiles.length} scenario(s) using LLM provider from env.`);
+
   for (const scenarioFile of scenarioFiles) {
     const scenario = await readJsonFile<Scenario>(scenarioFile);
+    logger.info(`Generating plan for ${scenario.scenario_id} (${path.basename(scenarioFile)})...`);
     const prompt = buildPlannerPrompt(scenario);
     const plan = await callLLM(prompt);
     const outputPath = path.join(outputDir, `${toSafeFileName(scenario.scenario_id)}.md`);
@@ -42,6 +45,7 @@ function buildPlannerPrompt(scenario: Scenario): string {
     '- Include preconditions.',
     '- Include step-by-step business flow.',
     '- Include assertions.',
+    '- Separate mandatory outcomes from optional UI: use explicit wording such as "Must:" for URL, page title/heading, and data visible in lists/forms; use "Optional (if visible):" for success toasts, snackbars, or brief banners that may auto-dismiss.',
     '- Include notes for dynamic UI states that need recon.',
     '',
     'Scenario JSON:',

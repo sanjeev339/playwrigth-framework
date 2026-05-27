@@ -61,6 +61,8 @@ export interface DomElementSnapshot {
   text?: string;
   role?: string;
   ariaLabel?: string;
+  /** From DOM `aria-live` — helps classify transient announcements. */
+  ariaLive?: string;
   label?: string;
   placeholder?: string;
   title?: string;
@@ -79,6 +81,8 @@ export interface DomElementSnapshot {
   suggestedLocator?: string;
   locatorPriority?: string[];
   structuredLocatorPriority?: StructuredLocator[];
+  /** Heuristic: ephemeral UI (toasts) vs stable — set during recon enrichment. */
+  uiStability?: 'transient' | 'stable' | 'unknown';
 }
 
 export interface AccessibilityNode {

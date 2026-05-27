@@ -120,15 +120,7 @@ if (require.main === module) {
       logger.info(`Built ${scenarios.length} scenario file(s).`);
     })
     .catch((error) => {
-      console.error('ERROR Scenario build failed.');
-      if (error instanceof Error) {
-        console.error(`Name: ${error.name}`);
-        console.error(`Message: ${error.message}`);
-        console.error(`Stack: ${error.stack}`);
-        console.error(`Context: failed during buildScenarios execution in src/scenario/scenarioBuilder.ts`);
-      } else {
-        console.error(`Details: ${String(error)}`);
-      }
+      logger.error('Scenario build failed.', error);
       process.exitCode = 1;
     });
 }

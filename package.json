@@ -21,6 +21,7 @@
     "test:normalizer": "ts-node src/scenario/stepNormalizer.test.ts"
   },
   "dependencies": {
+    "@google/genai": "^2.6.0",
     "dotenv": "^16.4.7",
     "fs-extra": "^11.2.0",
     "openai": "^4.77.0",

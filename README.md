@@ -49,9 +49,9 @@ Place payloads in `input/test_data.json`:
   {
     "scenario_id": "TC-UM-001",
     "payload": {
-      "First Name": "Priya",
+      "First Name": "Riya",
       "Last Name": "Sharma",
-      "Email Address": "priya.sharma@piraiinfotech.com",
+      "Email Address": "Riya.sharma@piraiinfotech.com",
       "Role": "Executive",
       "Status": "Pending"
     }
