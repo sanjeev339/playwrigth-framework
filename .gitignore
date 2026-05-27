@@ -11,3 +11,5 @@ reports/locator-validation.json
 reports/result.json
 reports/result.html
 recon/**/*.png
+.DS_Store
+recon/
