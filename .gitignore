@@ -1,34 +1,13 @@
-# Dependencies
 node_modules/
-.pnp
-.pnp.js
-
-# Environment
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Playwright
-test-results/
-playwright-report/
-blob-report/
-allure-results/
-allure-report/
-reports/
-screenshots/
-
-# System
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Misc
 dist/
-scratch/
+.env
+*.log
+playwright-report/
+test-results/
+reports/playwright-html/
+reports/playwright-report.json
+reports/run-result.json
+reports/locator-validation.json
+reports/result.json
+reports/result.html
+recon/**/*.png

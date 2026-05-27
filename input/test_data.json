@@ -1,0 +1,19 @@
+[
+  {
+    "scenario_id": "TC-UM-001",
+    "execution_order": 1,
+    "data_strategy": "positive_valid_create",
+    "edge_case_type": null,
+    "depends_on": [],
+    "payload": {
+      "First Name": "Priya",
+      "Last Name": "Sharma",
+      "Full Name": "Priya Sharma",
+      "Email Address": "priya.sharma+auto001@piraiinfotech.com",
+      "Role": "ADMIN 1",
+      "Status": "Pending",
+      "Created Date": "2026-04-01T12:00:00",
+      "Created By": "Client_admin01"
+    }
+  }
+]

@@ -1,0 +1,524 @@
+{
+  "scenario_id": "TC-UM-001",
+  "state": "login-page",
+  "url": "https://adminportal.dev.eigen-dyne.com/login/",
+  "timestamp": "2026-05-26T13:24:58.835Z",
+  "action_before_snapshot": "Open login page",
+  "decision": null,
+  "action_error": null,
+  "elements": [
+    {
+      "index": 0,
+      "tag": "label",
+      "className": "mb-2 block font-semibold text-[12px] text-[var(--label-text-color)] ",
+      "text": "Email Address *",
+      "label": "Email Address *",
+      "isVisible": true,
+      "isEnabled": true,
+      "isLikelyClickable": false,
+      "boundingBox": {
+        "x": 740,
+        "y": 315,
+        "width": 440,
+        "height": 18
+      },
+      "cssCandidate": "div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(1) > label:nth-of-type(1)",
+      "xpathCandidate": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[1]/label[1]",
+      "suggestedLocator": "page.getByLabel(/Email Address \\*/i)",
+      "locatorPriority": [
+        "page.getByLabel(/Email Address \\*/i)",
+        "page.getByText(/Email Address \\*/i)",
+        "page.locator(\"div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(1) > label:nth-of-type(1)\")",
+        "page.locator(\"xpath=/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[1]/label[1]\")"
+      ],
+      "structuredLocatorPriority": [
+        {
+          "method": "getByLabel",
+          "text": "Email Address *",
+          "exact": false
+        },
+        {
+          "method": "getByText",
+          "text": "Email Address *",
+          "exact": false
+        },
+        {
+          "method": "css",
+          "selector": "div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(1) > label:nth-of-type(1)"
+        },
+        {
+          "method": "xpath",
+          "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[1]/label[1]"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "tag": "input",
+      "type": "email",
+      "id": "email",
+      "name": "email",
+      "className": "h-[36px] w-full rounded-[8px] border bg-[var(--color-background)]! px-3 py-2 !text-[12px] ring-0! outline-none placeholder:text-[var(--gray-text-color)] focus:border-[var(--primary...",
+      "label": "Email Address *",
+      "placeholder": "Enter your Email",
+      "value": "",
+      "isVisible": true,
+      "isEnabled": true,
+      "isLikelyClickable": true,
+      "boundingBox": {
+        "x": 740,
+        "y": 341,
+        "width": 440,
+        "height": 44
+      },
+      "cssCandidate": "input[name=\"email\"]",
+      "xpathCandidate": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[1]/div[1]/div[1]/input[1]",
+      "suggestedLocator": "page.getByRole(\"textbox\", { name: /Email Address \\*/i })",
+      "locatorPriority": [
+        "page.getByRole(\"textbox\", { name: /Email Address \\*/i })",
+        "page.getByLabel(/Email Address \\*/i)",
+        "page.getByPlaceholder(/Enter your Email/i)",
+        "page.locator(\"[name=\\\"email\\\"]\")",
+        "page.locator(\"#email\")",
+        "page.locator(\"input[name=\\\"email\\\"]\")",
+        "page.locator(\"xpath=/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[1]/div[1]/div[1]/input[1]\")"
+      ],
+      "structuredLocatorPriority": [
+        {
+          "method": "getByRole",
+          "role": "textbox",
+          "name": "Email Address *",
+          "exact": false
+        },
+        {
+          "method": "getByLabel",
+          "text": "Email Address *",
+          "exact": false
+        },
+        {
+          "method": "getByPlaceholder",
+          "text": "Enter your Email",
+          "exact": false
+        },
+        {
+          "method": "css",
+          "selector": "[name=\"email\"]"
+        },
+        {
+          "method": "css",
+          "selector": "#email"
+        },
+        {
+          "method": "css",
+          "selector": "input[name=\"email\"]"
+        },
+        {
+          "method": "xpath",
+          "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[1]/div[1]/div[1]/input[1]"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "tag": "label",
+      "className": "mb-2 block font-semibold text-[12px] text-[var(--label-text-color)] ",
+      "text": "Password *",
+      "label": "Password *",
+      "isVisible": true,
+      "isEnabled": true,
+      "isLikelyClickable": false,
+      "boundingBox": {
+        "x": 740,
+        "y": 405,
+        "width": 440,
+        "height": 18
+      },
+      "cssCandidate": "div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(2) > label:nth-of-type(1)",
+      "xpathCandidate": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/label[1]",
+      "suggestedLocator": "page.getByLabel(/Password \\*/i)",
+      "locatorPriority": [
+        "page.getByLabel(/Password \\*/i)",
+        "page.getByText(/Password \\*/i)",
+        "page.locator(\"div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(2) > label:nth-of-type(1)\")",
+        "page.locator(\"xpath=/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/label[1]\")"
+      ],
+      "structuredLocatorPriority": [
+        {
+          "method": "getByLabel",
+          "text": "Password *",
+          "exact": false
+        },
+        {
+          "method": "getByText",
+          "text": "Password *",
+          "exact": false
+        },
+        {
+          "method": "css",
+          "selector": "div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(2) > label:nth-of-type(1)"
+        },
+        {
+          "method": "xpath",
+          "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/label[1]"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "tag": "input",
+      "type": "password",
+      "id": "password",
+      "name": "password",
+      "className": "h-[36px] w-full rounded-[8px] border bg-[var(--color-background)]! px-3 py-2 !text-[12px] ring-0! outline-none placeholder:text-[var(--gray-text-color)] focus:border-[var(--primary...",
+      "label": "Password *",
+      "placeholder": "Enter your Password",
+      "isVisible": true,
+      "isEnabled": true,
+      "isLikelyClickable": true,
+      "boundingBox": {
+        "x": 740,
+        "y": 431,
+        "width": 440,
+        "height": 44
+      },
+      "cssCandidate": "input[name=\"password\"]",
+      "xpathCandidate": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/div[1]/div[1]/input[1]",
+      "suggestedLocator": "page.getByRole(\"textbox\", { name: /Password \\*/i })",
+      "locatorPriority": [
+        "page.getByRole(\"textbox\", { name: /Password \\*/i })",
+        "page.getByLabel(/Password \\*/i)",
+        "page.getByPlaceholder(/Enter your Password/i)",
+        "page.locator(\"[name=\\\"password\\\"]\")",
+        "page.locator(\"#password\")",
+        "page.locator(\"input[name=\\\"password\\\"]\")",
+        "page.locator(\"xpath=/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/div[1]/div[1]/input[1]\")"
+      ],
+      "structuredLocatorPriority": [
+        {
+          "method": "getByRole",
+          "role": "textbox",
+          "name": "Password *",
+          "exact": false
+        },
+        {
+          "method": "getByLabel",
+          "text": "Password *",
+          "exact": false
+        },
+        {
+          "method": "getByPlaceholder",
+          "text": "Enter your Password",
+          "exact": false
+        },
+        {
+          "method": "css",
+          "selector": "[name=\"password\"]"
+        },
+        {
+          "method": "css",
+          "selector": "#password"
+        },
+        {
+          "method": "css",
+          "selector": "input[name=\"password\"]"
+        },
+        {
+          "method": "xpath",
+          "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/div[1]/div[1]/input[1]"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "tag": "a",
+      "className": "text-[12px] font-semibold text-(--primary-blue) hover:underline",
+      "text": "Forgot Password?",
+      "title": "Forgot Password",
+      "href": "https://adminportal.dev.eigen-dyne.com/login/forgot-password",
+      "isVisible": true,
+      "isEnabled": true,
+      "isLikelyClickable": true,
+      "boundingBox": {
+        "x": 1075,
+        "y": 495,
+        "width": 105,
+        "height": 18
+      },
+      "cssCandidate": "div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(3) > a:nth-of-type(1)",
+      "xpathCandidate": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[3]/a[1]",
+      "suggestedLocator": "page.getByRole(\"link\", { name: /Forgot Password\\?/i })",
+      "locatorPriority": [
+        "page.getByRole(\"link\", { name: /Forgot Password\\?/i })",
+        "page.getByText(/Forgot Password\\?/i)",
+        "page.locator(\"div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(3) > a:nth-of-type(1)\")",
+        "page.locator(\"xpath=/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[3]/a[1]\")"
+      ],
+      "structuredLocatorPriority": [
+        {
+          "method": "getByRole",
+          "role": "link",
+          "name": "Forgot Password?",
+          "exact": false
+        },
+        {
+          "method": "getByText",
+          "text": "Forgot Password?",
+          "exact": false
+        },
+        {
+          "method": "css",
+          "selector": "div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(3) > a:nth-of-type(1)"
+        },
+        {
+          "method": "xpath",
+          "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[3]/a[1]"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "tag": "button",
+      "type": "submit",
+      "className": "h-[48px]! w-full \n    transition-all duration-300 ease-out hover:scale-[1.02]\n    \n      relative overflow-hidden\n      before:content-[\"\"] \n      before:absolute \n      before:top...",
+      "text": "Login",
+      "isVisible": true,
+      "isEnabled": true,
+      "isLikelyClickable": true,
+      "boundingBox": {
+        "x": 740,
+        "y": 533,
+        "width": 440,
+        "height": 48
+      },
+      "cssCandidate": "div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(4) > button:nth-of-type(1)",
+      "xpathCandidate": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]",
+      "suggestedLocator": "page.getByRole(\"button\", { name: /Login/i })",
+      "locatorPriority": [
+        "page.getByRole(\"button\", { name: /Login/i })",
+        "page.getByText(/Login/i)",
+        "page.locator(\"div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(4) > button:nth-of-type(1)\")",
+        "page.locator(\"xpath=/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]\")"
+      ],
+      "structuredLocatorPriority": [
+        {
+          "method": "getByRole",
+          "role": "button",
+          "name": "Login",
+          "exact": false
+        },
+        {
+          "method": "getByText",
+          "text": "Login",
+          "exact": false
+        },
+        {
+          "method": "css",
+          "selector": "div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(4) > button:nth-of-type(1)"
+        },
+        {
+          "method": "xpath",
+          "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]"
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "tag": "div",
+      "className": "absolute right-3 flex items-center justify-center cursor-pointer text-[var(--gray-text-color)]",
+      "isVisible": true,
+      "isEnabled": true,
+      "isLikelyClickable": true,
+      "boundingBox": {
+        "x": 1152,
+        "y": 445,
+        "width": 16,
+        "height": 16
+      },
+      "cssCandidate": "div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)",
+      "xpathCandidate": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/div[1]/div[1]/div[1]",
+      "suggestedLocator": "page.locator(\"div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)\")",
+      "locatorPriority": [
+        "page.locator(\"div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)\")",
+        "page.locator(\"xpath=/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/div[1]/div[1]/div[1]\")"
+      ],
+      "structuredLocatorPriority": [
+        {
+          "method": "css",
+          "selector": "div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)"
+        },
+        {
+          "method": "xpath",
+          "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/div[1]/div[1]/div[1]"
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "tag": "div",
+      "isVisible": true,
+      "isEnabled": true,
+      "isLikelyClickable": true,
+      "boundingBox": {
+        "x": 1152,
+        "y": 445,
+        "width": 16,
+        "height": 16
+      },
+      "cssCandidate": "div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)",
+      "xpathCandidate": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/div[1]/div[1]/div[1]/div[1]",
+      "suggestedLocator": "page.locator(\"div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)\")",
+      "locatorPriority": [
+        "page.locator(\"div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)\")",
+        "page.locator(\"xpath=/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/div[1]/div[1]/div[1]/div[1]\")"
+      ],
+      "structuredLocatorPriority": [
+        {
+          "method": "css",
+          "selector": "div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)"
+        },
+        {
+          "method": "xpath",
+          "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/div[1]/div[1]/div[1]/div[1]"
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "tag": "div",
+      "className": "mx-auto flex items-center justify-center gap-2 text-[12px] font-[600] ",
+      "text": "Login",
+      "isVisible": true,
+      "isEnabled": true,
+      "isLikelyClickable": true,
+      "boundingBox": {
+        "x": 932,
+        "y": 548,
+        "width": 57,
+        "height": 18
+      },
+      "cssCandidate": "form:nth-of-type(1) > div:nth-of-type(4) > button:nth-of-type(1) > div:nth-of-type(1)",
+      "xpathCandidate": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]",
+      "suggestedLocator": "page.getByText(/Login/i)",
+      "locatorPriority": [
+        "page.getByText(/Login/i)",
+        "page.locator(\"form:nth-of-type(1) > div:nth-of-type(4) > button:nth-of-type(1) > div:nth-of-type(1)\")",
+        "page.locator(\"xpath=/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]\")"
+      ],
+      "structuredLocatorPriority": [
+        {
+          "method": "getByText",
+          "text": "Login",
+          "exact": false
+        },
+        {
+          "method": "css",
+          "selector": "form:nth-of-type(1) > div:nth-of-type(4) > button:nth-of-type(1) > div:nth-of-type(1)"
+        },
+        {
+          "method": "xpath",
+          "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]"
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "tag": "span",
+      "className": "text-[12px] font-[600] flex-1 text-center whitespace-nowrap  ",
+      "text": "Login",
+      "isVisible": true,
+      "isEnabled": true,
+      "isLikelyClickable": true,
+      "boundingBox": {
+        "x": 932,
+        "y": 548,
+        "width": 33,
+        "height": 18
+      },
+      "cssCandidate": "div:nth-of-type(4) > button:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1)",
+      "xpathCandidate": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]/span[1]",
+      "suggestedLocator": "page.getByText(/Login/i)",
+      "locatorPriority": [
+        "page.getByText(/Login/i)",
+        "page.locator(\"div:nth-of-type(4) > button:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1)\")",
+        "page.locator(\"xpath=/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]/span[1]\")"
+      ],
+      "structuredLocatorPriority": [
+        {
+          "method": "getByText",
+          "text": "Login",
+          "exact": false
+        },
+        {
+          "method": "css",
+          "selector": "div:nth-of-type(4) > button:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1)"
+        },
+        {
+          "method": "xpath",
+          "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]/span[1]"
+        }
+      ]
+    },
+    {
+      "index": 10,
+      "tag": "span",
+      "className": "flex-shrink-0 ",
+      "isVisible": true,
+      "isEnabled": true,
+      "isLikelyClickable": true,
+      "boundingBox": {
+        "x": 972,
+        "y": 549,
+        "width": 16,
+        "height": 16
+      },
+      "cssCandidate": "div:nth-of-type(4) > button:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(2)",
+      "xpathCandidate": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]/span[2]",
+      "suggestedLocator": "page.locator(\"div:nth-of-type(4) > button:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(2)\")",
+      "locatorPriority": [
+        "page.locator(\"div:nth-of-type(4) > button:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(2)\")",
+        "page.locator(\"xpath=/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]/span[2]\")"
+      ],
+      "structuredLocatorPriority": [
+        {
+          "method": "css",
+          "selector": "div:nth-of-type(4) > button:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(2)"
+        },
+        {
+          "method": "xpath",
+          "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]/span[2]"
+        }
+      ]
+    },
+    {
+      "index": 11,
+      "tag": "div",
+      "isVisible": true,
+      "isEnabled": true,
+      "isLikelyClickable": true,
+      "boundingBox": {
+        "x": 972,
+        "y": 549,
+        "width": 16,
+        "height": 16
+      },
+      "cssCandidate": "button:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(2) > div:nth-of-type(1)",
+      "xpathCandidate": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]/span[2]/div[1]",
+      "suggestedLocator": "page.locator(\"button:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(2) > div:nth-of-type(1)\")",
+      "locatorPriority": [
+        "page.locator(\"button:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(2) > div:nth-of-type(1)\")",
+        "page.locator(\"xpath=/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]/span[2]/div[1]\")"
+      ],
+      "structuredLocatorPriority": [
+        {
+          "method": "css",
+          "selector": "button:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(2) > div:nth-of-type(1)"
+        },
+        {
+          "method": "xpath",
+          "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]/span[2]/div[1]"
+        }
+      ]
+    }
+  ],
+  "accessibility": {}
+}
