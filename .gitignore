@@ -10,8 +10,6 @@ reports/run-result.json
 reports/locator-validation.json
 reports/result.json
 reports/result.html
-recon/**/*.png
+recon/**
 .DS_Store
-recon/
-scenarios/
-
+scenarios/** */
