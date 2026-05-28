@@ -8,6 +8,7 @@ import { logger } from '../utils/logger';
 import { decideAndExecuteAction } from './actionDecisionEngine';
 import { scanAccessibility } from './accessibilityScanner';
 import { scanVisibleDom } from './domScanner';
+import { waitForRafCycles, waitForSnapshotStability } from './pageStabilizer';
 import type { ReconDecision } from './reconDecisionTypes';
 import { writeStateSnapshot } from './stateSnapshotWriter';
 
@@ -52,6 +53,7 @@ export async function runInteractiveRecon(options: {
 
       const context = await browser.newContext();
       const page = await context.newPage();
+      const snapshotSessionId = `${safeScenarioId}-${Date.now()}`;
       let sequence = 1;
       const previousActionErrors: string[] = [];
 
@@ -65,7 +67,8 @@ export async function runInteractiveRecon(options: {
           state: 'login-page',
           actionBeforeSnapshot: 'Open login page',
           decision: null,
-          actionError: null
+          actionError: null,
+          snapshotSessionId
         });
         writtenSnapshots.push(loginSnapshot.filePath);
 
@@ -81,7 +84,8 @@ export async function runInteractiveRecon(options: {
           state: 'dashboard-page',
           actionBeforeSnapshot: 'Perform login',
           decision: null,
-          actionError: loginError
+          actionError: loginError,
+          snapshotSessionId
         });
         writtenSnapshots.push(dashboardSnapshot.filePath);
 
@@ -95,7 +99,8 @@ export async function runInteractiveRecon(options: {
             state: `step-${stepNo}-before`,
             actionBeforeSnapshot: step.instruction,
             decision: null,
-            actionError: null
+            actionError: null,
+            snapshotSessionId
           });
           writtenSnapshots.push(before.filePath);
 
@@ -115,7 +120,8 @@ export async function runInteractiveRecon(options: {
                 state,
                 actionBeforeSnapshot,
                 decision: intermediateDecision,
-                actionError: intermediateDecision.actionError ?? null
+                actionError: intermediateDecision.actionError ?? null,
+                snapshotSessionId
               });
               writtenSnapshots.push(dropdownSnapshot.filePath);
             }
@@ -134,7 +140,8 @@ export async function runInteractiveRecon(options: {
             state: `step-${stepNo}-after`,
             actionBeforeSnapshot: step.instruction,
             decision,
-            actionError: decision.actionError ?? null
+            actionError: decision.actionError ?? null,
+            snapshotSessionId
           });
           writtenSnapshots.push(after.filePath);
         }
@@ -166,6 +173,10 @@ function logReconDecision(stepNo: number, instruction: string, decision: ReconDe
   console.log(`[Recon] Safe candidates: ${safeCandidates}`);
   console.log(`[Recon] LLM used: ${llmUsed}`);
   console.log(`[Recon] LLM parse status: ${llmParseStatus}`);
+  console.log(`[Recon] Action confidence: ${decision.confidence ?? 'n/a'}`);
+  console.log(
+    `[Recon] Selector confidence: ${decision.selectorConfidenceScore ?? 'n/a'} (${decision.selectorRisk ?? 'n/a'})`
+  );
   if (decision.llmParseError) {
     console.log(`[Recon] LLM parse error: ${decision.llmParseError}`);
     console.log(`[Recon] LLM raw response preview: ${decision.llmRawResponsePreview ?? ''}`);
@@ -184,8 +195,16 @@ async function captureSnapshot(input: {
   actionBeforeSnapshot: string;
   decision: ReconDecision | null;
   actionError: string | null;
+  snapshotSessionId: string;
 }): Promise<CapturedSnapshot> {
+  const stabilization = await waitForSnapshotStability(input.page);
+  if (stabilization.timedOut) {
+    logger.warn(
+      `[stabilizer] timeout reached before quiet window (state=${input.state}, quietWindowMs=${stabilization.mutationQuietWindowMs}, durationMs=${stabilization.durationMs}).`
+    );
+  }
   const elements = await scanVisibleDom(input.page);
+  await waitForRafCycles(input.page, 2);
   const accessibility = await scanAccessibility(input.page);
   const snapshot: ReconSnapshot = {
     scenario_id: input.scenarioId,
@@ -195,6 +214,9 @@ async function captureSnapshot(input: {
     action_before_snapshot: input.actionBeforeSnapshot,
     decision: input.decision,
     action_error: input.actionError,
+    snapshotSessionId: input.snapshotSessionId,
+    snapshotSequence: input.sequence,
+    stabilization,
     elements,
     accessibility
   };

@@ -13,3 +13,5 @@ reports/result.html
 recon/**/*.png
 .DS_Store
 recon/
+scenarios/
+

@@ -46,6 +46,7 @@ export async function resolveDeterministicCandidates(
         locatorType: structuredLocator.method,
         priority: match.score + locatorPreference(parsedAction, structuredLocator, element) + index,
         source: `deterministic:${match.matchFields.join(',')}`,
+        ...scoreCandidateConfidence(structuredLocator, element),
         elementSummary: summarizeElement(element),
         structuredLocator
       });
@@ -320,6 +321,40 @@ function dedupeCandidates(candidates: LocatorCandidate[]): LocatorCandidate[] {
   }
 
   return [...byLocator.values()];
+}
+
+function scoreCandidateConfidence(
+  locator: StructuredLocator,
+  element: DomElementSnapshot
+): Pick<LocatorCandidate, 'selectorConfidenceScore' | 'selectorRisk' | 'selectorConfidenceSignals'> {
+  let score = element.selectorConfidenceScore ?? 0.5;
+  const signals = new Set<string>(element.selectorConfidenceSignals ?? []);
+
+  if (locator.method === 'getByTestId') {
+    score += 0.15;
+    signals.add('testIdLocator');
+  } else if (locator.method === 'getByRole') {
+    score += 0.08;
+    signals.add('roleLocator');
+  } else if (locator.method === 'xpath') {
+    score -= 0.15;
+    signals.add('xpathPenalty');
+  }
+
+  if (locator.method === 'css' && locator.selector.includes(':nth-')) {
+    score -= 0.2;
+    signals.add('nthChildPenalty');
+  }
+
+  const normalized = Math.max(0, Math.min(1, Number(score.toFixed(2))));
+  const selectorRisk: 'low' | 'medium' | 'high' =
+    normalized >= 0.8 ? 'low' : normalized >= 0.55 ? 'medium' : 'high';
+
+  return {
+    selectorConfidenceScore: normalized,
+    selectorRisk,
+    selectorConfidenceSignals: [...signals]
+  };
 }
 
 function targetWords(value: string): string[] {

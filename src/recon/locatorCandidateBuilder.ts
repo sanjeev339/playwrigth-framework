@@ -36,12 +36,17 @@ export function addLocatorCandidates(elements: DomElementSnapshot[]): DomElement
     const structuredLocatorPriority = buildStructuredLocatorPriority(element);
     const locatorPriority = structuredLocatorPriority.map(locatorToString);
     const uiStability = element.uiStability ?? inferUiStability(element);
+    const primaryLocator = structuredLocatorPriority[0];
+    const confidence = primaryLocator ? scoreLocatorStructuralConfidence(element, primaryLocator) : undefined;
 
     return {
       ...element,
       suggestedLocator: locatorPriority[0],
       locatorPriority,
       structuredLocatorPriority,
+      selectorConfidenceScore: confidence?.score,
+      selectorRisk: confidence?.risk,
+      selectorConfidenceSignals: confidence?.signals,
       uiStability
     };
   });
@@ -197,4 +202,77 @@ function dedupeStructuredLocators(locators: StructuredLocator[]): StructuredLoca
   }
 
   return deduped;
+}
+
+function scoreLocatorStructuralConfidence(
+  element: DomElementSnapshot,
+  locator: StructuredLocator
+): { score: number; risk: 'low' | 'medium' | 'high'; signals: string[] } {
+  let score = 0.45;
+  const signals: string[] = [];
+
+  if (element.dataTestId || element.dataTest || element.dataCy || element.dataQa) {
+    score += 0.35;
+    signals.push('hasTestAttribute');
+  }
+
+  if (locator.method === 'getByRole') {
+    score += 0.25;
+    signals.push('roleBased');
+    if (locator.name && locator.name.length <= 80) {
+      score += 0.05;
+      signals.push('accessibleName');
+    }
+  }
+
+  if (locator.method === 'getByLabel') {
+    score += 0.22;
+    signals.push('labelAssociated');
+  }
+
+  if (locator.method === 'getByPlaceholder') {
+    score += 0.14;
+    signals.push('placeholderBased');
+  }
+
+  if (element.id && isStableIdentifier(element.id)) {
+    score += 0.12;
+    signals.push('stableId');
+  } else if (element.id) {
+    score -= 0.08;
+    signals.push('dynamicIdPattern');
+  }
+
+  if (locator.method === 'getByText') {
+    score -= 0.08;
+    signals.push('textOnlySelector');
+  }
+
+  if (locator.method === 'xpath') {
+    score -= 0.2;
+    signals.push('xpathSelector');
+    if (locator.selector.includes('[')) {
+      score -= 0.08;
+      signals.push('positionalXpath');
+    }
+  }
+
+  if (locator.method === 'css') {
+    if (locator.selector.includes(':nth-')) {
+      score -= 0.22;
+      signals.push('nthChildPattern');
+    }
+    if (locator.selector.split('>').length >= 4) {
+      score -= 0.08;
+      signals.push('deepAncestryChain');
+    }
+    if (/[._-][A-Za-z]*[0-9a-f]{6,}/.test(locator.selector)) {
+      score -= 0.15;
+      signals.push('hashLikeClassPattern');
+    }
+  }
+
+  const normalized = Math.max(0, Math.min(1, Number(score.toFixed(2))));
+  const risk: 'low' | 'medium' | 'high' = normalized >= 0.8 ? 'low' : normalized >= 0.55 ? 'medium' : 'high';
+  return { score: normalized, risk, signals };
 }

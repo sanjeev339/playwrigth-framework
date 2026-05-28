@@ -86,6 +86,9 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
         selectedValue: parsedAction.value,
         decisionSource: 'deterministic',
         confidence: 'high',
+        selectorConfidenceScore: deterministicSelection.selectorConfidenceScore,
+        selectorRisk: deterministicSelection.selectorRisk,
+        selectorConfidenceSignals: deterministicSelection.selectorConfidenceSignals,
         reason:
           safeCandidates.length === 1
             ? 'Exactly one deterministic safe locator matched.'
@@ -112,6 +115,12 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
     decision.confidence = advisorDecision.confidence;
     decision.selectedLocator = advisorDecision.selectedLocator;
     decision.selectedValue = advisorDecision.value ?? parsedAction.value;
+    const selectedCandidate = deterministicCandidates.find((candidate) => candidate.locator === advisorDecision.selectedLocator);
+    if (selectedCandidate) {
+      decision.selectorConfidenceScore = selectedCandidate.selectorConfidenceScore;
+      decision.selectorRisk = selectedCandidate.selectorRisk;
+      decision.selectorConfidenceSignals = selectedCandidate.selectorConfidenceSignals;
+    }
 
     if (advisorDecision.actionType === 'skip') {
       return {
@@ -160,6 +169,9 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
       selectedValue: advisorDecision.value ?? parsedAction.value,
       decisionSource: 'llm',
       confidence: advisorDecision.confidence,
+      selectorConfidenceScore: selectedCandidate?.selectorConfidenceScore,
+      selectorRisk: selectedCandidate?.selectorRisk,
+      selectorConfidenceSignals: selectedCandidate?.selectorConfidenceSignals,
       reason: advisorDecision.reason,
       knownCandidates: deterministicCandidates
     });
@@ -277,6 +289,9 @@ async function executeSelectedLocator(
     selectedValue: string | null;
     decisionSource: 'deterministic' | 'llm';
     confidence: 'high' | 'medium' | 'low';
+    selectorConfidenceScore?: number;
+    selectorRisk?: 'low' | 'medium' | 'high';
+    selectorConfidenceSignals?: string[];
     reason: string;
     knownCandidates: LocatorCandidate[];
   }
@@ -290,6 +305,9 @@ async function executeSelectedLocator(
       selectedValue: options.selectedValue,
       llmReason: options.reason,
       confidence: options.confidence,
+      selectorConfidenceScore: options.selectorConfidenceScore,
+      selectorRisk: options.selectorRisk,
+      selectorConfidenceSignals: options.selectorConfidenceSignals,
       actionStatus: 'failed',
       actionError: `Unsupported locator: ${options.selectedLocator}`
     };
@@ -324,6 +342,9 @@ async function executeSelectedLocator(
         selectedValue: options.selectedValue,
         llmReason: options.reason,
         confidence: options.confidence,
+        selectorConfidenceScore: options.selectorConfidenceScore,
+        selectorRisk: options.selectorRisk,
+        selectorConfidenceSignals: options.selectorConfidenceSignals,
         actionStatus: 'skipped',
         actionError: `Action ${options.parsedAction.actionType} is not executable.`
       };
@@ -337,6 +358,9 @@ async function executeSelectedLocator(
       selectedValue: options.selectedValue,
       llmReason: options.reason,
       confidence: options.confidence,
+      selectorConfidenceScore: options.selectorConfidenceScore,
+      selectorRisk: options.selectorRisk,
+      selectorConfidenceSignals: options.selectorConfidenceSignals,
       executed: true,
       actionStatus: 'success',
       actionError: null
@@ -350,6 +374,9 @@ async function executeSelectedLocator(
       selectedValue: options.selectedValue,
       llmReason: options.reason,
       confidence: options.confidence,
+      selectorConfidenceScore: options.selectorConfidenceScore,
+      selectorRisk: options.selectorRisk,
+      selectorConfidenceSignals: options.selectorConfidenceSignals,
       executed: false,
       actionStatus: 'failed',
       actionError: error instanceof Error ? error.message : String(error)

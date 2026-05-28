@@ -36,6 +36,9 @@ export interface LocatorCandidate {
   locatorType: string;
   priority: number;
   source: string;
+  selectorConfidenceScore?: number;
+  selectorRisk?: 'low' | 'medium' | 'high';
+  selectorConfidenceSignals?: string[];
   elementSummary?: Record<string, unknown>;
   structuredLocator: StructuredLocator;
 }
@@ -74,6 +77,9 @@ export interface ReconDecision {
   selectedValue: string | null;
   llmReason?: string;
   confidence?: 'high' | 'medium' | 'low';
+  selectorConfidenceScore?: number;
+  selectorRisk?: 'low' | 'medium' | 'high';
+  selectorConfidenceSignals?: string[];
   llmRawResponsePreview?: string;
   llmParseError?: string | null;
   llmRetryUsed?: boolean;

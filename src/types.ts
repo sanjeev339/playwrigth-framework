@@ -81,8 +81,21 @@ export interface DomElementSnapshot {
   suggestedLocator?: string;
   locatorPriority?: string[];
   structuredLocatorPriority?: StructuredLocator[];
+  /**
+   * Deterministic structural confidence estimate (0..1) for the top-ranked locator.
+   * This is not a correctness probability.
+   */
+  selectorConfidenceScore?: number;
+  selectorRisk?: 'low' | 'medium' | 'high';
+  selectorConfidenceSignals?: string[];
   /** Heuristic: ephemeral UI (toasts) vs stable — set during recon enrichment. */
   uiStability?: 'transient' | 'stable' | 'unknown';
+}
+
+export interface SnapshotStabilizationTelemetry {
+  durationMs: number;
+  mutationQuietWindowMs: number;
+  timedOut: boolean;
 }
 
 export interface AccessibilityNode {
@@ -102,6 +115,9 @@ export interface ReconSnapshot {
   action_before_snapshot?: string;
   decision?: ReconDecision | null;
   action_error: string | null;
+  snapshotSessionId?: string;
+  snapshotSequence?: number;
+  stabilization?: SnapshotStabilizationTelemetry;
   elements: DomElementSnapshot[];
   accessibility: AccessibilityNode | Record<string, never>;
 }
