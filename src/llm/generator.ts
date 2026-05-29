@@ -12,6 +12,8 @@ import {
 } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 import { normalizeNestedTestImports } from '../utils/specImportPaths';
+import { normalizeGeneratedWebsiteUrlUsage, websiteUrlPromptRules } from '../utils/websiteUrl';
+import { requireEnvValue } from '../config/env';
 import { callLLM } from './llmClient';
 
 export async function generateTests(options: {
@@ -44,7 +46,7 @@ export async function generateTests(options: {
     logger.info(`Loaded ${snapshots.length} recon snapshot(s) for ${scenario.scenario_id}.`);
     const prompt = buildGeneratorPrompt(scenario, plan, snapshots);
     const generated = await callLLM(prompt);
-    const code = normalizeNestedTestImports(stripCodeFence(generated));
+    const code = normalizeGeneratedWebsiteUrlUsage(normalizeNestedTestImports(stripCodeFence(generated)));
     const outputPath = path.join(outputDir, `${safeScenarioId}.spec.ts`);
     await writeTextFile(outputPath, code);
     writtenFiles.push(outputPath);
@@ -60,6 +62,10 @@ async function readReconSnapshots(reconPath: string): Promise<ReconSnapshot[]> {
 }
 
 function buildGeneratorPrompt(scenario: Scenario, plan: string, snapshots: ReconSnapshot[]): string {
+  const entryUrl =
+    snapshots.find((snapshot) => snapshot.state === 'login-page')?.url ?? requireEnvValue('WEBSITE_URL');
+  const websiteUrlRules = websiteUrlPromptRules(entryUrl);
+
   const compactSnapshots = snapshots.map((snapshot) => ({
     scenario_id: snapshot.scenario_id,
     state: snapshot.state,
@@ -93,6 +99,7 @@ function buildGeneratorPrompt(scenario: Scenario, plan: string, snapshots: Recon
       '- Use process.env.WEBSITE_URL.',
       '- Use process.env.LOGIN_EMAIL.',
       '- Use process.env.LOGIN_PASSWORD.',
+      websiteUrlRules,
       '- Never hardcode login credentials.',
       '- Use payload values for business data.',
       '- Prefer locators from recon snapshot suggestedLocator and locatorPriority.',

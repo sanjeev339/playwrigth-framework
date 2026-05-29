@@ -33,6 +33,26 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
   const decision = createBaseDecision(input.scenarioId, parsedAction);
 
   try {
+    if (parsedAction.parseStatus === 'failed') {
+      return {
+        ...decision,
+        actionStatus: 'failed',
+        actionError: `parse_failure: ${parsedAction.parseReason ?? 'parse_failed'}`
+      };
+    }
+
+    if (
+      parsedAction.parseStatus === 'ambiguous' &&
+      ['click', 'select', 'fill', 'navigate'].includes(parsedAction.actionType) &&
+      !parsedAction.target
+    ) {
+      return {
+        ...decision,
+        actionStatus: 'failed',
+        actionError: `parse_failure: ${parsedAction.parseReason ?? 'ambiguous_target'}`
+      };
+    }
+
     if (parsedAction.actionType === 'verify') {
       return {
         ...decision,
@@ -314,6 +334,8 @@ async function executeSelectedLocator(
   }
 
   try {
+    const beforeSignals = await collectUiTransitionSignals(input.page);
+
     if (options.parsedAction.actionType === 'click' || options.parsedAction.actionType === 'navigate') {
       await locator.click();
       await waitForSettledPage(input.page);
@@ -347,6 +369,25 @@ async function executeSelectedLocator(
         selectorConfidenceSignals: options.selectorConfidenceSignals,
         actionStatus: 'skipped',
         actionError: `Action ${options.parsedAction.actionType} is not executable.`
+      };
+    }
+
+    const transition = await verifyPostcondition(input.page, options.parsedAction.actionType, beforeSignals);
+    if (!transition.ok) {
+      return {
+        ...options.decision,
+        parsedAction: options.parsedAction,
+        decisionSource: options.decisionSource,
+        selectedLocator: options.selectedLocator,
+        selectedValue: options.selectedValue,
+        llmReason: options.reason,
+        confidence: options.confidence,
+        selectorConfidenceScore: options.selectorConfidenceScore,
+        selectorRisk: options.selectorRisk,
+        selectorConfidenceSignals: options.selectorConfidenceSignals,
+        executed: false,
+        actionStatus: 'failed',
+        actionError: `postcondition_failure: ${transition.reason}`
       };
     }
 
@@ -583,6 +624,45 @@ async function waitForSettledPage(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded').catch(() => undefined);
   await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
   await page.waitForTimeout(250);
+}
+
+async function collectUiTransitionSignals(page: Page): Promise<{ url: string; dialogLikeCount: number; visibleCount: number }> {
+  return page
+    .evaluate(() => {
+      const dialogLike = document.querySelectorAll('[role="dialog"], [role="menu"], [role="listbox"]').length;
+      const visible = Array.from(document.querySelectorAll<HTMLElement>('button,a,input,textarea,select,[role]')).filter((el) => {
+        const rect = el.getBoundingClientRect();
+        const style = window.getComputedStyle(el);
+        return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+      }).length;
+      return { url: window.location.href, dialogLikeCount: dialogLike, visibleCount: visible };
+    })
+    .catch(() => ({ url: page.url(), dialogLikeCount: 0, visibleCount: 0 }));
+}
+
+async function verifyPostcondition(
+  page: Page,
+  actionType: ParsedAction['actionType'],
+  before: { url: string; dialogLikeCount: number; visibleCount: number }
+): Promise<{ ok: boolean; reason?: string }> {
+  const after = await collectUiTransitionSignals(page);
+  const urlChanged = before.url !== after.url;
+  const dialogChanged = before.dialogLikeCount !== after.dialogLikeCount;
+  const visibleChanged = Math.abs(before.visibleCount - after.visibleCount) >= 2;
+
+  if (actionType === 'navigate') {
+    return urlChanged || visibleChanged ? { ok: true } : { ok: false, reason: 'navigate_no_state_change' };
+  }
+
+  if (actionType === 'click' || actionType === 'select') {
+    return urlChanged || dialogChanged || visibleChanged ? { ok: true } : { ok: false, reason: 'click_select_no_state_change' };
+  }
+
+  if (actionType === 'fill') {
+    return { ok: true };
+  }
+
+  return { ok: true };
 }
 
 function appendReason(existing: string | undefined, next: string): string {

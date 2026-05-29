@@ -23,6 +23,8 @@ export interface ScenarioStep {
   instruction: string;
   raw_instruction?: string;
   expected_result?: string;
+  normalization_strategy?: string;
+  normalization_context_from_previous?: boolean;
 }
 
 export interface Scenario {

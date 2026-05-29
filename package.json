@@ -18,7 +18,9 @@
     "report": "ts-node src/reports/reportWriter.ts",
     "pipeline": "npm run build:scenarios && npm run plan && npm run recon && npm run generate && npm run validate && npm run run:generated && npm run heal && npm run report",
     "typecheck": "tsc --noEmit",
-    "test:normalizer": "ts-node src/scenario/stepNormalizer.test.ts"
+    "test:normalizer": "ts-node tests/unit/scenario/stepNormalizer.test.ts",
+    "test:website-url": "ts-node tests/unit/utils/websiteUrl.test.ts",
+    "test:parser": "ts-node tests/unit/recon/actionParser.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.6.0",

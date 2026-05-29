@@ -14,6 +14,8 @@ import {
 } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 import { normalizeNestedTestImports } from '../utils/specImportPaths';
+import { normalizeGeneratedWebsiteUrlUsage, websiteUrlPromptRules } from '../utils/websiteUrl';
+import { requireEnvValue } from '../config/env';
 import { callLLM } from './llmClient';
 
 interface HealingResult {
@@ -75,7 +77,9 @@ export async function healFailedTests(options: {
     const generatedCode = await readTextFile(generatedFile);
     logger.info(`Healing ${scenarioId} (${path.basename(generatedFile)}, ${snapshots.length} recon snapshot(s))...`);
     const prompt = buildHealerPrompt(generatedCode, runResult, snapshots, scenario);
-    const healedCode = normalizeNestedTestImports(stripCodeFence(await callLLM(prompt)));
+    const healedCode = normalizeGeneratedWebsiteUrlUsage(
+      normalizeNestedTestImports(stripCodeFence(await callLLM(prompt)))
+    );
     const healedPath = path.join(outputDir, `${toSafeFileName(scenarioId)}.spec.ts`);
     await writeTextFile(healedPath, healedCode);
     healedFiles.push(healedPath);
@@ -110,6 +114,10 @@ function buildHealerPrompt(
   snapshots: ReconSnapshot[],
   scenario?: Scenario
 ): string {
+  const entryUrl =
+    snapshots.find((snapshot) => snapshot.state === 'login-page')?.url ?? requireEnvValue('WEBSITE_URL');
+  const websiteUrlRules = websiteUrlPromptRules(entryUrl);
+
   const compactSnapshots = snapshots.map((snapshot) => ({
     state: snapshot.state,
     url: snapshot.url,
@@ -137,6 +145,7 @@ function buildHealerPrompt(
       '- Do not change business flow.',
       '- Do not change test data.',
       '- Do not hardcode credentials.',
+      websiteUrlRules,
       '- Prefer imports from @playwright/test only; inline locators instead of page objects when possible.',
       '- If the input uses page objects or playwright.config, preserve them but fix paths: healed files live under tests/healed, so repo-root modules must be imported as ../../pages/..., ../../fixtures/..., ../../playwright.config — never ../pages/... or ../playwright.config (that resolves under tests/ and breaks).',
       '- Prefer recon locator candidates.',

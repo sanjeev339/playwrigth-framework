@@ -2,6 +2,7 @@ import path from 'node:path';
 import { chromium, type Locator, type Page } from '@playwright/test';
 import fs from 'fs-extra';
 import { getWebEnv } from '../config/env';
+import { normalizeWebsiteEntryUrl } from '../utils/websiteUrl';
 import type { ReconSnapshot, Scenario } from '../types';
 import { listFiles, readJsonFile, readTextFile, resolveFromRoot, toSafeFileName } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
@@ -58,7 +59,7 @@ export async function runInteractiveRecon(options: {
       const previousActionErrors: string[] = [];
 
       try {
-        await page.goto(env.WEBSITE_URL, { waitUntil: 'domcontentloaded' });
+        await page.goto(normalizeWebsiteEntryUrl(env.WEBSITE_URL), { waitUntil: 'domcontentloaded' });
         const loginSnapshot = await captureSnapshot({
           page,
           scenarioId: scenario.scenario_id,
@@ -168,6 +169,7 @@ function logReconDecision(stepNo: number, instruction: string, decision: ReconDe
 
   console.log(`[Recon] Step ${stepNo}: ${instruction}`);
   console.log(`[Recon] Parsed: ${parsed.actionType} -> ${parsed.target ?? 'none'}`);
+  console.log(`[Recon] Parse status: ${parsed.parseStatus ?? 'n/a'} (${parsed.parseReason ?? 'n/a'})`);
   console.log(`[Recon] Value key used: ${valueKey}`);
   console.log(`[Recon] Deterministic candidates: ${decision.deterministicCandidates.length}`);
   console.log(`[Recon] Safe candidates: ${safeCandidates}`);
@@ -183,7 +185,20 @@ function logReconDecision(stepNo: number, instruction: string, decision: ReconDe
     console.log(`[Recon] LLM correction retry status: ${decision.llmRetryStatus ?? 'not_used'}`);
   }
   console.log(`[Recon] Selected locator: ${decision.selectedLocator ?? 'none'}`);
+  const failureCategory = classifyFailure(decision.actionError);
+  if (failureCategory) {
+    console.log(`[Recon] Failure category: ${failureCategory}`);
+  }
   console.log(`[Recon] Status: ${decision.actionStatus}`);
+}
+
+function classifyFailure(actionError?: string | null): string | null {
+  if (!actionError) {
+    return null;
+  }
+  if (actionError.startsWith('parse_failure:')) return 'parse_failure';
+  if (actionError.startsWith('postcondition_failure:')) return 'postcondition_failure';
+  return 'locator_failure';
 }
 
 async function captureSnapshot(input: {

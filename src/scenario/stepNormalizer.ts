@@ -4,11 +4,13 @@ export interface NormalizedStep extends ScenarioStep {
   step_no: number;
   instruction: string;
   raw_instruction: string;
+  normalization_strategy?: string;
+  normalization_context_from_previous?: boolean;
 }
 
 type NormalizerInput = Pick<ScenarioStep, 'step_no' | 'instruction' | 'expected_result'>;
 
-const actionStartPattern = /^(navigate|go to|click|enter|fill|type|select|choose|verify|check|assert|wait)\b/i;
+const actionStartPattern = /^(navigate|go to|click|enter|fill|type|select|choose|verify|check|assert|wait|open|change|save)\b/i;
 
 export function normalizeScenarioSteps(
   steps: NormalizerInput[],
@@ -24,16 +26,18 @@ export function normalizeScenarioSteps(
     for (const segment of segments) {
       const atomicInstructions = splitCompoundInstruction(cleanInstruction(segment), payloadLabels);
 
-      for (const instruction of atomicInstructions) {
-        if (!instruction) {
+      for (const atomicInstruction of atomicInstructions) {
+        if (!atomicInstruction.instruction) {
           continue;
         }
 
         normalized.push({
           step_no: normalized.length + 1,
-          instruction,
+          instruction: atomicInstruction.instruction,
           raw_instruction: rawInstruction,
-          expected_result: step.expected_result
+          expected_result: step.expected_result,
+          normalization_strategy: atomicInstruction.strategy,
+          normalization_context_from_previous: atomicInstruction.contextFromPrevious
         });
       }
     }
@@ -64,21 +68,58 @@ function splitInstructionIntoSegments(instruction: string): string[] {
   return markerSegments.length > 1 ? markerSegments : [stripLeadingNumbering(cleaned).trim()].filter(Boolean);
 }
 
-function splitCompoundInstruction(instruction: string, payloadLabels: string[]): string[] {
+function splitCompoundInstruction(
+  instruction: string,
+  payloadLabels: string[]
+): Array<{ instruction: string; strategy: string; contextFromPrevious: boolean }> {
   const normalizedInstruction = cleanInstruction(instruction);
+  const chained = splitMixedVerbChain(normalizedInstruction);
+  if (chained.length > 1) {
+    return chained
+      .map((part, index) => ({
+        instruction: normalizeActionInstruction(part, payloadLabels),
+        strategy: 'action_graph_chain_split',
+        contextFromPrevious: index > 0
+      }))
+      .filter((part) => Boolean(part.instruction));
+  }
 
   if (/^click\b/i.test(normalizedInstruction) && /\band\s+click\b/i.test(normalizedInstruction)) {
     return normalizedInstruction
       .split(/\s+and\s+(?=click\b)/i)
-      .map((part) => normalizeActionInstruction(part, payloadLabels))
-      .filter(Boolean);
+      .map((part, index) => ({
+        instruction: normalizeActionInstruction(part, payloadLabels),
+        strategy: 'compound_click_split',
+        contextFromPrevious: index > 0
+      }))
+      .filter((part) => Boolean(part.instruction));
   }
 
   if (/^(enter|fill|type)\b/i.test(normalizedInstruction) && /\s+and\s+/i.test(normalizedInstruction)) {
-    return splitCompoundFieldInstruction(normalizedInstruction, payloadLabels);
+    return splitCompoundFieldInstruction(normalizedInstruction, payloadLabels).map((part, index) => ({
+      instruction: part,
+      strategy: 'compound_field_split',
+      contextFromPrevious: index > 0
+    }));
   }
 
-  return [normalizeActionInstruction(normalizedInstruction, payloadLabels)].filter(Boolean);
+  return [
+    {
+      instruction: normalizeActionInstruction(normalizedInstruction, payloadLabels),
+      strategy: 'direct_normalization',
+      contextFromPrevious: false
+    }
+  ].filter((part) => Boolean(part.instruction));
+}
+
+function splitMixedVerbChain(instruction: string): string[] {
+  const verbs = '(?:click|select|choose|enter|fill|type|verify|check|assert|wait|navigate|go\\s+to|open|change|save)';
+  const normalized = instruction.replace(/\s+/g, ' ').trim();
+  const parts = normalized
+    .split(new RegExp(`\\s+and\\s+(?=${verbs}\\b)`, 'i'))
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.length > 1 ? parts : [normalized];
 }
 
 function splitCompoundFieldInstruction(instruction: string, payloadLabels: string[]): string[] {
@@ -116,6 +157,21 @@ function normalizeActionInstruction(instruction: string, payloadLabels: string[]
   if (selectMatch?.[2]) {
     const verb = titleCaseAction(selectMatch[1]);
     return `${verb} ${canonicalizeFieldLabel(cleanTarget(selectMatch[2]), payloadLabels)}`;
+  }
+
+  const openMatch = cleaned.match(/^open\s+(?:the\s+)?(.+)$/i);
+  if (openMatch?.[1]) {
+    return `Click ${canonicalizeGeneralTarget(cleanTarget(openMatch[1]), payloadLabels)}`;
+  }
+
+  const changeMatch = cleaned.match(/^change\s+(?:the\s+)?(.+)$/i);
+  if (changeMatch?.[1]) {
+    return `Click ${canonicalizeGeneralTarget(cleanTarget(changeMatch[1]), payloadLabels)}`;
+  }
+
+  const saveMatch = cleaned.match(/^save\s+(.+)$/i);
+  if (saveMatch?.[1]) {
+    return `Click Save ${canonicalizeGeneralTarget(cleanTarget(saveMatch[1]), payloadLabels)}`;
   }
 
   const verifyMatch = cleaned.match(/^(verify|check|assert)\s+(?:the\s+)?(.+)$/i);

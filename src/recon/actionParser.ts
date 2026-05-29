@@ -10,13 +10,15 @@ export function parseAction(step: string | ScenarioStep, payload: Record<string,
   const actionType = detectActionType(normalized);
   const target = extractTarget(rawStep, actionType, payload);
   const value = valueForAction(actionType, target, payload);
+  const parseMetadata = evaluateParseStatus(rawStep, actionType, target);
 
   return {
     rawStep,
     stepNo,
     actionType,
     target,
-    value
+    value,
+    ...parseMetadata
   };
 }
 
@@ -123,8 +125,9 @@ function findPayloadKeyMention(rawStep: string, payloadKeys: string[]): string |
 function cleanTarget(value: string): string | null {
   const cleaned = value
     .replace(/\.$/, '')
+    .replace(/\b(?:click|select|choose|open|enter|fill|type|navigate|go to)\b/gi, '')
+    .replace(/\b(and|then)\b/gi, ' ')
     .replace(/\b(page|screen|menu|section|button|link|field|dropdown|option)\b/gi, '')
-    .replace(/\b(and select|and choose).+$/i, '')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -143,4 +146,49 @@ function normalizeRawStep(value: string): string {
 
 function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function evaluateParseStatus(
+  rawStep: string,
+  actionType: ActionType,
+  target: string | null
+): Pick<ParsedAction, 'parseStatus' | 'parseReason' | 'parseConfidence'> {
+  if (actionType === 'unknown') {
+    return {
+      parseStatus: 'failed',
+      parseReason: 'unknown_action_type',
+      parseConfidence: 0.1
+    };
+  }
+
+  if (['click', 'fill', 'select', 'navigate'].includes(actionType) && !target) {
+    return {
+      parseStatus: 'failed',
+      parseReason: 'missing_target',
+      parseConfidence: 0.2
+    };
+  }
+
+  const chainedVerbCount = (rawStep.match(/\b(click|select|choose|enter|fill|type|navigate|go to)\b/gi) ?? []).length;
+  if (chainedVerbCount > 1) {
+    return {
+      parseStatus: target ? 'ambiguous' : 'failed',
+      parseReason: target ? 'multi_action_chain_target_inferred' : 'multi_action_chain_target_unresolved',
+      parseConfidence: target ? 0.5 : 0.2
+    };
+  }
+
+  if (target && target.split(/\s+/).length > 6) {
+    return {
+      parseStatus: 'ambiguous',
+      parseReason: 'target_too_broad',
+      parseConfidence: 0.45
+    };
+  }
+
+  return {
+    parseStatus: 'ok',
+    parseReason: 'parsed_successfully',
+    parseConfidence: 0.9
+  };
 }

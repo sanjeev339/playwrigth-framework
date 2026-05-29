@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
+import { normalizeWebsiteEntryUrl } from '../utils/websiteUrl';
 
 dotenv.config();
 
@@ -48,7 +49,10 @@ const geminiSchema = sharedSchema.extend({
 });
 
 const webSchema = sharedSchema.extend({
-  WEBSITE_URL: z.string().url('WEBSITE_URL must be a valid URL'),
+  WEBSITE_URL: z
+    .string()
+    .url('WEBSITE_URL must be a valid URL')
+    .transform((value) => normalizeWebsiteEntryUrl(value)),
   LOGIN_EMAIL: z.string().min(1, 'LOGIN_EMAIL is required'),
   LOGIN_PASSWORD: z.string().min(1, 'LOGIN_PASSWORD is required')
 });

@@ -12,6 +12,9 @@ export interface ParsedAction {
   actionType: ActionType;
   target: string | null;
   value: string | null;
+  parseStatus?: 'ok' | 'ambiguous' | 'failed';
+  parseReason?: string;
+  parseConfidence?: number;
 }
 
 export type StructuredLocator =
