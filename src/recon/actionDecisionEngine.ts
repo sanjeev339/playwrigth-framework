@@ -10,6 +10,7 @@ import {
   validateLocatorCandidate,
   validateLocatorExpression
 } from './locatorSafetyValidator';
+import { logger } from '../utils/logger';
 import type {
   LLMActionDecision,
   LocatorCandidate,
@@ -86,13 +87,18 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
       return executeFormFill(input, parsedAction, decision);
     }
 
-    const deterministicCandidates = await resolveDeterministicCandidates(input.page, parsedAction, input.snapshotElements);
+    const deterministicCandidates = await resolveDeterministicCandidates(
+      input.page,
+      parsedAction,
+      input.snapshotElements,
+      input.payload
+    );
     const validatedCandidates = await validateCandidates(input.page, deterministicCandidates);
     const safeCandidates = deterministicCandidates.filter((candidate) =>
       validatedCandidates.some((validation) => validation.locator === candidate.locator && validation.isSafe)
     );
-    console.log(`[Recon] Deterministic candidates: ${deterministicCandidates.length}`);
-    console.log(`[Recon] Safe candidates: ${safeCandidates.length}`);
+    logger.info(`Deterministic candidates: ${deterministicCandidates.length}`);
+    logger.info(`Safe candidates: ${safeCandidates.length}`);
 
     decision.deterministicCandidates = deterministicCandidates;
     decision.validatedCandidates = validatedCandidates;
@@ -118,15 +124,42 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
     }
 
     console.log('[Recon] LLM used: yes');
-    const advisorDecision = await askLLMForActionDecision({
-      scenarioId: input.scenarioId,
-      parsedAction,
-      payload: input.payload,
-      visibleElements: input.snapshotElements,
-      locatorCandidates: deterministicCandidates,
-      validationResults: validatedCandidates,
-      previousActionErrors: input.previousActionErrors
-    });
+    let advisorDecision: LLMActionDecision;
+    try {
+      advisorDecision = await askLLMForActionDecision({
+        scenarioId: input.scenarioId,
+        parsedAction,
+        payload: input.payload,
+        visibleElements: input.snapshotElements,
+        locatorCandidates: deterministicCandidates,
+        validationResults: validatedCandidates,
+        previousActionErrors: input.previousActionErrors
+      });
+    } catch (error) {
+      const fallbackCandidate = selectDeterministicFallbackCandidate(deterministicCandidates, validatedCandidates);
+      if (fallbackCandidate) {
+        logger.warn(
+          `LLM call failed; using deterministic fallback locator: ${fallbackCandidate.locator}`,
+          error
+        );
+        return executeSelectedLocator(input, {
+          decision,
+          parsedAction,
+          selectedLocator: fallbackCandidate.locator,
+          selectedValue: parsedAction.value,
+          decisionSource: 'deterministic',
+          confidence: 'medium',
+          selectorConfidenceScore: fallbackCandidate.selectorConfidenceScore,
+          selectorRisk: fallbackCandidate.selectorRisk,
+          selectorConfidenceSignals: fallbackCandidate.selectorConfidenceSignals,
+          reason: 'Deterministic fallback after LLM failure.',
+          knownCandidates: deterministicCandidates
+        });
+      }
+
+      throw error;
+    }
+
     applyLLMMetadata(decision, advisorDecision);
     logLLMParseStatus(advisorDecision);
 
@@ -151,6 +184,27 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
     }
 
     if (advisorDecision.actionType === 'error' || !advisorDecision.selectedLocator) {
+      const fallbackCandidate = selectDeterministicFallbackCandidate(deterministicCandidates, validatedCandidates);
+      if (fallbackCandidate) {
+        logger.warn(`LLM did not select a locator; using deterministic fallback: ${fallbackCandidate.locator}`);
+        return executeSelectedLocator(input, {
+          decision,
+          parsedAction: {
+            ...parsedAction,
+            value: advisorDecision.value ?? parsedAction.value
+          },
+          selectedLocator: fallbackCandidate.locator,
+          selectedValue: advisorDecision.value ?? parsedAction.value,
+          decisionSource: 'deterministic',
+          confidence: 'medium',
+          selectorConfidenceScore: fallbackCandidate.selectorConfidenceScore,
+          selectorRisk: fallbackCandidate.selectorRisk,
+          selectorConfidenceSignals: fallbackCandidate.selectorConfidenceSignals,
+          reason: advisorDecision.reason || 'Deterministic fallback after LLM error.',
+          knownCandidates: deterministicCandidates
+        });
+      }
+
       return {
         ...decision,
         actionStatus: 'failed',
@@ -224,7 +278,7 @@ async function executeFormFill(
       value
     };
     const visibleElements = filledCount === 0 ? input.snapshotElements : await scanVisibleDom(input.page);
-    const candidates = await resolveDeterministicCandidates(input.page, fieldAction, visibleElements);
+    const candidates = await resolveDeterministicCandidates(input.page, fieldAction, visibleElements, input.payload);
     const validations = await validateCandidates(input.page, candidates);
     const safeCandidates = candidates.filter((candidate) =>
       validations.some((validation) => validation.locator === candidate.locator && validation.isSafe)
@@ -372,7 +426,7 @@ async function executeSelectedLocator(
       };
     }
 
-    const transition = await verifyPostcondition(input.page, options.parsedAction.actionType, beforeSignals);
+    const transition = await verifyPostcondition(input.page, options.parsedAction, beforeSignals);
     if (!transition.ok) {
       return {
         ...options.decision,
@@ -463,7 +517,7 @@ async function executeSelectAction(
     target: optionValue,
     value: null
   };
-  const optionCandidates = await resolveDeterministicCandidates(input.page, optionAction, optionElements);
+  const optionCandidates = await resolveDeterministicCandidates(input.page, optionAction, optionElements, input.payload);
   const optionValidations = await validateCandidates(input.page, optionCandidates);
   decision.deterministicCandidates.push(...optionCandidates);
   decision.validatedCandidates.push(...optionValidations);
@@ -518,13 +572,7 @@ async function executeSelectAction(
 }
 
 async function validateCandidates(page: Page, candidates: LocatorCandidate[]): Promise<LocatorValidationResult[]> {
-  const results: LocatorValidationResult[] = [];
-
-  for (const candidate of candidates) {
-    results.push(await validateLocatorCandidate(page, candidate));
-  }
-
-  return results;
+  return Promise.all(candidates.map((candidate) => validateLocatorCandidate(page, candidate)));
 }
 
 function createBaseDecision(scenarioId: string, parsedAction: ParsedAction): ReconDecision {
@@ -588,11 +636,11 @@ function applyLLMMetadata(decision: ReconDecision, advisorDecision: LLMActionDec
 
 function logLLMParseStatus(advisorDecision: LLMActionDecision): void {
   const parseStatus = advisorDecision.parseError ? 'failed' : 'success';
-  console.log(`[Recon] LLM parse status: ${parseStatus}`);
+  logger.info(`LLM parse status: ${parseStatus}`);
   if (advisorDecision.parseError) {
-    console.log(`[Recon] LLM parse error: ${advisorDecision.parseError}`);
-    console.log(`[Recon] LLM raw response preview: ${advisorDecision.rawResponsePreview ?? ''}`);
-    console.log(`[Recon] LLM correction retry status: ${advisorDecision.retryStatus ?? 'not_used'}`);
+    logger.info(`LLM parse error: ${advisorDecision.parseError}`);
+    logger.info(`LLM raw response preview: ${advisorDecision.rawResponsePreview ?? ''}`);
+    logger.info(`LLM correction retry status: ${advisorDecision.retryStatus ?? 'not_used'}`);
   }
 }
 
@@ -623,7 +671,6 @@ function unsafeLocatorReason(validation: LocatorValidationResult): string {
 async function waitForSettledPage(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded').catch(() => undefined);
   await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
-  await page.waitForTimeout(250);
 }
 
 async function collectUiTransitionSignals(page: Page): Promise<{ url: string; dialogLikeCount: number; visibleCount: number }> {
@@ -642,16 +689,21 @@ async function collectUiTransitionSignals(page: Page): Promise<{ url: string; di
 
 async function verifyPostcondition(
   page: Page,
-  actionType: ParsedAction['actionType'],
+  parsedAction: ParsedAction,
   before: { url: string; dialogLikeCount: number; visibleCount: number }
 ): Promise<{ ok: boolean; reason?: string }> {
   const after = await collectUiTransitionSignals(page);
   const urlChanged = before.url !== after.url;
   const dialogChanged = before.dialogLikeCount !== after.dialogLikeCount;
   const visibleChanged = Math.abs(before.visibleCount - after.visibleCount) >= 2;
+  const actionType = parsedAction.actionType;
 
   if (actionType === 'navigate') {
     return urlChanged || visibleChanged ? { ok: true } : { ok: false, reason: 'navigate_no_state_change' };
+  }
+
+  if (actionType === 'click' && isSearchFocusTarget(parsedAction.target)) {
+    return { ok: true };
   }
 
   if (actionType === 'click' || actionType === 'select') {
@@ -663,6 +715,50 @@ async function verifyPostcondition(
   }
 
   return { ok: true };
+}
+
+function isSearchFocusTarget(target: string | null): boolean {
+  if (!target) {
+    return false;
+  }
+
+  const normalized = target.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return normalized === 'search' || normalized === 'searchfield';
+}
+
+function selectDeterministicFallbackCandidate(
+  candidates: LocatorCandidate[],
+  validations: LocatorValidationResult[]
+): LocatorCandidate | null {
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const sorted = [...candidates].sort((left, right) => left.priority - right.priority);
+  const safeCandidates = sorted.filter((candidate) =>
+    validations.some((validation) => validation.locator === candidate.locator && validation.isSafe)
+  );
+
+  if (safeCandidates.length > 0) {
+    return safeCandidates[0];
+  }
+
+  const matchedCandidates = sorted.filter((candidate) =>
+    validations.some((validation) => validation.locator === candidate.locator && validation.count > 0)
+  );
+
+  const mediumConfidence = matchedCandidates.filter(
+    (candidate) => (candidate.selectorConfidenceScore ?? 0) >= 0.55
+  );
+  if (mediumConfidence.length > 0) {
+    return mediumConfidence[0];
+  }
+
+  if (process.env.RECON_ALLOW_UNSAFE_FALLBACK === 'false' && matchedCandidates.length > 0) {
+    return matchedCandidates[0];
+  }
+
+  return null;
 }
 
 function appendReason(existing: string | undefined, next: string): string {

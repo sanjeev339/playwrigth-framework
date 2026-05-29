@@ -1,4 +1,10 @@
 import type { ScenarioStep } from '../types';
+import {
+  isSearchStep,
+  resolveComposedNamePayloadKeys,
+  resolvePayloadKeyForStep,
+  shouldReclassifySelectAsClick
+} from './actionSemantics';
 import type { ActionType, ParsedAction } from './reconDecisionTypes';
 
 const secretKeyPattern = /(password|passcode|secret|token|jwt|cookie|authorization|api[_-]?key)/i;
@@ -7,9 +13,26 @@ export function parseAction(step: string | ScenarioStep, payload: Record<string,
   const rawStep = normalizeRawStep(typeof step === 'string' ? step : step.instruction);
   const stepNo = typeof step === 'string' ? undefined : step.step_no;
   const normalized = rawStep.toLowerCase();
-  const actionType = detectActionType(normalized);
-  const target = extractTarget(rawStep, actionType, payload);
-  const value = valueForAction(actionType, target, payload);
+  let actionType = detectActionType(normalized);
+  let target = extractTarget(rawStep, actionType, payload);
+  let value = valueForAction(actionType, target, payload);
+
+  if (shouldParseAsSearchFill(rawStep)) {
+    actionType = 'fill';
+    const payloadKey = resolveSearchPayloadKey(rawStep, target, payload);
+    target = payloadKey ?? target ?? 'Search';
+    value = payloadKey ? String(sanitizePayload(payload)[payloadKey] ?? '') : value;
+  }
+
+  if (actionType === 'click') {
+    target = enrichUserRowTarget(rawStep, target, payload);
+  }
+
+  if (actionType === 'select' && shouldReclassifySelectAsClick(target, value, payload)) {
+    actionType = 'click';
+    value = null;
+  }
+
   const parseMetadata = evaluateParseStatus(rawStep, actionType, target);
 
   return {
@@ -41,7 +64,69 @@ export function sanitizePayload(payload: Record<string, unknown>): Record<string
   return sanitized;
 }
 
+function resolveSearchPayloadKey(
+  rawStep: string,
+  target: string | null,
+  payload: Record<string, unknown>
+): string | null {
+  const sanitized = sanitizePayload(payload);
+
+  if (/\b(?:user\s+name|full\s+name)\b/i.test(rawStep) && sanitized['Full Name']) {
+    return 'Full Name';
+  }
+
+  const composed = resolveComposedNamePayloadKeys(payload);
+  if (/\buser\s+name\b/i.test(rawStep) && composed) {
+    return composed[0];
+  }
+
+  return resolvePayloadKeyForStep(rawStep, target, payload);
+}
+
+function shouldParseAsSearchFill(rawStep: string): boolean {
+  if (/^search\s+user\s+by\b/i.test(rawStep)) {
+    return true;
+  }
+
+  if (isSearchStep(rawStep)) {
+    return true;
+  }
+
+  return /\bclick\b.*\bsearch\b.*\band\s+search\b/i.test(rawStep);
+}
+
+function enrichUserRowTarget(rawStep: string, target: string | null, payload: Record<string, unknown>): string | null {
+  if (!target) {
+    return target;
+  }
+
+  if (normalize(target) !== 'user' && !/\bclick\s+user\b/i.test(rawStep)) {
+    return target;
+  }
+
+  const displayName = getDisplayNameFromPayload(payload);
+  return displayName ?? target;
+}
+
+function getDisplayNameFromPayload(payload: Record<string, unknown>): string | null {
+  const sanitized = sanitizePayload(payload);
+  if (sanitized['Full Name']) {
+    return sanitized['Full Name'];
+  }
+
+  const firstName = sanitized['First Name'];
+  const lastName = sanitized['Last Name'];
+  if (firstName && lastName) {
+    return `${firstName} ${lastName}`.trim();
+  }
+
+  return null;
+}
+
 function detectActionType(normalizedStep: string): ActionType {
+  if (/^search\s+user\s+by\b/i.test(normalizedStep)) {
+    return 'fill';
+  }
   if (/^(navigate|go)\s+to\b/.test(normalizedStep) || /^navigate\b/.test(normalizedStep)) return 'navigate';
   if (/^click\b/.test(normalizedStep)) return 'click';
   if (/^(enter|fill|type)\b/.test(normalizedStep)) return 'fill';

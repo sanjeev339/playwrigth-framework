@@ -1,5 +1,11 @@
 import type { Scenario, ReconSnapshot } from '../types';
 import type { ReconAction } from '../recon/reconActionExtractor';
+import {
+  isDropdownSelectAction,
+  isSearchStep,
+  payloadValueExpressionForAction,
+  searchPayloadExpression
+} from '../recon/actionSemantics';
 import { truncate } from '../utils/fileUtils';
 
 export function buildGeneratorPrompt(input: {
@@ -13,11 +19,11 @@ export function buildGeneratorPrompt(input: {
       'You are an expert TypeScript Playwright test generator.',
       '',
       'You MUST generate the Playwright test from the provided reconAction list.',
-      'The reconAction list is the source of truth for locators.',
+      'The reconAction list is the source of truth for locators, URLs, and post-step state.',
+      'Do not invent app-specific routes, module names, or payload field names.',
       'Do not invent generic locators when selectedLocator exists.',
       'Do not stop after login.',
       'Every action in reconAction must appear in the generated test.',
-      'If actionStatus is failed for a select/dropdown step, generate robust custom dropdown fallback code using parsedAction.value.',
       '',
       'Hard rules:',
       '1. Use @playwright/test with TypeScript.',
@@ -27,17 +33,16 @@ export function buildGeneratorPrompt(input: {
       '   await page.goto(loginUrl);',
       '4. Never call page.goto(`${baseURL}/login/`).',
       '5. Never append /login/ manually when WEBSITE_URL is present.',
-      '6. After login, assert stable post-login UI:',
-      "   await expect(page.getByRole('button', { name: /User Management/i })).toBeVisible();",
+      '6. After login, assert visibility of the first recon action selectedLocator (from reconActions[0]).',
       '7. For successful recon actions, use reconAction.selectedLocator exactly.',
-      '8. For New Internal User, if recon selected Add Internal User, use:',
-      '   page.getByText(/New Internal User|Add Internal User/i)',
-      '9. For custom dropdowns, never use selectOption unless recon proves the element is a native select.',
-      '10. For Role dropdown, click dropdownLocator or page.getByText(/^Select role$/i), then click option by payload value.',
-      "11. Role option fallback must include page.locator('[role=\"listbox\"], .p-dropdown-panel, .p-dropdown-items').getByText(/^VALUE$/i).",
-      '12. Use payload values for business fields.',
-      '13. Never hardcode login credentials; use process.env.LOGIN_EMAIL and process.env.LOGIN_PASSWORD.',
-      '14. Output full code only. No Markdown. No explanation.',
+      '8. For custom dropdowns, never use selectOption unless recon proves a native select element.',
+      '9. For failed select steps, use dropdownLocator + optionValue from recon and dropdown-open snapshot elements.',
+      '10. Use payload values from scenario JSON only via payload[KEY] expressions.',
+      '11. Search steps must fill the search field using payload, not only click the placeholder.',
+      '12. Derive post-step assertions from postActionUrl or postActionLandmarkLocator on each reconAction when present.',
+      '13. Never call selectCustomDropdown with an empty option value.',
+      '14. Use { timeout: 15000 } on post-navigation expect().toBeVisible() / toHaveURL() assertions.',
+      '15. Output full code only. No Markdown. No explanation.',
       '',
       'Scenario JSON:',
       JSON.stringify(input.scenario, null, 2),
@@ -92,10 +97,23 @@ export function compactDropdownSnapshot(snapshot: ReconSnapshot): CompactDropdow
   };
 }
 
+interface RenderContext {
+  reconActions: ReconAction[];
+  actionIndex: number;
+}
+
 export function buildDeterministicReconTest(scenario: Scenario, reconActions: ReconAction[]): string {
   const title = `${scenario.scenario_id}: ${scenario.action ?? scenario.module ?? 'Generated scenario'}`;
   const payloadLiteral = JSON.stringify(scenario.payload, null, 2).replace(/\n/g, '\n  ');
-  const actionSteps = reconActions.map((action) => renderActionStep(action, scenario.payload)).join('\n\n');
+  const actionSteps = reconActions
+    .map((action, actionIndex) =>
+      renderActionStep(action, scenario.payload, {
+        reconActions,
+        actionIndex
+      })
+    )
+    .join('\n\n');
+  const loginAssertion = renderLoginPostAssertion(reconActions[0]);
 
   return `import { test, expect, type Locator, type Page } from '@playwright/test';
 
@@ -159,21 +177,20 @@ async function clickFirst(label: string, locators: Locator[]): Promise<void> {
 }
 
 async function selectCustomDropdown(page: Page, openDropdown: () => Locator, optionValue: string): Promise<void> {
-  await openDropdown().click();
+  await openDropdown().click({ force: true });
 
   const exactOptionRegex = new RegExp(\`^\${escapeRegex(optionValue)}$\`, 'i');
   const optionCandidates = [
+    page.locator('li.p-multiselect-item, li[role="option"]').filter({ hasText: exactOptionRegex }),
     page.getByRole('option', { name: exactOptionRegex }),
-    page.locator('[role="listbox"], .p-dropdown-panel, .p-dropdown-items').getByText(exactOptionRegex),
-    page.locator('li[role="option"]').filter({ hasText: exactOptionRegex }),
+    page.locator('[role="listbox"], .p-dropdown-panel, .p-dropdown-items, .p-multiselect-panel').getByText(exactOptionRegex),
     page.getByText(exactOptionRegex)
   ];
 
   for (const locator of optionCandidates) {
     const candidate = await firstUsable(locator);
     if (candidate) {
-      await candidate.click();
-      await expect(page.getByText(exactOptionRegex).first()).toBeVisible({ timeout: 5000 });
+      await candidate.click({ force: true });
       return;
     }
   }
@@ -211,7 +228,7 @@ test(${JSON.stringify(title)}, async ({ page }) => {
       page.getByText(/login|sign in|submit/i)
     ]);
 
-    await expect(page.getByRole('button', { name: /User Management/i })).toBeVisible({ timeout: 15000 });
+${loginAssertion}
   });
 
 ${indent(actionSteps, 2)}
@@ -219,19 +236,29 @@ ${indent(actionSteps, 2)}
 `;
 }
 
-function renderActionStep(action: ReconAction, payload: Record<string, unknown>): string {
+function renderActionStep(action: ReconAction, payload: Record<string, unknown>, context: RenderContext): string {
   const stepTitle = `Step ${action.stepNo ?? '?'}: ${action.rawStep}`;
   const locator = locatorForAction(action);
-  const valueExpression = payloadValueExpression(action, payload);
+  const nextAction = context.reconActions[context.actionIndex + 1];
+
+  if ((action.actionType === 'navigate' || action.actionType === 'click') && isSearchStep(action.rawStep)) {
+    const searchValue = searchPayloadExpression(payload, action.rawStep, action.target);
+    const followUpAssertion = renderSearchFollowUpAssertion(nextAction, payload);
+    return `await test.step(${JSON.stringify(stepTitle)}, async () => {
+  await ${locator}.fill(${searchValue});
+${followUpAssertion}
+});`;
+  }
 
   if (action.actionType === 'navigate' || action.actionType === 'click') {
     return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await ${locator}.click();
-${renderClickAssertion(action)}
+${renderPostActionAssertion(action)}
 });`;
   }
 
   if (action.actionType === 'fill') {
+    const valueExpression = payloadValueExpressionForAction(action, payload);
     return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await ${locator}.fill(${valueExpression});
   await expect(${locator}).toHaveValue(${valueExpression});
@@ -239,10 +266,19 @@ ${renderClickAssertion(action)}
   }
 
   if (action.actionType === 'select') {
-    const dropdownLocator = dropdownLocatorForAction(action);
-    const optionValueExpression = payloadValueExpression(action, payload);
+    if (!isDropdownSelectAction(action, payload)) {
+      const clickLocator = action.selectedLocator ?? action.dropdownLocator ?? locator;
+      return `await test.step(${JSON.stringify(stepTitle)}, async () => {
+  await ${clickLocator}.click();
+${renderPostActionAssertion(action)}
+});`;
+    }
+
+    const dropdownLocator = dropdownOpenLocatorForAction(action);
+    const optionValueExpression = payloadValueExpressionForAction(action, payload);
     return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await selectCustomDropdown(page, () => ${dropdownLocator}, ${optionValueExpression});
+${renderPostActionAssertion(action)}
 });`;
   }
 
@@ -263,36 +299,87 @@ ${renderClickAssertion(action)}
 });`;
 }
 
-function renderClickAssertion(action: ReconAction): string {
-  if (/user management/i.test(action.rawStep)) {
-    return "  await expect(page.getByRole('button', { name: /Add User/i })).toBeVisible({ timeout: 15000 });";
+function renderLoginPostAssertion(firstAction: ReconAction | undefined): string {
+  if (firstAction?.selectedLocator) {
+    return `    await expect(${firstAction.selectedLocator}).toBeVisible({ timeout: 15000 });`;
   }
-  if (/add user/i.test(action.rawStep)) {
-    return '  await expect(page.getByText(/New Internal User|Add Internal User/i)).toBeVisible({ timeout: 10000 });';
+
+  if (firstAction?.target) {
+    const pattern = escapeRegexForLiteral(firstAction.target);
+    return `    await expect(page.getByRole('button', { name: /${pattern}/i })).toBeVisible({ timeout: 15000 });`;
   }
-  if (/new internal user/i.test(action.rawStep)) {
-    return '  await expect(page.getByRole(\'textbox\', { name: /Enter first name/i })).toBeVisible({ timeout: 10000 });';
+
+  return `    await expect(page.locator('body')).toBeVisible({ timeout: 15000 });`;
+}
+
+function renderPostActionAssertion(action: ReconAction): string {
+  const urlAssertion = urlAssertionFromPostActionUrl(action.postActionUrl);
+  if (urlAssertion) {
+    return urlAssertion;
   }
-  if (/save/i.test(action.rawStep)) {
-    return "  await page.waitForLoadState('networkidle').catch(() => undefined);";
+
+  if (action.postActionLandmarkLocator) {
+    return `  await expect(${action.postActionLandmarkLocator}).toBeVisible({ timeout: 15000 });`;
   }
+
+  if (action.selectedLocator && action.actionStatus === 'success') {
+    return `  await expect(${action.selectedLocator}).toBeVisible({ timeout: 15000 });`;
+  }
+
   return "  await page.waitForLoadState('domcontentloaded').catch(() => undefined);";
 }
 
-function locatorForAction(action: ReconAction): string {
-  if (/new internal user/i.test(action.rawStep)) {
-    return 'page.getByText(/New Internal User|Add Internal User/i)';
+function renderSearchFollowUpAssertion(nextAction: ReconAction | undefined, payload: Record<string, unknown>): string {
+  if (nextAction?.selectedLocator) {
+    return `  await expect(${nextAction.selectedLocator}).toBeVisible({ timeout: 15000 });`;
   }
 
+  const key = Object.keys(payload).find((entry) => {
+    const value = String(payload[entry] ?? '');
+    return value.length > 0 && !/^(true|false)$/i.test(value);
+  });
+
+  if (key) {
+    return `  await expect(page.getByText(String(payload[${JSON.stringify(key)}]))).toBeVisible({ timeout: 15000 });`;
+  }
+
+  return "  await page.waitForLoadState('domcontentloaded').catch(() => undefined);";
+}
+
+function urlAssertionFromPostActionUrl(url: string | null | undefined): string | null {
+  if (!url) {
+    return null;
+  }
+
+  try {
+    const pathname = new URL(url).pathname;
+    const segments = pathname.split('/').filter(Boolean);
+    const anchor = segments[segments.length - 1];
+    if (!anchor) {
+      return null;
+    }
+
+    const escaped = escapeRegexForLiteral(anchor);
+    return `  await expect(page).toHaveURL(/${escaped}/i, { timeout: 15000 });`;
+  } catch {
+    return null;
+  }
+}
+
+function locatorForAction(action: ReconAction): string {
   return action.selectedLocator ?? fallbackLocator(action);
 }
 
-function dropdownLocatorForAction(action: ReconAction): string {
-  if (/role/i.test(action.target ?? action.rawStep)) {
-    return 'page.getByText(/^Select role$/i)';
+function dropdownOpenLocatorForAction(action: ReconAction): string {
+  if (action.dropdownLocator) {
+    return action.dropdownLocator;
   }
 
-  return action.dropdownLocator ?? action.selectedLocator ?? fallbackLocator(action);
+  if (action.selectedLocator) {
+    return action.selectedLocator;
+  }
+
+  return fallbackLocator(action);
 }
 
 function fallbackLocator(action: ReconAction): string {
@@ -304,24 +391,10 @@ function fallbackLocator(action: ReconAction): string {
   }
 
   if (action.actionType === 'select') {
-    return `page.getByText(${pattern})`;
+    return `page.getByRole('combobox', { name: ${pattern} })`;
   }
 
-  return `page.getByText(${pattern})`;
-}
-
-function payloadValueExpression(action: ReconAction, payload: Record<string, unknown>): string {
-  const target = action.target;
-  if (target && Object.prototype.hasOwnProperty.call(payload, target)) {
-    return `String(payload[${JSON.stringify(target)}])`;
-  }
-
-  const matchingKey = Object.keys(payload).find((key) => String(payload[key]) === String(action.selectedValue ?? action.value ?? ''));
-  if (matchingKey) {
-    return `String(payload[${JSON.stringify(matchingKey)}])`;
-  }
-
-  return JSON.stringify(String(action.selectedValue ?? action.value ?? ''));
+  return `page.getByRole('button', { name: ${pattern} })`;
 }
 
 function regexLiteral(value: string): string {

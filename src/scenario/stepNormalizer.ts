@@ -24,7 +24,7 @@ export function normalizeScenarioSteps(
     const segments = splitInstructionIntoSegments(rawInstruction);
 
     for (const segment of segments) {
-      const atomicInstructions = splitCompoundInstruction(cleanInstruction(segment), payloadLabels);
+      const atomicInstructions = splitCompoundInstruction(cleanInstruction(segment), payloadLabels, payload);
 
       for (const atomicInstruction of atomicInstructions) {
         if (!atomicInstruction.instruction) {
@@ -70,14 +70,20 @@ function splitInstructionIntoSegments(instruction: string): string[] {
 
 function splitCompoundInstruction(
   instruction: string,
-  payloadLabels: string[]
+  payloadLabels: string[],
+  payload: Record<string, unknown> = {}
 ): Array<{ instruction: string; strategy: string; contextFromPrevious: boolean }> {
   const normalizedInstruction = cleanInstruction(instruction);
+  const searchSplit = splitSearchCompoundInstruction(normalizedInstruction, payloadLabels, payload);
+  if (searchSplit) {
+    return searchSplit;
+  }
+
   const chained = splitMixedVerbChain(normalizedInstruction);
   if (chained.length > 1) {
     return chained
       .map((part, index) => ({
-        instruction: normalizeActionInstruction(part, payloadLabels),
+        instruction: enrichVagueUserClick(normalizeActionInstruction(part, payloadLabels), payload),
         strategy: 'action_graph_chain_split',
         contextFromPrevious: index > 0
       }))
@@ -88,7 +94,7 @@ function splitCompoundInstruction(
     return normalizedInstruction
       .split(/\s+and\s+(?=click\b)/i)
       .map((part, index) => ({
-        instruction: normalizeActionInstruction(part, payloadLabels),
+        instruction: enrichVagueUserClick(normalizeActionInstruction(part, payloadLabels), payload),
         strategy: 'compound_click_split',
         contextFromPrevious: index > 0
       }))
@@ -105,11 +111,82 @@ function splitCompoundInstruction(
 
   return [
     {
-      instruction: normalizeActionInstruction(normalizedInstruction, payloadLabels),
+      instruction: enrichVagueUserClick(normalizeActionInstruction(normalizedInstruction, payloadLabels), payload),
       strategy: 'direct_normalization',
       contextFromPrevious: false
     }
   ].filter((part) => Boolean(part.instruction));
+}
+
+function splitSearchCompoundInstruction(
+  instruction: string,
+  payloadLabels: string[],
+  payload: Record<string, unknown>
+): Array<{ instruction: string; strategy: string; contextFromPrevious: boolean }> | null {
+  if (!/^click\b/i.test(instruction) || !/\bsearch\b/i.test(instruction) || !/\band\s+search\b/i.test(instruction)) {
+    return null;
+  }
+
+  const searchPayloadKey = findSearchPayloadLabel(payloadLabels, payload);
+  const fillInstruction = searchPayloadKey ? `Search user by ${searchPayloadKey}` : 'Search user by name';
+
+  return [
+    {
+      instruction: 'Click Search',
+      strategy: 'search_compound_split',
+      contextFromPrevious: false
+    },
+    {
+      instruction: fillInstruction,
+      strategy: 'search_compound_split',
+      contextFromPrevious: true
+    }
+  ];
+}
+
+function findSearchPayloadLabel(payloadLabels: string[], payload: Record<string, unknown>): string | null {
+  const preferredKeys = ['Full Name', 'Email Address'];
+  for (const key of preferredKeys) {
+    if (payloadLabels.includes(key) || Object.prototype.hasOwnProperty.call(payload, key)) {
+      return key;
+    }
+  }
+
+  return payloadLabels.find((label) => /name|email/i.test(label)) ?? null;
+}
+
+function enrichVagueUserClick(instruction: string, payload: Record<string, unknown>): string {
+  const clickMatch = instruction.match(/^Click\s+(.+)$/i);
+  if (!clickMatch?.[1]) {
+    return instruction;
+  }
+
+  const target = cleanTarget(clickMatch[1]);
+  if (normalize(target) !== 'user') {
+    return instruction;
+  }
+
+  const displayName = getDisplayNameFromPayload(payload);
+  if (displayName) {
+    return `Click ${displayName}`;
+  }
+
+  return instruction;
+}
+
+function getDisplayNameFromPayload(payload: Record<string, unknown>): string | null {
+  const fullName = payload['Full Name'];
+  if (fullName !== undefined && fullName !== null && String(fullName).trim()) {
+    return String(fullName).trim();
+  }
+
+  const firstName = payload['First Name'];
+  const lastName = payload['Last Name'];
+  if (firstName && lastName) {
+    return `${String(firstName).trim()} ${String(lastName).trim()}`.trim();
+  }
+
+  return null;
 }
 
 function splitMixedVerbChain(instruction: string): string[] {

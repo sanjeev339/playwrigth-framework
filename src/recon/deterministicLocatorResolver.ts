@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { DomElementSnapshot } from '../types';
+import { sanitizePayload } from './actionParser';
 import { buildStructuredLocatorPriority, locatorToString } from './locatorCandidateBuilder';
 import type { LocatorCandidate, ParsedAction, StructuredLocator } from './reconDecisionTypes';
 
@@ -16,7 +17,8 @@ const actionLocatorPreference: Record<string, number> = {
 export async function resolveDeterministicCandidates(
   _page: Page,
   parsedAction: ParsedAction,
-  snapshotElements: DomElementSnapshot[]
+  snapshotElements: DomElementSnapshot[],
+  payload: Record<string, unknown> = {}
 ): Promise<LocatorCandidate[]> {
   if (!parsedAction.target || parsedAction.target === '__FORM__') {
     return [];
@@ -29,7 +31,7 @@ export async function resolveDeterministicCandidates(
   const candidates: LocatorCandidate[] = [];
 
   for (const element of snapshotElements) {
-    const match = matchElement(parsedAction, element);
+    const match = matchElement(parsedAction, element, payload);
     if (!match.matches) {
       continue;
     }
@@ -58,10 +60,11 @@ export async function resolveDeterministicCandidates(
 
 function matchElement(
   parsedAction: ParsedAction,
-  element: DomElementSnapshot
+  element: DomElementSnapshot,
+  payload: Record<string, unknown> = {}
 ): { matches: boolean; score: number; matchFields: string[]; matchedTarget: string } {
   const target = parsedAction.target ?? '';
-  const targets = targetVariants(target);
+  const targets = targetVariants(target, parsedAction, payload);
   const fields = searchableFields(element);
   const matchFields: string[] = [];
   let bestScore = Number.MAX_SAFE_INTEGER;
@@ -83,11 +86,17 @@ function matchElement(
       const contains = normalizedValue.includes(normalizedTarget);
       const wordMatch = targetWords(targetVariant).every((word) => normalizedValue.includes(word));
 
+      if (contains && !exact && isWeakSubstringMatch(normalizedTarget, normalizedValue)) {
+        continue;
+      }
+
       if (exact || contains || wordMatch) {
         matchFields.push(field);
         matchedTarget = targetVariant;
         const fieldScore = exact ? 0 : contains ? 10 : 20;
-        bestScore = Math.min(bestScore, fieldScore + fieldWeight(field));
+        const rowBonus =
+          parsedAction.actionType === 'click' && isRowLikeElement(element) && targetVariant.includes(' ') ? -3 : 0;
+        bestScore = Math.min(bestScore, fieldScore + fieldWeight(field) + rowBonus);
       }
     }
   }
@@ -267,6 +276,7 @@ function elementKindWeight(parsedAction: ParsedAction, element: DomElementSnapsh
 
   if ((parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate') && ['button', 'a'].includes(tag)) return 0;
   if ((parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate') && ['button', 'link', 'menuitem'].includes(role ?? '')) return 2;
+  if (parsedAction.actionType === 'click' && ['cell', 'row', 'gridcell'].includes(role ?? '')) return 1;
   if (parsedAction.actionType === 'fill' && ['input', 'textarea'].includes(tag)) return 0;
   if (parsedAction.actionType === 'select' && tag === 'select') return 0;
   if (parsedAction.actionType === 'select' && ['combobox', 'button'].includes(role ?? '')) return 2;
@@ -365,7 +375,7 @@ function targetWords(value: string): string[] {
     .filter((word) => word.length > 1);
 }
 
-function targetVariants(value: string): string[] {
+function targetVariants(value: string, parsedAction?: ParsedAction, payload: Record<string, unknown> = {}): string[] {
   const variants = new Set<string>();
   const cleanValue = value.replace(/\bclick\s+on\b/gi, '').replace(/\s+/g, ' ').trim();
   if (cleanValue) {
@@ -380,7 +390,35 @@ function targetVariants(value: string): string[] {
     variants.add(cleanValue.replace(/\badd\b/gi, 'New'));
   }
 
+  if (parsedAction?.actionType === 'click' || parsedAction?.actionType === 'fill') {
+    const sanitized = sanitizePayload(payload);
+    for (const payloadValue of Object.values(sanitized)) {
+      if (payloadValue.trim().length > 1) {
+        variants.add(payloadValue);
+      }
+    }
+  }
+
   return [...variants];
+}
+
+function isWeakSubstringMatch(normalizedTarget: string, normalizedValue: string): boolean {
+  if (normalizedTarget.length < 3 || normalizedValue.length <= normalizedTarget.length) {
+    return false;
+  }
+
+  const words = normalizedTarget.split(/\s+/).filter((word) => word.length > 1);
+  if (words.length !== 1) {
+    return false;
+  }
+
+  const boundaryPattern = new RegExp(`\\b${words[0]}\\b`, 'i');
+  return !boundaryPattern.test(normalizedValue);
+}
+
+function isRowLikeElement(element: DomElementSnapshot): boolean {
+  const role = element.role?.toLowerCase();
+  return ['cell', 'row', 'gridcell'].includes(role ?? '');
 }
 
 function normalize(value: string): string {

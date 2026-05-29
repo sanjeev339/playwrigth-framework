@@ -9,10 +9,12 @@ const execFileAsync = promisify(execFile);
 
 export async function runGeneratedTests(options: {
   outputPath?: string;
+  testDir?: string;
 } = {}): Promise<PlaywrightRunResult> {
   const env = getBaseEnv();
+  const testDir = options.testDir ?? process.env.PLAYWRIGHT_TEST_DIR ?? 'tests/generated';
   const outputPath = options.outputPath ?? resolveFromRoot('reports', 'run-result.json');
-  const args = ['playwright', 'test', 'tests/generated'];
+  const args = ['playwright', 'test', testDir];
 
   if (!env.HEADLESS) {
     args.push('--headed');
@@ -62,7 +64,7 @@ export async function runGeneratedTests(options: {
 }
 
 function extractFailedTestFiles(output: string): string[] {
-  const matches = output.match(/tests\/generated\/[A-Za-z0-9_.-]+\.spec\.ts/g) ?? [];
+  const matches = output.match(/tests\/(?:generated|healed)\/[A-Za-z0-9_.-]+\.spec\.ts/g) ?? [];
   return [...new Set(matches)];
 }
 

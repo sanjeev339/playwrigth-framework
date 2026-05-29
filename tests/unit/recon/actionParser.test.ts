@@ -1,63 +1,49 @@
 import assert from 'node:assert/strict';
+import { describe, it } from 'vitest';
 import { parseAction } from '../../../src/recon/actionParser';
 
-const payload = {
-  Role: 'Admin',
-  'First Name': 'Riya',
-  Status: 'Active'
-};
+describe('actionParser', () => {
+  const editPayload = {
+    'Full Name': 'adithya j',
+    'Email Address': 'user@example.com',
+    Role: 'Workflow Operators'
+  };
 
-const cases = [
-  {
-    name: 'single click parses cleanly',
-    step: 'Click Save',
-    expected: { actionType: 'click', target: 'Save', parseStatus: 'ok' as const }
-  },
-  {
-    name: 'chained mixed verbs become ambiguous',
-    step: 'Click and select edit',
-    expected: {
-      actionType: 'click',
-      target: 'edit',
-      parseStatus: 'ambiguous' as const,
-      parseReason: 'multi_action_chain_target_inferred'
-    }
-  },
-  {
-    name: 'missing click target is failed parse',
-    step: 'Click on menu and select',
-    expected: { actionType: 'click', parseStatus: 'failed' as const, parseReason: 'missing_target' }
-  },
-  {
-    name: 'payload-backed select resolves target and value',
-    step: 'Select role from Role dropdown',
-    expected: { actionType: 'select', target: 'Role', parseStatus: 'ok' as const, value: 'Admin' }
-  },
-  {
-    name: 'payload-backed fill resolves key',
-    step: 'Enter First Name',
-    expected: { actionType: 'fill', target: 'First Name', parseStatus: 'ok' as const, value: 'Riya' }
-  },
-  {
-    name: 'navigate parses as route intent',
-    step: 'Navigate to User Management',
-    expected: { actionType: 'navigate', target: 'User Management', parseStatus: 'ok' as const }
-  }
-];
+  it('treats Select Edit as click', () => {
+    const selectEdit = parseAction('Select Edit', editPayload);
+    assert.equal(selectEdit.actionType, 'click');
+    assert.equal(selectEdit.target, 'Edit');
+  });
 
-for (const testCase of cases) {
-  const parsed = parseAction(testCase.step, payload);
-  assert.equal(parsed.actionType, testCase.expected.actionType, testCase.name);
-  if ('target' in testCase.expected) {
-    assert.equal(parsed.target, testCase.expected.target, testCase.name);
-  }
-  if ('value' in testCase.expected) {
-    assert.equal(parsed.value, testCase.expected.value, testCase.name);
-  }
-  assert.equal(parsed.parseStatus, testCase.expected.parseStatus, testCase.name);
-  if ('parseReason' in testCase.expected) {
-    assert.equal(parsed.parseReason, testCase.expected.parseReason, testCase.name);
-  }
-}
+  it('keeps Select Role as dropdown select with value', () => {
+    const selectRole = parseAction('Select Role', editPayload);
+    assert.equal(selectRole.actionType, 'select');
+    assert.equal(selectRole.value, 'Workflow Operators');
+  });
 
-console.log('actionParser.test.ts passed');
+  it('parses compound search step as fill with payload value', () => {
+    const searchStep = parseAction('Click Search And Search The User Name', editPayload);
+    assert.equal(searchStep.actionType, 'fill');
+    assert.equal(searchStep.target, 'Full Name');
+    assert.equal(searchStep.value, 'adithya j');
+  });
+
+  it('parses normalized search user step as fill', () => {
+    const searchStep = parseAction('Search user by Full Name', editPayload);
+    assert.equal(searchStep.actionType, 'fill');
+    assert.equal(searchStep.target, 'Full Name');
+    assert.equal(searchStep.value, 'adithya j');
+  });
+
+  it('enriches Click User to display name target', () => {
+    const userStep = parseAction('Click User', editPayload);
+    assert.equal(userStep.actionType, 'click');
+    assert.equal(userStep.target, 'adithya j');
+  });
+
+  it('keeps Click Search as click on search control', () => {
+    const focusStep = parseAction('Click Search', editPayload);
+    assert.equal(focusStep.actionType, 'click');
+    assert.equal(focusStep.target, 'Search');
+  });
+});

@@ -310,7 +310,6 @@ async function safeAction(action: () => Promise<void>): Promise<string | null> {
 async function waitForSettledPage(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded').catch(() => undefined);
   await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
-  await page.waitForTimeout(250);
 }
 
 if (require.main === module) {

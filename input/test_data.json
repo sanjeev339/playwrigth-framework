@@ -1,7 +1,6 @@
 [ 
   {
     "scenario_id": "TC-UM-003",
-    "execution_order": 3,
     "data_strategy": "positive_valid_update",
     "edge_case_type": null,
     "payload": {

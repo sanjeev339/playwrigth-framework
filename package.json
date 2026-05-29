@@ -2,25 +2,30 @@
   "name": "playwright-ai-framework",
   "version": "1.0.0",
   "description": "AI-powered Playwright automation framework with Excel scenarios, OpenAI planning/generation/healing, state-based recon, locator validation, and reports.",
-  "main": "dist/index.js",
   "license": "MIT",
   "scripts": {
     "build:scenarios": "ts-node src/scenario/scenarioBuilder.ts",
     "plan": "ts-node src/llm/planner.ts",
     "recon": "ts-node src/recon/interactiveRecon.ts",
     "generate": "ts-node src/llm/generator.ts",
+    "regenerate:spec": "ts-node scripts/regenerate-spec.ts",
     "validate": "ts-node src/recon/locatorValidator.ts",
     "test:seed": "playwright test tests/seed/seed.login.spec.ts --headed",
     "test:generated": "playwright test tests/generated --headed",
     "test:healed": "playwright test tests/healed --headed",
     "run:generated": "ts-node src/runner/playwrightRunner.ts",
+    "run:healed": "PLAYWRIGHT_TEST_DIR=tests/healed ts-node src/runner/playwrightRunner.ts",
     "heal": "ts-node src/llm/healer.ts",
     "report": "ts-node src/reports/reportWriter.ts",
     "pipeline": "npm run build:scenarios && npm run plan && npm run recon && npm run generate && npm run validate && npm run run:generated && npm run heal && npm run report",
     "typecheck": "tsc --noEmit",
     "test:normalizer": "ts-node tests/unit/scenario/stepNormalizer.test.ts",
     "test:website-url": "ts-node tests/unit/utils/websiteUrl.test.ts",
-    "test:parser": "ts-node tests/unit/recon/actionParser.test.ts"
+    "test:parser": "ts-node tests/unit/recon/actionParser.test.ts",
+    "test:semantics": "vitest run tests/unit/recon/actionSemantics.test.ts",
+    "test:validation": "ts-node tests/unit/llm/validateGeneratedReconTest.test.ts",
+    "test:unit": "vitest run",
+    "test:vitest": "vitest run"
   },
   "dependencies": {
     "@google/genai": "^2.6.0",
@@ -35,6 +40,7 @@
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.10.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.5"
   }
 }

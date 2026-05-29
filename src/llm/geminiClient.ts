@@ -43,7 +43,8 @@ export async function callGemini(prompt: string): Promise<string> {
         break;
       }
 
-      await delay(1000 * 2 ** attempt);
+      const retryDelayMs = parseRetryDelayMs(error) ?? 1000 * 2 ** attempt;
+      await delay(retryDelayMs);
     }
   }
 
@@ -81,6 +82,40 @@ function getErrorStatus(error: unknown): number | undefined {
   }
 
   return undefined;
+}
+
+function parseRetryDelayMs(error: unknown): number | null {
+  const message = error instanceof Error ? error.message : String(error);
+  const retrySecondsMatch = message.match(/retry in (\d+(?:\.\d+)?)s/i);
+  if (retrySecondsMatch?.[1]) {
+    return Math.ceil(Number(retrySecondsMatch[1]) * 1000);
+  }
+
+  if (typeof error !== 'object' || error === null) {
+    return null;
+  }
+
+  const errorObject = error as { error?: { details?: unknown[] } };
+  const details = errorObject.error?.details;
+  if (!Array.isArray(details)) {
+    return null;
+  }
+
+  for (const detail of details) {
+    if (typeof detail !== 'object' || detail === null) {
+      continue;
+    }
+
+    const retryDelay = (detail as { retryDelay?: unknown }).retryDelay;
+    if (typeof retryDelay === 'string') {
+      const seconds = Number(retryDelay.replace(/s$/i, ''));
+      if (!Number.isNaN(seconds) && seconds > 0) {
+        return Math.ceil(seconds * 1000);
+      }
+    }
+  }
+
+  return null;
 }
 
 function delay(ms: number): Promise<void> {

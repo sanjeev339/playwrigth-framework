@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { ReconSnapshot, Scenario } from '../types';
-import { extractReconActions, type ReconAction } from '../recon/reconActionExtractor';
+import { loadReconActions, type ReconAction } from '../recon/reconActionExtractor';
 import {
   buildDeterministicReconTest,
   buildGeneratorPrompt,
@@ -10,8 +10,9 @@ import {
 import { listFiles, readJsonFile, readTextFile, resolveFromRoot, toSafeFileName, writeTextFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 import { normalizeNestedTestImports } from '../utils/specImportPaths';
-import { normalizeGeneratedWebsiteUrlUsage } from '../utils/websiteUrl';
+import { normalizeGeneratedSelectMisuse, normalizeGeneratedWebsiteUrlUsage } from '../utils/generatedTestSanitizer';
 import { callLLM } from './llmClient';
+import { validateGeneratedReconTest } from './validateGeneratedReconTest';
 
 export async function generateTests(options: {
   scenarioDir?: string;
@@ -41,7 +42,7 @@ export async function generateTests(options: {
 
     logger.info(`Generating test for ${scenario.scenario_id} (spec: ${path.basename(specPath)})...`);
     const plan = await readTextFile(specPath);
-    const reconActions = await extractReconActions(scenario.scenario_id);
+    const reconActions = await loadReconActions(scenario.scenario_id);
 
     if (reconActions.length === 0) {
       throw new Error(`No recon decisions found for ${scenario.scenario_id}. Run npm run recon first.`);
@@ -77,8 +78,8 @@ async function generateReconDrivenCode(input: {
 }): Promise<string> {
   try {
     const generated = await callLLM(input.prompt);
-    const llmCode = normalizeGeneratedWebsiteUrlUsage(
-      normalizeNestedTestImports(stripCodeFence(generated))
+    const llmCode = normalizeGeneratedSelectMisuse(
+      normalizeGeneratedWebsiteUrlUsage(normalizeNestedTestImports(stripCodeFence(generated)))
     );
     validateGeneratedReconTest(llmCode, input.scenario, input.reconActions);
     return llmCode;
@@ -114,55 +115,6 @@ async function readRelevantDropdownSnapshots(
   return snapshots
     .filter((snapshot) => /dropdown-open/i.test(snapshot.state) && failedSelectSteps.has(snapshot.decision?.stepNo ?? -1))
     .map(compactDropdownSnapshot);
-}
-
-function validateGeneratedReconTest(code: string, scenario: Scenario, reconActions: ReconAction[]): void {
-  const normalizedCode = code.toLowerCase();
-  const roleValue = String(scenario.payload.Role ?? scenario.payload.role ?? '').trim();
-  const requiredFragments = [
-    { fragment: 'User Management', message: 'Generated test missing required recon action: Step 1 - Navigate to User Management' },
-    { fragment: 'Add User', message: 'Generated test missing required recon action: Step 2 - Click Add User' },
-    { fragment: 'first name', message: 'Generated test missing required field action: First Name' },
-    { fragment: 'last name', message: 'Generated test missing required field action: Last Name' },
-    { fragment: 'email address', message: 'Generated test missing required field action: Email Address' },
-    { fragment: roleValue, message: `Generated test missing required Role value: ${roleValue}` },
-    { fragment: 'Save', message: 'Generated test missing required recon action: Click Save' }
-  ].filter((item) => item.fragment);
-
-  for (const item of requiredFragments) {
-    if (!normalizedCode.includes(item.fragment.toLowerCase())) {
-      throw new Error(item.message);
-    }
-  }
-
-  if (/selectOption\s*\(/.test(code)) {
-    throw new Error('Generated test must not use selectOption for Role custom dropdown.');
-  }
-
-  if (code.includes('${baseURL}/login/') || code.includes('/login/login')) {
-    throw new Error('Generated test must not append /login/ manually or create /login/login URLs.');
-  }
-
-  for (const action of reconActions) {
-    if (action.stepNo === undefined) {
-      continue;
-    }
-
-    const stepMarker = `Step ${action.stepNo}: ${action.rawStep}`;
-    if (!code.includes(stepMarker)) {
-      throw new Error(`Generated test missing required recon action: Step ${action.stepNo} - ${action.rawStep}`);
-    }
-
-    if (
-      action.actionStatus === 'success' &&
-      action.selectedLocator &&
-      action.actionType !== 'select' &&
-      !/new internal user/i.test(action.rawStep) &&
-      !code.includes(action.selectedLocator)
-    ) {
-      throw new Error(`Generated test missing required recon locator: Step ${action.stepNo} - ${action.rawStep}`);
-    }
-  }
 }
 
 function stripCodeFence(value: string): string {

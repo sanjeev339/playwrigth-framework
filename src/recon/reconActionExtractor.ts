@@ -22,6 +22,8 @@ export interface ReconAction {
   selectionVerified?: boolean;
   snapshotFile: string;
   dropdownSnapshotFile?: string | null;
+  postActionUrl?: string | null;
+  postActionLandmarkLocator?: string | null;
 }
 
 interface SnapshotWithFile {
@@ -78,8 +80,31 @@ export async function extractReconActions(scenarioId: string): Promise<ReconActi
   );
 
   const outputPath = resolveFromRoot('recon-summary', `${safeScenarioId}.actions.json`);
-  await writeJsonFile(outputPath, actions);
+  if (actions.length > 0) {
+    await writeJsonFile(outputPath, actions);
+  }
+
   return actions;
+}
+
+export async function loadReconActions(scenarioId: string): Promise<ReconAction[]> {
+  const extracted = await extractReconActions(scenarioId);
+  if (extracted.length > 0) {
+    return extracted;
+  }
+
+  const summaryPath = resolveFromRoot('recon-summary', `${toSafeFileName(scenarioId)}.actions.json`);
+  try {
+    const summary = await readJsonFile<ReconAction[]>(summaryPath);
+    if (summary.length > 0) {
+      return summary;
+    }
+  } catch {
+    // fall through to fixture
+  }
+
+  const fixturePath = resolveFromRoot('tests/fixtures/recon-actions', `${toSafeFileName(scenarioId)}.actions.json`);
+  return readJsonFile<ReconAction[]>(fixturePath);
 }
 
 function toReconAction(
@@ -116,8 +141,36 @@ function toReconAction(
     optionSelectStatus: optionStatus(decision, inferredOptionLocator),
     selectionVerified: decision.parsedAction.actionType === 'select' && decision.actionStatus === 'success',
     snapshotFile: path.relative(process.cwd(), entry.file),
-    dropdownSnapshotFile: dropdownSnapshot ? path.relative(process.cwd(), dropdownSnapshot.file) : null
+    dropdownSnapshotFile: dropdownSnapshot ? path.relative(process.cwd(), dropdownSnapshot.file) : null,
+    postActionUrl: entry.snapshot.url ?? null,
+    postActionLandmarkLocator: extractPostActionLandmark(entry.snapshot)
   };
+}
+
+function extractPostActionLandmark(snapshot: ReconSnapshot): string | null {
+  const headings = snapshot.elements.filter(
+    (element) =>
+      element.isVisible &&
+      (element.role === 'heading' || /^h[1-3]$/i.test(element.tag)) &&
+      Boolean(element.text?.trim())
+  );
+
+  const withSuggested = headings.find((element) => element.suggestedLocator);
+  if (withSuggested?.suggestedLocator) {
+    return withSuggested.suggestedLocator;
+  }
+
+  const primary =
+    headings.find((element) => element.tag === 'h1') ??
+    headings.find((element) => element.tag === 'h2') ??
+    headings[0];
+
+  if (!primary?.text) {
+    return null;
+  }
+
+  const escaped = primary.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\//g, '\\/');
+  return `page.getByRole('heading', { name: /${escaped}/i })`;
 }
 
 function splitSelectLocator(selectedLocator: string | null): { dropdownLocator: string | null; optionLocator: string | null } {

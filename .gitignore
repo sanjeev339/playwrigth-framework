@@ -12,4 +12,3 @@ reports/result.json
 reports/result.html
 recon/**
 .DS_Store
-scenarios/** */

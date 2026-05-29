@@ -103,6 +103,20 @@ npm run pipeline
 8. `heal` asks the configured LLM provider to repair only locator, wait, and assertion failures, then writes repaired tests to `tests/healed/`.
 9. `report` writes `reports/result.json` and `reports/result.html`.
 
+## Recon step quality and LLM quota
+
+Recon executes **`scenarios/*.json` steps** (from Excel via `build:scenarios`), not the Markdown plan in `specs/`.
+
+- Write **atomic** test steps in `input/test_flow.xlsx` (one action per numbered step). Compound lines such as “click search and search the user name” are auto-split when possible, but clear steps produce better recon.
+- Recon uses Gemini/OpenAI when deterministic locator resolution is ambiguous. Free-tier Gemini quotas can block later steps; increase quota, switch model, or set `RECON_ALLOW_UNSAFE_FALLBACK=true` to allow validated non-safe locator fallback after LLM failure.
+- After changing Excel or normalizer logic: `npm run build:scenarios && npm run recon`.
+
+Regenerate a single spec from recon summary:
+
+```bash
+npm run regenerate:spec TC-UM-003
+```
+
 ## Recon Behavior
 
 Recon is state-based, not a single page scan. It follows the actual user journey:
