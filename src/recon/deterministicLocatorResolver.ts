@@ -22,11 +22,14 @@ export async function resolveDeterministicCandidates(
     return [];
   }
 
-  if (!['navigate', 'click', 'fill', 'select'].includes(parsedAction.actionType)) {
+  if (!['navigate', 'click', 'fill', 'select', 'row_action'].includes(parsedAction.actionType)) {
     return [];
   }
 
   const candidates: LocatorCandidate[] = [];
+  candidates.push(...buildExactTargetCandidates(parsedAction));
+  candidates.push(...buildRowActionMenuCandidates(parsedAction, snapshotElements));
+  candidates.push(...buildNearbyLabeledControlCandidates(parsedAction, snapshotElements));
 
   for (const element of snapshotElements) {
     const match = matchElement(parsedAction, element);
@@ -54,6 +57,200 @@ export async function resolveDeterministicCandidates(
   }
 
   return dedupeCandidates(candidates).sort((left, right) => left.priority - right.priority);
+}
+
+function buildNearbyLabeledControlCandidates(
+  parsedAction: ParsedAction,
+  snapshotElements: DomElementSnapshot[]
+): LocatorCandidate[] {
+  if (!parsedAction.target || parsedAction.actionType !== 'select') {
+    return [];
+  }
+
+  const target = normalize(parsedAction.target);
+  if (!target) {
+    return [];
+  }
+
+  const labels = snapshotElements.filter((element) => {
+    if (element.tag.toLowerCase() !== 'label' || !element.boundingBox) {
+      return false;
+    }
+
+    const labelText = normalize(element.text ?? element.label ?? '');
+    return labelText === target || labelText.includes(target);
+  });
+
+  const candidates: LocatorCandidate[] = [];
+  for (const label of labels) {
+    const control = findControlNearLabel(parsedAction, label, snapshotElements);
+    if (!control) {
+      continue;
+    }
+
+    const structuredLocator: StructuredLocator = {
+      method: 'fieldControlByLabel',
+      label: label.text ?? label.label ?? parsedAction.target,
+      controlSelector:
+        parsedAction.actionType === 'select'
+          ? 'select, [role="combobox"], [aria-haspopup], [aria-expanded]'
+          : 'input, textarea, [contenteditable="true"], [role="textbox"]'
+    };
+
+    candidates.push({
+      locator: locatorToString(structuredLocator),
+      locatorType: structuredLocator.method,
+      priority: 1 + elementKindWeight(parsedAction, control),
+      source: 'deterministic:nearby-label-control',
+      selectorConfidenceScore: 0.86,
+      selectorRisk: 'low',
+      selectorConfidenceSignals: ['nearbyLabelScopedControl', 'payloadTarget'],
+      elementSummary: {
+        label: summarizeElement(label),
+        control: summarizeElement(control)
+      },
+      structuredLocator
+    });
+  }
+
+  return candidates;
+}
+
+function buildExactTargetCandidates(parsedAction: ParsedAction): LocatorCandidate[] {
+  const target = parsedAction.target?.trim();
+  if (!target || target === '__FORM__') {
+    return [];
+  }
+
+  const candidates: LocatorCandidate[] = [];
+  const targetTexts = targetVariants(target);
+
+  const push = (structuredLocator: StructuredLocator, priority: number, source = 'deterministic:atomic-exact-target') => {
+    candidates.push({
+      locator: locatorToString(structuredLocator),
+      locatorType: structuredLocator.method,
+      priority,
+      source,
+      selectorConfidenceScore: 0.92,
+      selectorRisk: 'low',
+      selectorConfidenceSignals: ['atomicActionTarget', 'exactNameFirst'],
+      elementSummary: { atomicTarget: target },
+      structuredLocator
+    });
+  };
+
+  if (parsedAction.actionType === 'navigate' || parsedAction.actionType === 'click') {
+    for (const targetText of targetTexts) {
+      push({ method: 'getByRole', role: 'button', name: targetText, exact: true }, 0);
+      push({ method: 'getByRole', role: 'link', name: targetText, exact: true }, 1);
+      push({ method: 'getByRole', role: 'menuitem', name: targetText, exact: true }, 2);
+      push({ method: 'getByText', text: targetText, exact: true }, 5);
+      push({ method: 'getByRole', role: 'button', name: targetText, exact: false }, 20, 'deterministic:atomic-fuzzy-target');
+      push({ method: 'getByRole', role: 'link', name: targetText, exact: false }, 21, 'deterministic:atomic-fuzzy-target');
+      push({ method: 'getByRole', role: 'menuitem', name: targetText, exact: false }, 22, 'deterministic:atomic-fuzzy-target');
+      push({ method: 'getByText', text: targetText, exact: false }, 30, 'deterministic:atomic-fuzzy-target');
+    }
+  }
+
+  if (parsedAction.actionType === 'fill') {
+    push({ method: 'getByLabel', text: target, exact: true }, 0);
+    push({ method: 'getByPlaceholder', text: target, exact: true }, 1);
+    push({ method: 'getByRole', role: 'textbox', name: target, exact: true }, 2);
+    push({ method: 'getByLabel', text: target, exact: false }, 20, 'deterministic:atomic-fuzzy-target');
+    push({ method: 'getByPlaceholder', text: target, exact: false }, 21, 'deterministic:atomic-fuzzy-target');
+    push({ method: 'getByRole', role: 'textbox', name: target, exact: false }, 22, 'deterministic:atomic-fuzzy-target');
+  }
+
+  if (parsedAction.actionType === 'select') {
+    push({ method: 'getByRole', role: 'combobox', name: target, exact: true }, 0);
+    push({ method: 'getByLabel', text: target, exact: true }, 1);
+    push({ method: 'getByText', text: `Select ${target}`, exact: true }, 2);
+    push({ method: 'getByRole', role: 'button', name: `Select ${target}`, exact: true }, 3);
+    push({ method: 'getByRole', role: 'combobox', name: target, exact: false }, 20, 'deterministic:atomic-fuzzy-target');
+    push({ method: 'getByLabel', text: target, exact: false }, 21, 'deterministic:atomic-fuzzy-target');
+  }
+
+  return candidates;
+}
+
+function findControlNearLabel(
+  parsedAction: ParsedAction,
+  label: DomElementSnapshot,
+  snapshotElements: DomElementSnapshot[]
+): DomElementSnapshot | null {
+  const labelBox = label.boundingBox;
+  if (!labelBox) {
+    return null;
+  }
+
+  const nearbyControls = snapshotElements
+    .filter((element) => element.index !== label.index && element.boundingBox && isElementCompatible(parsedAction, element))
+    .map((element) => ({
+      element,
+      distance: labeledControlDistance(labelBox, element.boundingBox!)
+    }))
+    .filter(({ distance }) => distance < Number.MAX_SAFE_INTEGER)
+    .sort((left, right) => left.distance - right.distance);
+
+  return nearbyControls[0]?.element ?? null;
+}
+
+function labeledControlDistance(labelBox: { x: number; y: number; width: number; height: number }, controlBox: { x: number; y: number; width: number; height: number }): number {
+  const verticalGap = controlBox.y - (labelBox.y + labelBox.height);
+  const overlapsHorizontally = controlBox.x < labelBox.x + labelBox.width + 24 && controlBox.x + controlBox.width > labelBox.x - 24;
+  const belowOrAligned = verticalGap >= -8 && verticalGap <= 90;
+
+  if (!overlapsHorizontally || !belowOrAligned) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return Math.abs(verticalGap) + Math.abs(controlBox.x - labelBox.x) / 10;
+}
+
+function buildRowActionMenuCandidates(
+  parsedAction: ParsedAction,
+  snapshotElements: DomElementSnapshot[]
+): LocatorCandidate[] {
+  if (!['click', 'row_action'].includes(parsedAction.actionType) || !parsedAction.target) {
+    return [];
+  }
+
+  const rowTargetMatch = parsedAction.target.match(/^actions?\s+menu\s+for\s+(.+)$/i);
+  const rowTarget = parsedAction.payloadIdentity?.identityValue ?? rowTargetMatch?.[1]?.trim();
+  if (!rowTarget) {
+    return [];
+  }
+
+  const rowElement = snapshotElements.find((element) => {
+    const tag = element.tag.toLowerCase();
+    const role = element.role?.toLowerCase();
+    const text = element.text ?? '';
+    return (tag === 'tr' || role === 'row') && normalize(text).includes(normalize(rowTarget));
+  });
+
+  if (!rowElement) {
+    return [];
+  }
+
+  const structuredLocator: StructuredLocator = {
+    method: 'rowButtonByText',
+    text: rowTarget,
+    buttonIndex: 0
+  };
+
+  return [
+    {
+      locator: locatorToString(structuredLocator),
+      locatorType: structuredLocator.method,
+      priority: 0,
+      source: 'deterministic:row-action-menu',
+      selectorConfidenceScore: 0.9,
+      selectorRisk: 'low',
+      selectorConfidenceSignals: ['rowScopedButton', 'payloadTarget'],
+      elementSummary: summarizeElement(rowElement),
+      structuredLocator
+    }
+  ];
 }
 
 function matchElement(
@@ -142,7 +339,7 @@ function isElementCompatible(parsedAction: ParsedAction, element: DomElementSnap
     );
   }
 
-  if (parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate') {
+  if (parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate' || parsedAction.actionType === 'row_action') {
     return (
       ['button', 'a', 'li'].includes(tag) ||
       ['button', 'link', 'menuitem', 'tab', 'option'].includes(role ?? '') ||
@@ -190,7 +387,7 @@ function filterLocatorsForAction(
     return preferred.length ? preferred : locators;
   }
 
-  if (parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate') {
+  if (parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate' || parsedAction.actionType === 'row_action') {
     const semanticTextLocator = semanticClickTextLocator(parsedAction, element);
     const preferred = locators.filter((locator) => {
       if (locator.method === 'getByRole') {
@@ -244,7 +441,7 @@ function locatorPreference(parsedAction: ParsedAction, locator: StructuredLocato
   const base = actionLocatorPreference[locator.method] ?? 20;
   const role = element.role?.toLowerCase();
 
-  if ((parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate') && locator.method === 'getByRole') {
+  if ((parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate' || parsedAction.actionType === 'row_action') && locator.method === 'getByRole') {
     if (['button', 'link', 'menuitem'].includes(role ?? '')) {
       return base - 1;
     }
@@ -265,8 +462,8 @@ function elementKindWeight(parsedAction: ParsedAction, element: DomElementSnapsh
   const tag = element.tag.toLowerCase();
   const role = element.role?.toLowerCase();
 
-  if ((parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate') && ['button', 'a'].includes(tag)) return 0;
-  if ((parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate') && ['button', 'link', 'menuitem'].includes(role ?? '')) return 2;
+  if ((parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate' || parsedAction.actionType === 'row_action') && ['button', 'a'].includes(tag)) return 0;
+  if ((parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate' || parsedAction.actionType === 'row_action') && ['button', 'link', 'menuitem'].includes(role ?? '')) return 2;
   if (parsedAction.actionType === 'fill' && ['input', 'textarea'].includes(tag)) return 0;
   if (parsedAction.actionType === 'select' && tag === 'select') return 0;
   if (parsedAction.actionType === 'select' && ['combobox', 'button'].includes(role ?? '')) return 2;
@@ -370,6 +567,15 @@ function targetVariants(value: string): string[] {
   const cleanValue = value.replace(/\bclick\s+on\b/gi, '').replace(/\s+/g, ' ').trim();
   if (cleanValue) {
     variants.add(cleanValue);
+  }
+
+  if (/\bactions?\s+menu\b|\bmenu\b/i.test(cleanValue)) {
+    variants.add('Actions menu');
+    variants.add('Row actions');
+    variants.add('Options menu');
+    variants.add('Context menu');
+    variants.add('More actions');
+    variants.add('More');
   }
 
   if (/\bnew\b/i.test(cleanValue)) {

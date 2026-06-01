@@ -1,0 +1,64 @@
+{
+  "scenario_id": "TC-UM-002",
+  "module": "User Management",
+  "raw_steps": [
+    {
+      "step_no": 1,
+      "instruction": "1. Navigate to User Management; 2. Click on Add User and click Add Internal User.; 3. Enter existing email address; 4. Click on Save",
+      "expected_result": "1. User Management page is displayed.; 2. Add User form is displayed.; 3. Email field shows entered value.; 4. Error message displays: 'Email already exists.'; Overall: System prevents duplicate email from being registered."
+    }
+  ],
+  "steps": [
+    {
+      "step_no": 1,
+      "instruction": "Navigate to User Management",
+      "raw_instruction": "1. Navigate to User Management; 2. Click on Add User and click Add Internal User.; 3. Enter existing email address; 4. Click on Save",
+      "expected_result": "1. User Management page is displayed.; 2. Add User form is displayed.; 3. Email field shows entered value.; 4. Error message displays: 'Email already exists.'; Overall: System prevents duplicate email from being registered."
+    },
+    {
+      "step_no": 2,
+      "instruction": "Click Add User",
+      "raw_instruction": "1. Navigate to User Management; 2. Click on Add User and click Add Internal User.; 3. Enter existing email address; 4. Click on Save",
+      "expected_result": "1. User Management page is displayed.; 2. Add User form is displayed.; 3. Email field shows entered value.; 4. Error message displays: 'Email already exists.'; Overall: System prevents duplicate email from being registered."
+    },
+    {
+      "step_no": 3,
+      "instruction": "Click Add Internal User",
+      "raw_instruction": "1. Navigate to User Management; 2. Click on Add User and click Add Internal User.; 3. Enter existing email address; 4. Click on Save",
+      "expected_result": "1. User Management page is displayed.; 2. Add User form is displayed.; 3. Email field shows entered value.; 4. Error message displays: 'Email already exists.'; Overall: System prevents duplicate email from being registered."
+    },
+    {
+      "step_no": 4,
+      "instruction": "Enter Email Address",
+      "raw_instruction": "1. Navigate to User Management; 2. Click on Add User and click Add Internal User.; 3. Enter existing email address; 4. Click on Save",
+      "expected_result": "1. User Management page is displayed.; 2. Add User form is displayed.; 3. Email field shows entered value.; 4. Error message displays: 'Email already exists.'; Overall: System prevents duplicate email from being registered."
+    },
+    {
+      "step_no": 5,
+      "instruction": "Click Save",
+      "raw_instruction": "1. Navigate to User Management; 2. Click on Add User and click Add Internal User.; 3. Enter existing email address; 4. Click on Save",
+      "expected_result": "1. User Management page is displayed.; 2. Add User form is displayed.; 3. Email field shows entered value.; 4. Error message displays: 'Email already exists.'; Overall: System prevents duplicate email from being registered."
+    }
+  ],
+  "expected_results": [
+    "1. User Management page is displayed.; 2. Add User form is displayed.; 3. Email field shows entered value.; 4. Error message displays: 'Email already exists.'; Overall: System prevents duplicate email from being registered."
+  ],
+  "payload": {
+    "First Name": "adithya",
+    "Last Name": "j",
+    "Full Name": "adithya j",
+    "Email Address": "sanjeevkumar.m00@gmail.com",
+    "Expected Error": "Email already exists"
+  },
+  "metadata": {
+    "execution_order": 2,
+    "data_strategy": "negative_invalid_create",
+    "edge_case_type": "duplicate_value",
+    "depends_on": [
+      "TC-UM-001"
+    ],
+    "created_at": "2026-05-29T12:33:22.885Z",
+    "source_excel": "input/test_flow.xlsx",
+    "source_json": "input/test_data.json"
+  }
+}

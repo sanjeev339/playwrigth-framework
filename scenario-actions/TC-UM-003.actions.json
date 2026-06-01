@@ -1,0 +1,52 @@
+[
+  {
+    "stepNo": 1,
+    "sourceStepTitle": "Navigate to User Management",
+    "rawActionText": "Click on the \"User Management\" navigation link or menu item",
+    "actionType": "navigate",
+    "target": "User Management",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": "Must: Page URL contains /user-management (or similar route) Must: Page title or main heading is \"User Management\" (or similar) Must: A list or table displaying users is visible"
+  },
+  {
+    "stepNo": 2,
+    "sourceStepTitle": "Select the target user for editing",
+    "rawActionText": "Click on the row, link, or \"View/Details\" button associated with sanjeevkumar.m00@gmail.com",
+    "actionType": "row_action",
+    "target": "Actions Menu for sanjeevkumar.m00@gmail.com",
+    "value": null,
+    "payloadKey": "Email Address",
+    "assertionHint": "Must: Be redirected to a user details page or a user details modal appears Must: If a dedicated page, URL contains /user-management/sanjeevkumar.m00@gmail.com (or a user ID) Must: Page title or main heading is \"User Details\" or \"View User\" (or similar) Must: The displayed email address on the details view is sanjeevkumar.m00@gmail.com"
+  },
+  {
+    "stepNo": 3,
+    "sourceStepTitle": "Initiate the edit process",
+    "rawActionText": "Click the \"Edit\" button on the user details page or within the user details modal",
+    "actionType": "click",
+    "target": "Edit",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": "Must: An \"Edit User\" form or modal is displayed Must: The \"Role\" dropdown/select element is visible and enabled"
+  },
+  {
+    "stepNo": 4,
+    "sourceStepTitle": "Select the new role",
+    "rawActionText": "Select \"Workflow Operators\" from the \"Role\" dropdown",
+    "actionType": "select",
+    "target": "Role",
+    "value": "Workflow Operators",
+    "payloadKey": "Role",
+    "assertionHint": "Must: The \"Role\" dropdown now displays \"Workflow Operators\" as the selected value"
+  },
+  {
+    "stepNo": 5,
+    "sourceStepTitle": "Save the changes",
+    "rawActionText": "Click the \"Save\" button",
+    "actionType": "click",
+    "target": "Save",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": "Optional (if visible): A success toast, snackbar, or banner appears with text like \"User role updated successfully\" or \"Changes saved.\" Must: Be redirected back to the user details page or the main user management list Must: The displayed role for sanjeevkumar.m00@gmail.com is \"Workflow Operators\" (either on the user details page or in the user list) Must: If redirected to the user list, the row for sanjeevkumar.m00@gmail.com explicitly shows \"Workflow Operators\" as the assigned role"
+  }
+]

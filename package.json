@@ -7,6 +7,7 @@
   "scripts": {
     "build:scenarios": "ts-node src/scenario/scenarioBuilder.ts",
     "plan": "ts-node src/llm/planner.ts",
+    "extract:actions": "ts-node src/specs/mdActionExtractor.ts",
     "recon": "ts-node src/recon/interactiveRecon.ts",
     "generate": "ts-node src/llm/generator.ts",
     "validate": "ts-node src/recon/locatorValidator.ts",
@@ -16,12 +17,12 @@
     "run:generated": "ts-node src/runner/playwrightRunner.ts",
     "heal": "ts-node src/llm/healer.ts",
     "report": "ts-node src/reports/reportWriter.ts",
-    "pipeline": "npm run build:scenarios && npm run plan && npm run recon && npm run generate && npm run validate && npm run run:generated && npm run heal && npm run report",
+    "pipeline": "npm run build:scenarios && npm run plan && npm run extract:actions && npm run recon && npm run generate && npm run validate && npm run run:generated && npm run heal && npm run report",
     "typecheck": "tsc --noEmit",
     "test:normalizer": "ts-node src/scenario/stepNormalizer.test.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.6.0",
+    "@google/genai": "^2.7.0",
     "dotenv": "^16.4.7",
     "fs-extra": "^11.2.0",
     "openai": "^4.77.0",

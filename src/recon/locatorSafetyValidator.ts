@@ -87,6 +87,33 @@ export function parseLocatorExpression(locatorExpression: string): StructuredLoc
     };
   }
 
+  const rowButtonMatch = trimmed.match(
+    /^page\.getByRole\((['"])row\1,\s*\{\s*name:\s*(\/(.+)\/[a-z]*|(['"])(.*?)\4)\s*\}\)\.locator\((['"])button\6\)\.nth\((\d+)\)$/
+  );
+  if (rowButtonMatch) {
+    return {
+      method: 'rowButtonByText',
+      text: unescapePattern(rowButtonMatch[3] ?? rowButtonMatch[5] ?? '') ?? '',
+      buttonIndex: Number(rowButtonMatch[7] ?? 0)
+    };
+  }
+
+  const fieldControlMatch = trimmed.match(
+    /^page\.locator\((['"])label\1\)\.filter\(\{\s*hasText:\s*(\/(.+)\/[a-z]*|(['"])(.*?)\4)\s*\}\)\.locator\((['"])xpath=\.\.\6\)\.locator\((['"])(.*?)\7\)$/
+  );
+  if (fieldControlMatch) {
+    const selector = fieldControlMatch[8];
+    if (!selector || !isSafeSelector(selector)) {
+      return null;
+    }
+
+    return {
+      method: 'fieldControlByLabel',
+      label: unescapePattern(fieldControlMatch[3] ?? fieldControlMatch[5] ?? '') ?? '',
+      controlSelector: selector
+    };
+  }
+
   return null;
 }
 
@@ -101,7 +128,8 @@ async function validateStructuredLocator(
     const first = count > 0 ? locator.first() : null;
     const isVisible = first ? await first.isVisible({ timeout: 750 }).catch(() => false) : undefined;
     const isEnabled = first ? await first.isEnabled({ timeout: 750 }).catch(() => false) : undefined;
-    const isSafe = count === 1 && isVisible !== false && isEnabled !== false;
+    const hasDisabledAncestor = first ? await hasDisabledUiAncestor(first).catch(() => false) : undefined;
+    const isSafe = count === 1 && isVisible !== false && isEnabled !== false && hasDisabledAncestor !== true;
 
     return {
       locator: locatorExpression,
@@ -109,7 +137,7 @@ async function validateStructuredLocator(
       isVisible,
       isEnabled,
       isSafe,
-      reason: validationReason(count, isVisible, isEnabled)
+      reason: validationReason(count, isVisible, isEnabled, hasDisabledAncestor)
     };
   } catch (error) {
     return {
@@ -152,14 +180,37 @@ function locatorFromStructured(page: Page, structuredLocator: StructuredLocator)
         : `xpath=${structuredLocator.selector}`;
       return page.locator(selector);
     }
+    case 'rowButtonByText':
+      return page
+        .getByRole('row', { name: new RegExp(escapeRegex(structuredLocator.text), 'i') })
+        .locator('button')
+        .nth(structuredLocator.buttonIndex ?? 0);
+    case 'fieldControlByLabel':
+      return page.locator(fieldControlXPath(structuredLocator.label));
   }
 }
 
-function validationReason(count: number, isVisible?: boolean, isEnabled?: boolean): string {
+async function hasDisabledUiAncestor(locator: Locator): Promise<boolean> {
+  return locator.evaluate((node) => {
+    if (!(node instanceof Element)) {
+      return false;
+    }
+
+    return Boolean(node.closest('[disabled], [aria-disabled="true"], [data-p-disabled="true"], .p-disabled'));
+  });
+}
+
+function validationReason(
+  count: number,
+  isVisible?: boolean,
+  isEnabled?: boolean,
+  hasDisabledAncestor?: boolean
+): string {
   if (count === 0) return 'Locator matched zero elements.';
   if (count > 1) return `Locator matched ${count} elements; strict mode risk.`;
   if (isVisible === false) return 'Locator matched one element, but it is not visible.';
   if (isEnabled === false) return 'Locator matched one element, but it is not enabled.';
+  if (hasDisabledAncestor === true) return 'Locator matched one element, but it is inside a disabled UI ancestor.';
   return 'Locator matched exactly one visible enabled element.';
 }
 
@@ -179,4 +230,26 @@ function unescapePattern(value: string | undefined): string | undefined {
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function fieldControlXPath(label: string): string {
+  const labelLiteral = xpathLiteral(label);
+  const controlPredicate =
+    'self::input or self::textarea or self::select or @role="combobox" or @aria-haspopup or @aria-expanded';
+  return `xpath=//label[contains(normalize-space(.), ${labelLiteral})]/following-sibling::*[${controlPredicate} or .//*[${controlPredicate}]][1]`;
+}
+
+function xpathLiteral(value: string): string {
+  if (!value.includes('"')) {
+    return `"${value}"`;
+  }
+
+  if (!value.includes("'")) {
+    return `'${value}'`;
+  }
+
+  return `concat(${value
+    .split('"')
+    .map((part) => `"${part}"`)
+    .join(', \'"\', ')})`;
 }

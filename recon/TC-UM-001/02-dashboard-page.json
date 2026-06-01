@@ -2,10 +2,17 @@
   "scenario_id": "TC-UM-001",
   "state": "dashboard-page",
   "url": "https://adminportal.dev.eigen-dyne.com/dashboard",
-  "timestamp": "2026-05-27T12:17:14.708Z",
+  "timestamp": "2026-05-29T11:30:17.451Z",
   "action_before_snapshot": "Perform login",
   "decision": null,
   "action_error": null,
+  "snapshotSessionId": "TC-UM-001-1780054214091",
+  "snapshotSequence": 2,
+  "stabilization": {
+    "durationMs": 937,
+    "mutationQuietWindowMs": 500,
+    "timedOut": false
+  },
   "elements": [
     {
       "index": 0,
@@ -36,7 +43,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[1]/div[1]/div[1]/button[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.15,
+      "selectorRisk": "high",
+      "selectorConfidenceSignals": [
+        "nthChildPattern",
+        "deepAncestryChain"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 1,
@@ -82,7 +96,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/button[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 2,
@@ -128,7 +149,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[1]/div[2]/div[1]/div[2]/div[1]/button[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 3,
@@ -174,7 +202,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[1]/div[2]/div[1]/div[3]/div[1]/button[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 4,
@@ -220,7 +255,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[1]/div[2]/div[1]/div[4]/div[1]/button[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 5,
@@ -266,7 +308,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[1]/div[2]/div[1]/div[5]/div[1]/button[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 6,
@@ -312,7 +361,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[1]/div[2]/div[1]/div[5]/div[2]/div[1]/div[2]/button[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 7,
@@ -358,7 +414,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[1]/div[2]/div[1]/div[5]/div[2]/div[1]/div[3]/button[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 8,
@@ -404,7 +467,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[1]/div[2]/div[1]/div[6]/div[1]/button[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 9,
@@ -450,7 +520,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[1]/div[3]/div[1]/div[1]/div[1]/button[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 10,
@@ -458,6 +535,7 @@
       "className": "relative w-fit min-w-[90vw] sm:w-fit sm:min-w-[400px] items-start gap-4 rounded-2xl bg-[var(--color-background)] px-6 py-5 ",
       "text": "Login successful Success",
       "role": "alert",
+      "ariaLive": "polite",
       "isVisible": true,
       "isEnabled": true,
       "isLikelyClickable": false,
@@ -496,7 +574,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[2]/div[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "transient"
     },
     {
       "index": 11,
@@ -536,7 +621,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[2]/div[1]/button[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 12,
@@ -567,7 +659,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[1]/div[1]/div[1]/button[1]/div[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.15,
+      "selectorRisk": "high",
+      "selectorConfidenceSignals": [
+        "nthChildPattern",
+        "deepAncestryChain"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 13,
@@ -605,7 +704,13 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/header[1]/div[2]/div[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.37,
+      "selectorRisk": "high",
+      "selectorConfidenceSignals": [
+        "textOnlySelector"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 14,
@@ -643,7 +748,13 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/header[1]/div[2]/div[1]/div[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.37,
+      "selectorRisk": "high",
+      "selectorConfidenceSignals": [
+        "textOnlySelector"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 15,
@@ -681,7 +792,13 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/header[1]/div[2]/div[1]/div[2]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.37,
+      "selectorRisk": "high",
+      "selectorConfidenceSignals": [
+        "textOnlySelector"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 16,
@@ -712,7 +829,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[2]/div[1]/button[1]/div[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.15,
+      "selectorRisk": "high",
+      "selectorConfidenceSignals": [
+        "nthChildPattern",
+        "deepAncestryChain"
+      ],
+      "uiStability": "unknown"
     }
   ],
   "accessibility": {}

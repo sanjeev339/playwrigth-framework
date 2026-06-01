@@ -21,7 +21,7 @@ interface LLMAdvisorInput {
   previousActionErrors?: string[];
 }
 
-const allowedActionTypes = ['click', 'navigate', 'fill', 'select', 'verify', 'wait', 'skip', 'error'] as const;
+const allowedActionTypes = ['click', 'navigate', 'fill', 'select', 'verify', 'wait', 'row_action', 'skip', 'error'] as const;
 
 const decisionSchema = z.object({
   actionType: z.enum(allowedActionTypes),
@@ -240,7 +240,7 @@ function buildPrompt(input: LLMAdvisorInput): string {
       '',
       'Required JSON schema:',
       '{',
-      '  "actionType": "click" | "navigate" | "fill" | "select" | "verify" | "wait" | "skip" | "error",',
+      '  "actionType": "click" | "navigate" | "fill" | "select" | "verify" | "wait" | "row_action" | "skip" | "error",',
       '  "target": "string",',
       '  "value": "string | null",',
       '  "selectedLocator": "string | null",',
@@ -260,7 +260,7 @@ function buildCorrectionPrompt(invalidResponse: string): string {
       '',
       'Schema:',
       '{',
-      '  "actionType": "click" | "navigate" | "fill" | "select" | "verify" | "wait" | "skip" | "error",',
+      '  "actionType": "click" | "navigate" | "fill" | "select" | "verify" | "wait" | "row_action" | "skip" | "error",',
       '  "target": "string",',
       '  "value": "string | null",',
       '  "selectedLocator": "string | null",',

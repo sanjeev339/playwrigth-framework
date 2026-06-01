@@ -1,0 +1,64 @@
+{
+  "scenario_id": "TC-UM-003",
+  "module": "User Management",
+  "raw_steps": [
+    {
+      "step_no": 1,
+      "instruction": "1. Navigate to User Management; 2.Click on the user and click on edit.; 3. Select role from Role dropdown; 4. Click on Save.",
+      "expected_result": "1. User Management page is displayed.; 2. User details are displayed.; 3. Role dropdown reflects the chosen role.; 4. User role is updated successfully.; Overall: User's assigned role reflects changes in the user list."
+    }
+  ],
+  "steps": [
+    {
+      "step_no": 1,
+      "instruction": "Navigate to User Management",
+      "raw_instruction": "1. Navigate to User Management; 2.Click on the user and click on edit.; 3. Select role from Role dropdown; 4. Click on Save.",
+      "expected_result": "1. User Management page is displayed.; 2. User details are displayed.; 3. Role dropdown reflects the chosen role.; 4. User role is updated successfully.; Overall: User's assigned role reflects changes in the user list."
+    },
+    {
+      "step_no": 2,
+      "instruction": "Click Actions Menu for sanjeevkumar.m00@gmail.com",
+      "raw_instruction": "1. Navigate to User Management; 2.Click on the user and click on edit.; 3. Select role from Role dropdown; 4. Click on Save.",
+      "expected_result": "1. User Management page is displayed.; 2. User details are displayed.; 3. Role dropdown reflects the chosen role.; 4. User role is updated successfully.; Overall: User's assigned role reflects changes in the user list."
+    },
+    {
+      "step_no": 3,
+      "instruction": "Click Edit",
+      "raw_instruction": "1. Navigate to User Management; 2.Click on the user and click on edit.; 3. Select role from Role dropdown; 4. Click on Save.",
+      "expected_result": "1. User Management page is displayed.; 2. User details are displayed.; 3. Role dropdown reflects the chosen role.; 4. User role is updated successfully.; Overall: User's assigned role reflects changes in the user list."
+    },
+    {
+      "step_no": 4,
+      "instruction": "Select Role",
+      "raw_instruction": "1. Navigate to User Management; 2.Click on the user and click on edit.; 3. Select role from Role dropdown; 4. Click on Save.",
+      "expected_result": "1. User Management page is displayed.; 2. User details are displayed.; 3. Role dropdown reflects the chosen role.; 4. User role is updated successfully.; Overall: User's assigned role reflects changes in the user list."
+    },
+    {
+      "step_no": 5,
+      "instruction": "Click Save",
+      "raw_instruction": "1. Navigate to User Management; 2.Click on the user and click on edit.; 3. Select role from Role dropdown; 4. Click on Save.",
+      "expected_result": "1. User Management page is displayed.; 2. User details are displayed.; 3. Role dropdown reflects the chosen role.; 4. User role is updated successfully.; Overall: User's assigned role reflects changes in the user list."
+    }
+  ],
+  "expected_results": [
+    "1. User Management page is displayed.; 2. User details are displayed.; 3. Role dropdown reflects the chosen role.; 4. User role is updated successfully.; Overall: User's assigned role reflects changes in the user list."
+  ],
+  "payload": {
+    "First Name": "adithya",
+    "Last Name": "j",
+    "Full Name": "adithya j",
+    "Email Address": "sanjeevkumar.m00@gmail.com",
+    "Role": "Workflow Operators"
+  },
+  "metadata": {
+    "execution_order": 3,
+    "data_strategy": "positive_valid_update",
+    "edge_case_type": null,
+    "depends_on": [
+      "TC-UM-001"
+    ],
+    "created_at": "2026-05-29T12:33:22.886Z",
+    "source_excel": "input/test_flow.xlsx",
+    "source_json": "input/test_data.json"
+  }
+}

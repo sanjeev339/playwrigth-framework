@@ -1,0 +1,52 @@
+[
+  {
+    "stepNo": 1,
+    "sourceStepTitle": "Navigate to User Management",
+    "rawActionText": "Navigate to the User Management section of the application",
+    "actionType": "navigate",
+    "target": "User Management",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": null
+  },
+  {
+    "stepNo": 2,
+    "sourceStepTitle": "Click \"Add User\"",
+    "rawActionText": "Locate and click the \"Add User\" button",
+    "actionType": "click",
+    "target": "Add User",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": null
+  },
+  {
+    "stepNo": 3,
+    "sourceStepTitle": "Click \"Add Internal User\"",
+    "rawActionText": "From the options presented (if any), click \"Add Internal User\"",
+    "actionType": "click",
+    "target": "Add Internal User",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": null
+  },
+  {
+    "stepNo": 4,
+    "sourceStepTitle": "Enter Existing Email Address",
+    "rawActionText": "In the \"Email Address\" input field, enter the existing email address: process.env.EXISTING_USER_EMAIL",
+    "actionType": "fill",
+    "target": "Email Address",
+    "value": "sanjeevkumar.m00@gmail.com",
+    "payloadKey": "Email Address",
+    "assertionHint": null
+  },
+  {
+    "stepNo": 5,
+    "sourceStepTitle": "Click \"Save\"",
+    "rawActionText": "Locate and click the \"Save\" button on the \"Add Internal User\" form",
+    "actionType": "click",
+    "target": "Save",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": null
+  }
+]

@@ -1,4 +1,5 @@
 import type { ScenarioStep } from '../types';
+import { resolvePayloadIdentity } from './payloadIdentityResolver';
 
 export interface NormalizedStep extends ScenarioStep {
   step_no: number;
@@ -22,7 +23,7 @@ export function normalizeScenarioSteps(
     const segments = splitInstructionIntoSegments(rawInstruction);
 
     for (const segment of segments) {
-      const atomicInstructions = splitCompoundInstruction(cleanInstruction(segment), payloadLabels);
+      const atomicInstructions = splitCompoundInstruction(cleanInstruction(segment), payloadLabels, payload);
 
       for (const instruction of atomicInstructions) {
         if (!instruction) {
@@ -64,21 +65,115 @@ function splitInstructionIntoSegments(instruction: string): string[] {
   return markerSegments.length > 1 ? markerSegments : [stripLeadingNumbering(cleaned).trim()].filter(Boolean);
 }
 
-function splitCompoundInstruction(instruction: string, payloadLabels: string[]): string[] {
+function splitCompoundInstruction(
+  instruction: string,
+  payloadLabels: string[],
+  payload: Record<string, unknown>
+): string[] {
   const normalizedInstruction = cleanInstruction(instruction);
 
-  if (/^click\b/i.test(normalizedInstruction) && /\band\s+click\b/i.test(normalizedInstruction)) {
-    return normalizedInstruction
-      .split(/\s+and\s+(?=click\b)/i)
-      .map((part) => normalizeActionInstruction(part, payloadLabels))
-      .filter(Boolean);
+  const rowMenuActionSteps = splitRowMenuActionInstruction(normalizedInstruction, payload, payloadLabels);
+  if (rowMenuActionSteps.length > 0) {
+    return rowMenuActionSteps;
+  }
+
+  const rowSelectionStep = normalizeGenericRowSelectionInstruction(normalizedInstruction, payload);
+  if (rowSelectionStep) {
+    return [rowSelectionStep];
+  }
+
+  const mixedActionParts = splitMixedCompoundActions(normalizedInstruction);
+  if (mixedActionParts.length > 1) {
+    return mixedActionParts.map((part) => normalizeActionInstruction(part, payloadLabels, payload)).filter(Boolean);
   }
 
   if (/^(enter|fill|type)\b/i.test(normalizedInstruction) && /\s+and\s+/i.test(normalizedInstruction)) {
     return splitCompoundFieldInstruction(normalizedInstruction, payloadLabels);
   }
 
-  return [normalizeActionInstruction(normalizedInstruction, payloadLabels)].filter(Boolean);
+  return [normalizeActionInstruction(normalizedInstruction, payloadLabels, payload)].filter(Boolean);
+}
+
+function splitRowMenuActionInstruction(
+  instruction: string,
+  payload: Record<string, unknown>,
+  payloadLabels: string[]
+): string[] {
+  if (!/^(click|select|choose|open)\b/i.test(instruction) || !hasGenericRowSubject(instruction)) {
+    return [];
+  }
+
+  const parts = instruction.split(/\s+and\s+/i).map((part) => part.trim()).filter(Boolean);
+  const finalActionPart = [...parts].reverse().find((part) => {
+    if (!/^(click|select|choose)\b/i.test(part)) {
+      return false;
+    }
+
+    return !/\b(menu|actions?|more)\b/i.test(part) && !isGenericRowSubject(part);
+  });
+
+  if (!finalActionPart) {
+    return [];
+  }
+
+  const actionTarget = extractClickOrSelectTarget(finalActionPart);
+  if (!actionTarget) {
+    return [];
+  }
+
+  const rowTarget = resolvePayloadIdentity(payload)?.identityValue;
+  return [
+    `Click Actions Menu for ${rowTarget ?? 'record'}`,
+    `Click ${canonicalizeGeneralTarget(actionTarget, payloadLabels)}`
+  ];
+}
+
+function normalizeGenericRowSelectionInstruction(
+  instruction: string,
+  payload: Record<string, unknown>
+): string | null {
+  if (!/^(click|select|choose|open)\b/i.test(instruction) || !isGenericRowSelection(instruction)) {
+    return null;
+  }
+
+  return `Click Actions Menu for ${resolvePayloadIdentity(payload)?.identityValue ?? 'record'}`;
+}
+
+function splitMixedCompoundActions(instruction: string): string[] {
+  const actionBoundary = /\s+and\s+(?=(?:navigate|go|click|enter|fill|type|select|choose|verify|check|assert|wait)\b)/i;
+  return instruction
+    .split(actionBoundary)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function extractClickOrSelectTarget(instruction: string): string | null {
+  const match = instruction.match(/^(?:click|select|choose)\s+(?:on\s+)?(?:the\s+)?(.+)$/i);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  return cleanTarget(match[1]);
+}
+
+function isGenericRowSubject(instruction: string): boolean {
+  const target = instruction.replace(/^(?:click|select|choose)\s+(?:on\s+)?(?:the\s+)?/i, '').trim();
+  return /^(user|record|row|item|customer|employee|member|account|entry|profile|license)$/i.test(target);
+}
+
+function hasGenericRowSubject(instruction: string): boolean {
+  return /^(?:click|select|choose|open)\s+(?:on\s+)?(?:the\s+)?(?:identified\s+)?(?:user|record|row|item|customer|employee|member|account|entry|profile|license)\b/i.test(
+    instruction
+  );
+}
+
+function isGenericRowSelection(instruction: string): boolean {
+  const target = instruction
+    .replace(/^(?:click|select|choose|open)\s+(?:on\s+)?(?:the\s+)?/i, '')
+    .replace(/\b(?:to|for)\s+(?:edit|delete|remove|view|details|open|disable|enable|activate|deactivate|approve|reject)\b.*$/i, '')
+    .trim();
+
+  return /^(?:identified\s+)?(?:user|record|row|item|customer|employee|member|account|entry|profile|license)$/i.test(target);
 }
 
 function splitCompoundFieldInstruction(instruction: string, payloadLabels: string[]): string[] {
@@ -93,7 +188,11 @@ function splitCompoundFieldInstruction(instruction: string, payloadLabels: strin
   return parts.map((part) => `${verb} ${part}`);
 }
 
-function normalizeActionInstruction(instruction: string, payloadLabels: string[]): string {
+function normalizeActionInstruction(
+  instruction: string,
+  payloadLabels: string[],
+  payload: Record<string, unknown>
+): string {
   const cleaned = cleanInstruction(instruction);
 
   const navigateMatch = cleaned.match(/^(?:navigate|go)\s+(?:to\s+)?(.+)$/i);
@@ -103,7 +202,7 @@ function normalizeActionInstruction(instruction: string, payloadLabels: string[]
 
   const clickMatch = cleaned.match(/^click\s+(?:on\s+)?(?:the\s+)?(.+)$/i);
   if (clickMatch?.[1]) {
-    return `Click ${canonicalizeGeneralTarget(cleanTarget(clickMatch[1]), payloadLabels)}`;
+    return `Click ${canonicalizeClickTarget(cleanTarget(clickMatch[1]), payloadLabels, payload)}`;
   }
 
   const fillMatch = cleaned.match(/^(enter|fill|type)\s+(?:the\s+)?(.+)$/i);
@@ -114,6 +213,10 @@ function normalizeActionInstruction(instruction: string, payloadLabels: string[]
 
   const selectMatch = cleaned.match(/^(select|choose)\s+(?:the\s+)?(.+)$/i);
   if (selectMatch?.[2]) {
+    if (/\bedit\b/i.test(selectMatch[2])) {
+      return 'Click Edit';
+    }
+
     const verb = titleCaseAction(selectMatch[1]);
     return `${verb} ${canonicalizeFieldLabel(cleanTarget(selectMatch[2]), payloadLabels)}`;
   }
@@ -152,19 +255,29 @@ function cleanTarget(value: string): string {
     .trim();
 }
 
+function canonicalizeClickTarget(target: string, payloadLabels: string[], payload: Record<string, unknown>): string {
+  if (/^(user|record|row|item|customer|employee|member|account|entry|profile|license)$/i.test(target)) {
+    return resolvePayloadIdentity(payload)?.identityValue ?? canonicalizeGeneralTarget(target, payloadLabels);
+  }
+
+  if (/^(menu|actions?|action menu|actions menu|more)$/i.test(target)) {
+    return 'Actions Menu';
+  }
+
+  return canonicalizeGeneralTarget(target, payloadLabels);
+}
+
 function canonicalizeFieldLabel(target: string, payloadLabels: string[]): string {
   const directPayloadMatch = findPayloadLabel(target, payloadLabels);
   if (directPayloadMatch) {
     return directPayloadMatch;
   }
 
-  const titleCased = target
+  return target
     .split(/\s+/)
     .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
-
-  return commonLabelFixups(titleCased);
 }
 
 function canonicalizeGeneralTarget(target: string, payloadLabels: string[]): string {
@@ -189,13 +302,6 @@ function findPayloadLabel(target: string, payloadLabels: string[]): string | nul
     sortedLabels.find((label) => normalize(label).includes(normalizedTarget) || normalizedTarget.includes(normalize(label))) ??
     null
   );
-}
-
-function commonLabelFixups(value: string): string {
-  return value
-    .replace(/\bFirst name\b/i, 'First Name')
-    .replace(/\bLast name\b/i, 'Last Name')
-    .replace(/\bEmail address\b/i, 'Email Address');
 }
 
 function titleCaseAction(value: string): string {

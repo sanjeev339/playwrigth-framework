@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-05-29T12:33:32.538Z",
+  "scenarios": [
+    {
+      "scenario_id": "TC-UM-001",
+      "action_file": "scenario-actions/TC-UM-001.actions.json",
+      "action_count": 8,
+      "warnings": []
+    },
+    {
+      "scenario_id": "TC-UM-002",
+      "action_file": "scenario-actions/TC-UM-002.actions.json",
+      "action_count": 5,
+      "warnings": []
+    },
+    {
+      "scenario_id": "TC-UM-003",
+      "action_file": "scenario-actions/TC-UM-003.actions.json",
+      "action_count": 5,
+      "warnings": []
+    },
+    {
+      "scenario_id": "TC-UM-004",
+      "action_file": "scenario-actions/TC-UM-004.actions.json",
+      "action_count": 4,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}

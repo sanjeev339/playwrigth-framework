@@ -27,14 +27,11 @@ export function buildGeneratorPrompt(input: {
       '   await page.goto(loginUrl);',
       '4. Never call page.goto(`${baseURL}/login/`).',
       '5. Never append /login/ manually when WEBSITE_URL is present.',
-      '6. After login, assert stable post-login UI:',
-      "   await expect(page.getByRole('button', { name: /User Management/i })).toBeVisible();",
+      '6. After login, assert the first reconAction locator is visible when a selectedLocator exists; otherwise assert page body is visible.',
       '7. For successful recon actions, use reconAction.selectedLocator exactly.',
-      '8. For New Internal User, if recon selected Add Internal User, use:',
-      '   page.getByText(/New Internal User|Add Internal User/i)',
-      '9. For custom dropdowns, never use selectOption unless recon proves the element is a native select.',
-      '10. For Role dropdown, click dropdownLocator or page.getByText(/^Select role$/i), then click option by payload value.',
-      "11. Role option fallback must include page.locator('[role=\"listbox\"], .p-dropdown-panel, .p-dropdown-items').getByText(/^VALUE$/i).",
+      '8. For custom dropdowns, never use selectOption unless recon proves the element is a native select.',
+      '9. For dropdown options, click an option by parsedAction.value/payload value using role/text fallback.',
+      '10. For row_action, use rowActionLocator or selectedLocator from recon-summary; do not guess the row.',
       '12. Use payload values for business fields.',
       '13. Never hardcode login credentials; use process.env.LOGIN_EMAIL and process.env.LOGIN_PASSWORD.',
       '14. Output full code only. No Markdown. No explanation.',
@@ -95,7 +92,9 @@ export function compactDropdownSnapshot(snapshot: ReconSnapshot): CompactDropdow
 export function buildDeterministicReconTest(scenario: Scenario, reconActions: ReconAction[]): string {
   const title = `${scenario.scenario_id}: ${scenario.action ?? scenario.module ?? 'Generated scenario'}`;
   const payloadLiteral = JSON.stringify(scenario.payload, null, 2).replace(/\n/g, '\n  ');
-  const actionSteps = reconActions.map((action) => renderActionStep(action, scenario.payload)).join('\n\n');
+  const actionSteps = reconActions
+    .map((action, index) => renderActionStep(action, scenario.payload, reconActions[index - 1]))
+    .join('\n\n');
 
   return `import { test, expect, type Locator, type Page } from '@playwright/test';
 
@@ -158,13 +157,34 @@ async function clickFirst(label: string, locators: Locator[]): Promise<void> {
   throw new Error(\`Unable to find clickable control for \${label}.\`);
 }
 
+async function clickMenuItemAfterRowAction(label: string, openMenu: () => Locator, item: () => Locator): Promise<void> {
+  let candidate = await firstUsable(item());
+
+  if (!candidate) {
+    const opener = await firstUsable(openMenu());
+    if (!opener) {
+      throw new Error(\`Unable to find row action menu opener for \${label}.\`);
+    }
+
+    await opener.click();
+    candidate = await firstUsable(item());
+  }
+
+  if (!candidate) {
+    throw new Error(\`Unable to find row menu item for \${label}.\`);
+  }
+
+  await candidate.click();
+}
+
 async function selectCustomDropdown(page: Page, openDropdown: () => Locator, optionValue: string): Promise<void> {
   await openDropdown().click();
 
   const exactOptionRegex = new RegExp(\`^\${escapeRegex(optionValue)}$\`, 'i');
   const optionCandidates = [
     page.getByRole('option', { name: exactOptionRegex }),
-    page.locator('[role="listbox"], .p-dropdown-panel, .p-dropdown-items').getByText(exactOptionRegex),
+    page.locator('[role="listbox"], [role="menu"], [role="dialog"]').getByText(exactOptionRegex),
+    page.locator('[aria-selected], [data-option], li').filter({ hasText: exactOptionRegex }),
     page.locator('li[role="option"]').filter({ hasText: exactOptionRegex }),
     page.getByText(exactOptionRegex)
   ];
@@ -211,7 +231,7 @@ test(${JSON.stringify(title)}, async ({ page }) => {
       page.getByText(/login|sign in|submit/i)
     ]);
 
-    await expect(page.getByRole('button', { name: /User Management/i })).toBeVisible({ timeout: 15000 });
+${indent(renderPostLoginAssertion(reconActions), 4)}
   });
 
 ${indent(actionSteps, 2)}
@@ -219,12 +239,24 @@ ${indent(actionSteps, 2)}
 `;
 }
 
-function renderActionStep(action: ReconAction, payload: Record<string, unknown>): string {
+function renderActionStep(action: ReconAction, payload: Record<string, unknown>, previousAction?: ReconAction): string {
   const stepTitle = `Step ${action.stepNo ?? '?'}: ${action.rawStep}`;
   const locator = locatorForAction(action);
   const valueExpression = payloadValueExpression(action, payload);
 
-  if (action.actionType === 'navigate' || action.actionType === 'click') {
+  if (action.actionType === 'navigate' || action.actionType === 'click' || action.actionType === 'row_action') {
+    const previousRowMenuLocator =
+      previousAction?.actionType === 'row_action'
+        ? previousAction.rowActionLocator ?? previousAction.selectedLocator
+        : null;
+
+    if (action.actionType === 'click' && previousRowMenuLocator && action.selectedLocator) {
+      return `await test.step(${JSON.stringify(stepTitle)}, async () => {
+  await clickMenuItemAfterRowAction(${JSON.stringify(action.rawStep)}, () => ${previousRowMenuLocator}, () => ${locator});
+${renderClickAssertion(action)}
+});`;
+    }
+
     return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await ${locator}.click();
 ${renderClickAssertion(action)}
@@ -264,34 +296,25 @@ ${renderClickAssertion(action)}
 }
 
 function renderClickAssertion(action: ReconAction): string {
-  if (/user management/i.test(action.rawStep)) {
-    return "  await expect(page.getByRole('button', { name: /Add User/i })).toBeVisible({ timeout: 15000 });";
+  if (action.actionType === 'row_action') {
+    return '  await page.waitForTimeout(150);';
   }
-  if (/add user/i.test(action.rawStep)) {
-    return '  await expect(page.getByText(/New Internal User|Add Internal User/i)).toBeVisible({ timeout: 10000 });';
-  }
-  if (/new internal user/i.test(action.rawStep)) {
-    return '  await expect(page.getByRole(\'textbox\', { name: /Enter first name/i })).toBeVisible({ timeout: 10000 });';
-  }
-  if (/save/i.test(action.rawStep)) {
+
+  if (/save|submit|create|update|confirm|finish|done/i.test(action.rawStep)) {
     return "  await page.waitForLoadState('networkidle').catch(() => undefined);";
   }
   return "  await page.waitForLoadState('domcontentloaded').catch(() => undefined);";
 }
 
 function locatorForAction(action: ReconAction): string {
-  if (/new internal user/i.test(action.rawStep)) {
-    return 'page.getByText(/New Internal User|Add Internal User/i)';
+  if (action.actionType === 'row_action' && action.rowActionLocator) {
+    return action.rowActionLocator;
   }
 
   return action.selectedLocator ?? fallbackLocator(action);
 }
 
 function dropdownLocatorForAction(action: ReconAction): string {
-  if (/role/i.test(action.target ?? action.rawStep)) {
-    return 'page.getByText(/^Select role$/i)';
-  }
-
   return action.dropdownLocator ?? action.selectedLocator ?? fallbackLocator(action);
 }
 
@@ -322,6 +345,15 @@ function payloadValueExpression(action: ReconAction, payload: Record<string, unk
   }
 
   return JSON.stringify(String(action.selectedValue ?? action.value ?? ''));
+}
+
+function renderPostLoginAssertion(reconActions: ReconAction[]): string {
+  const firstActionWithLocator = reconActions.find((action) => action.selectedLocator && ['navigate', 'click', 'fill', 'select', 'row_action'].includes(action.actionType));
+  if (firstActionWithLocator?.selectedLocator) {
+    return `await expect(${firstActionWithLocator.selectedLocator}).toBeVisible({ timeout: 15000 });`;
+  }
+
+  return "await expect(page.locator('body')).toBeVisible({ timeout: 15000 });";
 }
 
 function regexLiteral(value: string): string {

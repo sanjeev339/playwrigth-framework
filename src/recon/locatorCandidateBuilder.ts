@@ -149,14 +149,14 @@ export function locatorToString(locator: StructuredLocator): string {
   switch (locator.method) {
     case 'getByRole':
       return locator.name
-        ? `page.getByRole(${quote(locator.role)}, { name: ${regex(locator.name)} })`
+        ? `page.getByRole(${quote(locator.role)}, { name: ${regex(locator.name, locator.exact)} })`
         : `page.getByRole(${quote(locator.role)})`;
     case 'getByLabel':
-      return `page.getByLabel(${regex(locator.text)})`;
+      return `page.getByLabel(${regex(locator.text, locator.exact)})`;
     case 'getByPlaceholder':
-      return `page.getByPlaceholder(${regex(locator.text)})`;
+      return `page.getByPlaceholder(${regex(locator.text, locator.exact)})`;
     case 'getByText':
-      return `page.getByText(${regex(locator.text)})`;
+      return `page.getByText(${regex(locator.text, locator.exact)})`;
     case 'getByTestId':
       return `page.getByTestId(${quote(locator.text)})`;
     case 'css':
@@ -165,6 +165,10 @@ export function locatorToString(locator: StructuredLocator): string {
       const selector = locator.selector.startsWith('xpath=') ? locator.selector : `xpath=${locator.selector}`;
       return `page.locator(${quote(selector)})`;
     }
+    case 'rowButtonByText':
+      return `page.getByRole("row", { name: ${regex(locator.text)} }).locator("button").nth(${locator.buttonIndex ?? 0})`;
+    case 'fieldControlByLabel':
+      return `page.locator(${quote(fieldControlXPath(locator.label))})`;
   }
 }
 
@@ -172,9 +176,9 @@ function quote(value: string): string {
   return JSON.stringify(value);
 }
 
-function regex(value: string): string {
+function regex(value: string, exact = false): string {
   const trimmed = value.trim().replace(/\s+/g, ' ');
-  return `/${escapeRegex(trimmed)}/i`;
+  return exact ? `/^${escapeRegex(trimmed)}$/i` : `/${escapeRegex(trimmed)}/i`;
 }
 
 function escapeRegex(value: string): string {
@@ -183,6 +187,28 @@ function escapeRegex(value: string): string {
 
 function cssEscape(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function fieldControlXPath(label: string): string {
+  const labelLiteral = xpathLiteral(label);
+  const controlPredicate =
+    'self::input or self::textarea or self::select or @role="combobox" or @aria-haspopup or @aria-expanded';
+  return `xpath=//label[contains(normalize-space(.), ${labelLiteral})]/following-sibling::*[${controlPredicate} or .//*[${controlPredicate}]][1]`;
+}
+
+function xpathLiteral(value: string): string {
+  if (!value.includes('"')) {
+    return `"${value}"`;
+  }
+
+  if (!value.includes("'")) {
+    return `'${value}'`;
+  }
+
+  return `concat(${value
+    .split('"')
+    .map((part) => `"${part}"`)
+    .join(', \'"\', ')})`;
 }
 
 function cleanText(value: string): string {
@@ -255,6 +281,16 @@ function scoreLocatorStructuralConfidence(
       score -= 0.08;
       signals.push('positionalXpath');
     }
+  }
+
+  if (locator.method === 'rowButtonByText') {
+    score += 0.28;
+    signals.push('rowScopedButton');
+  }
+
+  if (locator.method === 'fieldControlByLabel') {
+    score += 0.3;
+    signals.push('nearbyLabelScopedControl');
   }
 
   if (locator.method === 'css') {

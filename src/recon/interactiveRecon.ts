@@ -2,13 +2,15 @@ import path from 'node:path';
 import { chromium, type Locator, type Page } from '@playwright/test';
 import fs from 'fs-extra';
 import { getWebEnv } from '../config/env';
-import type { ReconSnapshot, Scenario } from '../types';
+import type { ReconSnapshot, Scenario, ScenarioStep } from '../types';
+import { ensureScenarioActions, type ScenarioAtomicAction } from '../specs/mdActionExtractor';
 import { listFiles, readJsonFile, readTextFile, resolveFromRoot, toSafeFileName } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 import { decideAndExecuteAction } from './actionDecisionEngine';
 import { scanAccessibility } from './accessibilityScanner';
 import { scanVisibleDom } from './domScanner';
 import { waitForRafCycles, waitForSnapshotStability } from './pageStabilizer';
+import { extractReconActions } from './reconActionExtractor';
 import type { ReconDecision } from './reconDecisionTypes';
 import { writeStateSnapshot } from './stateSnapshotWriter';
 
@@ -50,6 +52,28 @@ export async function runInteractiveRecon(options: {
       if (!plan) {
         logger.warn(`No Markdown plan found for ${scenario.scenario_id}; recon will use scenario steps only.`);
       }
+      const atomicActions = await ensureScenarioActions({
+        scenario,
+        specsDir: specDir,
+        scenarioDir,
+        outputDir: resolveFromRoot('scenario-actions')
+      });
+      const reconSteps = atomicActions.length > 0 ? atomicActions.map(toReconStep) : scenario.steps;
+
+      if (atomicActions.length > 0) {
+        logger.info(
+          `[Recon] Loaded ${atomicActions.length} atomic action(s) from scenario-actions/${safeScenarioId}.actions.json`
+        );
+        for (const action of atomicActions) {
+          console.log(
+            `[Recon] Step ${action.stepNo}: ${action.actionType} -> ${action.target ?? 'none'}${
+              action.value ? ` = ${action.value}` : ''
+            }`
+          );
+        }
+      } else {
+        logger.warn(`[Recon] No scenario-actions file found for ${scenario.scenario_id}; using normalized Excel scenario steps.`);
+      }
 
       const context = await browser.newContext();
       const page = await context.newPage();
@@ -89,8 +113,8 @@ export async function runInteractiveRecon(options: {
         });
         writtenSnapshots.push(dashboardSnapshot.filePath);
 
-        for (const step of scenario.steps) {
-          const stepNo = step.step_no ?? scenario.steps.indexOf(step) + 1;
+        for (const step of reconSteps) {
+          const stepNo = step.step_no ?? reconSteps.indexOf(step) + 1;
           const before = await captureSnapshot({
             page,
             scenarioId: scenario.scenario_id,
@@ -148,6 +172,9 @@ export async function runInteractiveRecon(options: {
       } finally {
         await context.close();
       }
+
+      const extractedActions = await extractReconActions(scenario.scenario_id, outputDir);
+      logger.info(`Extracted ${extractedActions.length} recon action(s) for ${scenario.scenario_id}.`);
     }
   } finally {
     await browser.close();
@@ -160,7 +187,7 @@ function logReconDecision(stepNo: number, instruction: string, decision: ReconDe
   const parsed = decision.parsedAction;
   const valueKey =
     parsed.value && parsed.target && parsed.target !== '__FORM__' && ['fill', 'select'].includes(parsed.actionType)
-      ? parsed.target
+      ? parsed.payloadKey ?? parsed.target
       : 'none';
   const safeCandidates = decision.validatedCandidates.filter((candidate) => candidate.isSafe).length;
   const llmUsed = decision.decisionSource === 'llm' ? 'yes' : 'no';
@@ -184,6 +211,39 @@ function logReconDecision(stepNo: number, instruction: string, decision: ReconDe
   }
   console.log(`[Recon] Selected locator: ${decision.selectedLocator ?? 'none'}`);
   console.log(`[Recon] Status: ${decision.actionStatus}`);
+}
+
+function toReconStep(action: ScenarioAtomicAction): ScenarioStep & { atomicAction: ScenarioAtomicAction } {
+  return {
+    step_no: action.stepNo,
+    instruction: actionInstruction(action),
+    raw_instruction: action.rawActionText,
+    expected_result: action.assertionHint ?? undefined,
+    atomicAction: action
+  };
+}
+
+function actionInstruction(action: ScenarioAtomicAction): string {
+  const target = action.target ?? '';
+
+  switch (action.actionType) {
+    case 'navigate':
+      return target ? `Navigate to ${target}` : action.rawActionText;
+    case 'click':
+      return target ? `Click ${target}` : action.rawActionText;
+    case 'fill':
+      return target ? `Fill ${target}` : action.rawActionText;
+    case 'select':
+      return target ? `Select ${target}` : action.rawActionText;
+    case 'row_action':
+      return target ? `Click ${target}` : action.rawActionText;
+    case 'verify':
+      return target ? `Verify ${target}` : action.rawActionText;
+    case 'wait':
+      return 'Wait';
+    default:
+      return action.rawActionText;
+  }
 }
 
 async function captureSnapshot(input: {

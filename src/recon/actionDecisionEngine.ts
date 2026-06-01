@@ -93,8 +93,23 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
           safeCandidates.length === 1
             ? 'Exactly one deterministic safe locator matched.'
             : 'Multiple safe locator strings matched the same UI element; selected the highest-priority locator.',
-        knownCandidates: deterministicCandidates
+          knownCandidates: deterministicCandidates
       });
+    }
+
+    const disabledTargetReason = disabledTargetValidationReason(deterministicCandidates, validatedCandidates);
+    if (disabledTargetReason) {
+      return {
+        ...decision,
+        decisionSource: 'deterministic',
+        selectedLocator: disabledTargetReason.locator,
+        selectedValue: parsedAction.value,
+        llmReason: 'Matching UI target is present but disabled; LLM fallback skipped.',
+        confidence: 'high',
+        executed: false,
+        actionStatus: 'failed',
+        actionError: disabledTargetReason.reason
+      };
     }
 
     console.log('[Recon] LLM used: yes');
@@ -314,7 +329,11 @@ async function executeSelectedLocator(
   }
 
   try {
-    if (options.parsedAction.actionType === 'click' || options.parsedAction.actionType === 'navigate') {
+    if (
+      options.parsedAction.actionType === 'click' ||
+      options.parsedAction.actionType === 'navigate' ||
+      options.parsedAction.actionType === 'row_action'
+    ) {
       await locator.click();
       await waitForSettledPage(input.page);
     } else if (options.parsedAction.actionType === 'fill') {
@@ -332,7 +351,17 @@ async function executeSelectedLocator(
       options.decision.decisionSource = options.decisionSource;
       options.decision.llmReason = options.reason;
       options.decision.confidence = options.confidence;
+      options.decision.dropdownLocator = options.selectedLocator;
+      options.decision.optionValue = options.selectedValue;
+      options.decision.dropdownOpenStatus = 'skipped';
+      options.decision.optionSelectStatus = 'skipped';
+      options.decision.selectionVerified = false;
       const optionLocator = await executeSelectAction(input, options.parsedAction, locator, options.decision);
+      options.decision.optionLocator = optionLocator;
+      options.decision.optionValue = options.selectedValue;
+      options.decision.dropdownOpenStatus = 'success';
+      options.decision.optionSelectStatus = 'success';
+      options.decision.selectionVerified = true;
       options.selectedLocator = `${options.selectedLocator} -> ${optionLocator}`;
     } else {
       return {
@@ -391,7 +420,8 @@ async function executeSelectAction(
   decision: ReconDecision
 ): Promise<string> {
   await dropdownLocator.click();
-  await input.page.waitForTimeout(250);
+  decision.dropdownOpenStatus = 'success';
+  await input.page.waitForTimeout(300);
 
   if (input.onIntermediateSnapshot) {
     await input.onIntermediateSnapshot(
@@ -435,20 +465,29 @@ async function executeSelectAction(
   if (safeOptionCandidates.length === 1) {
     selectedOptionLocator = safeOptionCandidates[0].locator;
   } else {
-    const advisorDecision = await askLLMForActionDecision({
-      scenarioId: input.scenarioId,
-      parsedAction: optionAction,
-      payload: input.payload,
-      visibleElements: optionElements,
-      locatorCandidates: optionCandidates,
-      validationResults: optionValidations,
-      previousActionErrors: input.previousActionErrors
-    });
-    applyLLMMetadata(decision, advisorDecision);
-    logLLMParseStatus(advisorDecision);
-    decision.llmReason = appendReason(decision.llmReason, `Option selection: ${advisorDecision.reason}`);
-    decision.confidence = lowerConfidence(decision.confidence, advisorDecision.confidence);
-    selectedOptionLocator = advisorDecision.selectedLocator;
+    const deterministicOption = selectDeterministicSafeCandidate(safeOptionCandidates);
+    if (deterministicOption) {
+      selectedOptionLocator = deterministicOption.locator;
+      decision.llmReason = appendReason(
+        decision.llmReason,
+        'Option selection used the highest-priority deterministic safe locator.'
+      );
+    } else {
+      const advisorDecision = await askLLMForActionDecision({
+        scenarioId: input.scenarioId,
+        parsedAction: optionAction,
+        payload: input.payload,
+        visibleElements: optionElements,
+        locatorCandidates: optionCandidates,
+        validationResults: optionValidations,
+        previousActionErrors: input.previousActionErrors
+      });
+      applyLLMMetadata(decision, advisorDecision);
+      logLLMParseStatus(advisorDecision);
+      decision.llmReason = appendReason(decision.llmReason, `Option selection: ${advisorDecision.reason}`);
+      decision.confidence = lowerConfidence(decision.confidence, advisorDecision.confidence);
+      selectedOptionLocator = advisorDecision.selectedLocator;
+    }
   }
 
   if (!selectedOptionLocator) {
@@ -472,6 +511,10 @@ async function executeSelectAction(
   }
 
   await optionLocator.click();
+  decision.optionLocator = selectedOptionLocator;
+  decision.optionValue = optionValue;
+  decision.optionSelectStatus = 'success';
+  decision.selectionVerified = true;
   await waitForSettledPage(input.page);
   return selectedOptionLocator;
 }
@@ -517,6 +560,11 @@ function selectDeterministicSafeCandidate(safeCandidates: LocatorCandidate[]): L
     return sorted[0];
   }
 
+  const strongestSemanticCandidate = sorted.find(isStrongSemanticCandidate);
+  if (strongestSemanticCandidate) {
+    return strongestSemanticCandidate;
+  }
+
   const top = sorted[0];
   if (isStrongSemanticCandidate(top)) {
     return top;
@@ -534,7 +582,7 @@ function selectDeterministicSafeCandidate(safeCandidates: LocatorCandidate[]): L
 function isStrongSemanticCandidate(candidate: LocatorCandidate): boolean {
   return (
     candidate.priority <= 30 &&
-    ['getByTestId', 'getByRole', 'getByLabel', 'getByPlaceholder', 'getByText'].includes(candidate.locatorType)
+    ['getByTestId', 'getByRole', 'getByLabel', 'getByPlaceholder', 'getByText', 'fieldControlByLabel'].includes(candidate.locatorType)
   );
 }
 
@@ -577,6 +625,46 @@ function unsafeLocatorReason(validation: LocatorValidationResult): string {
     return `strict_mode_risk: ${validation.reason}`;
   }
   return validation.reason;
+}
+
+function disabledTargetValidationReason(
+  candidates: LocatorCandidate[],
+  validations: LocatorValidationResult[]
+): { locator: string; reason: string } | null {
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const candidateLocators = new Set(candidates.map((candidate) => candidate.locator));
+  const relevantValidations = validations.filter((validation) => candidateLocators.has(validation.locator));
+  if (relevantValidations.length === 0) {
+    return null;
+  }
+
+  const disabledValidation = relevantValidations.find((validation) =>
+    /not enabled|disabled UI ancestor/i.test(validation.reason)
+  );
+
+  if (!disabledValidation) {
+    return null;
+  }
+
+  const allMatchesAreDisabledOrUnsafe = relevantValidations.every((validation) => {
+    if (validation.isSafe) {
+      return false;
+    }
+
+    return /not enabled|disabled UI ancestor|strict mode risk|matched zero elements/i.test(validation.reason);
+  });
+
+  if (!allMatchesAreDisabledOrUnsafe) {
+    return null;
+  }
+
+  return {
+    locator: disabledValidation.locator,
+    reason: `Target is present but disabled: ${disabledValidation.reason}`
+  };
 }
 
 async function waitForSettledPage(page: Page): Promise<void> {

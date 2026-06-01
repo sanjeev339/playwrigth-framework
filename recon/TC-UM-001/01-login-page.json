@@ -2,10 +2,17 @@
   "scenario_id": "TC-UM-001",
   "state": "login-page",
   "url": "https://adminportal.dev.eigen-dyne.com/login/",
-  "timestamp": "2026-05-27T12:17:12.861Z",
+  "timestamp": "2026-05-29T11:30:15.801Z",
   "action_before_snapshot": "Open login page",
   "decision": null,
   "action_error": null,
+  "snapshotSessionId": "TC-UM-001-1780054214091",
+  "snapshotSequence": 1,
+  "stabilization": {
+    "durationMs": 561,
+    "mutationQuietWindowMs": 500,
+    "timedOut": false
+  },
   "elements": [
     {
       "index": 0,
@@ -50,7 +57,13 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[1]/label[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.67,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "labelAssociated"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 1,
@@ -116,7 +129,15 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[1]/div[1]/div[1]/input[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.87,
+      "selectorRisk": "low",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName",
+        "stableId"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 2,
@@ -161,7 +182,13 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/label[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.67,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "labelAssociated"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 3,
@@ -226,7 +253,15 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/div[1]/div[1]/input[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.87,
+      "selectorRisk": "low",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName",
+        "stableId"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 4,
@@ -239,9 +274,9 @@
       "isEnabled": true,
       "isLikelyClickable": true,
       "boundingBox": {
-        "x": 1075,
+        "x": 1076,
         "y": 495,
-        "width": 105,
+        "width": 104,
         "height": 18
       },
       "cssCandidate": "div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(3) > a:nth-of-type(1)",
@@ -273,7 +308,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[3]/a[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 5,
@@ -319,7 +361,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.75,
+      "selectorRisk": "medium",
+      "selectorConfidenceSignals": [
+        "roleBased",
+        "accessibleName"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 6,
@@ -350,7 +399,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/div[1]/div[1]/div[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.15,
+      "selectorRisk": "high",
+      "selectorConfidenceSignals": [
+        "nthChildPattern",
+        "deepAncestryChain"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 7,
@@ -380,7 +436,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[2]/div[1]/div[1]/div[1]/div[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.15,
+      "selectorRisk": "high",
+      "selectorConfidenceSignals": [
+        "nthChildPattern",
+        "deepAncestryChain"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 8,
@@ -393,7 +456,7 @@
       "boundingBox": {
         "x": 932,
         "y": 548,
-        "width": 57,
+        "width": 56,
         "height": 18
       },
       "cssCandidate": "form:nth-of-type(1) > div:nth-of-type(4) > button:nth-of-type(1) > div:nth-of-type(1)",
@@ -418,7 +481,13 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.37,
+      "selectorRisk": "high",
+      "selectorConfidenceSignals": [
+        "textOnlySelector"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 9,
@@ -431,7 +500,7 @@
       "boundingBox": {
         "x": 932,
         "y": 548,
-        "width": 33,
+        "width": 32,
         "height": 18
       },
       "cssCandidate": "div:nth-of-type(4) > button:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1)",
@@ -456,7 +525,13 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]/span[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.37,
+      "selectorRisk": "high",
+      "selectorConfidenceSignals": [
+        "textOnlySelector"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 10,
@@ -487,7 +562,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]/span[2]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.15,
+      "selectorRisk": "high",
+      "selectorConfidenceSignals": [
+        "nthChildPattern",
+        "deepAncestryChain"
+      ],
+      "uiStability": "unknown"
     },
     {
       "index": 11,
@@ -517,7 +599,14 @@
           "method": "xpath",
           "selector": "/html/body/div[1]/div[1]/div[2]/div[1]/div[1]/form[1]/div[4]/button[1]/div[1]/span[2]/div[1]"
         }
-      ]
+      ],
+      "selectorConfidenceScore": 0.15,
+      "selectorRisk": "high",
+      "selectorConfidenceSignals": [
+        "nthChildPattern",
+        "deepAncestryChain"
+      ],
+      "uiStability": "unknown"
     }
   ],
   "accessibility": {}

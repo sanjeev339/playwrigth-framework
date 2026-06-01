@@ -1,4 +1,6 @@
-export type ActionType = 'navigate' | 'click' | 'fill' | 'select' | 'verify' | 'wait' | 'unknown';
+import type { PayloadIdentity } from '../scenario/payloadIdentityResolver';
+
+export type ActionType = 'navigate' | 'click' | 'fill' | 'select' | 'verify' | 'wait' | 'row_action' | 'unknown';
 
 export type DecisionActionType = Exclude<ActionType, 'unknown'> | 'skip' | 'error';
 
@@ -12,6 +14,9 @@ export interface ParsedAction {
   actionType: ActionType;
   target: string | null;
   value: string | null;
+  payloadKey?: string | null;
+  payloadIdentity?: PayloadIdentity | null;
+  rowAction?: string | null;
 }
 
 export type StructuredLocator =
@@ -29,6 +34,16 @@ export type StructuredLocator =
   | {
       method: 'css' | 'xpath';
       selector: string;
+    }
+  | {
+      method: 'rowButtonByText';
+      text: string;
+      buttonIndex?: number;
+    }
+  | {
+      method: 'fieldControlByLabel';
+      label: string;
+      controlSelector?: string;
     };
 
 export interface LocatorCandidate {
@@ -80,6 +95,12 @@ export interface ReconDecision {
   selectorConfidenceScore?: number;
   selectorRisk?: 'low' | 'medium' | 'high';
   selectorConfidenceSignals?: string[];
+  dropdownLocator?: string | null;
+  optionLocator?: string | null;
+  optionValue?: string | null;
+  dropdownOpenStatus?: 'success' | 'failed' | 'skipped' | 'not_applicable';
+  optionSelectStatus?: 'success' | 'failed' | 'skipped' | 'not_applicable';
+  selectionVerified?: boolean;
   llmRawResponsePreview?: string;
   llmParseError?: string | null;
   llmRetryUsed?: boolean;

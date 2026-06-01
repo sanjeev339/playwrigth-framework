@@ -1,0 +1,42 @@
+[
+  {
+    "stepNo": 1,
+    "sourceStepTitle": "Navigate to User Management",
+    "rawActionText": "Navigate to the \"User Management\" section of the application, typically via a main navigation menu or a direct URL",
+    "actionType": "navigate",
+    "target": "User Management",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": "Must: The current URL contains a path segment like /user-management or /admin/users Must: A prominent page title or heading, such as \"User Management\", \"Manage Users\", or \"Users List\", is visible"
+  },
+  {
+    "stepNo": 2,
+    "sourceStepTitle": "Select the User to Deactivate",
+    "rawActionText": "Click on the identified user's row, name, or an associated \"View Details\" / \"Edit\" action to open their individual user profile or details page",
+    "actionType": "row_action",
+    "target": "Actions Menu for sanjeevkumar.m00@gmail.com",
+    "value": null,
+    "payloadKey": "Email Address",
+    "assertionHint": "Must: The user's Full Name (adithya j) is clearly visible on the page Must: The user's Email Address (sanjeevkumar.m00@gmail.com) is clearly visible Must: The user's current Status is displayed as \"Active\""
+  },
+  {
+    "stepNo": 3,
+    "sourceStepTitle": "Click on Deactivate",
+    "rawActionText": "On the user details page, locate and click the \"Deactivate\" button or similar control (e.g., \"Change Status\", \"Disable User\")",
+    "actionType": "click",
+    "target": "Deactivate",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": "Optional (if visible): A success toast, snackbar, or brief banner message appears, e.g., \"User 'adithya j' has been deactivated successfully.\" Must: The user's Status displayed on the page (or upon returning to the User Management list and refreshing) changes to \"Deactivated\""
+  },
+  {
+    "stepNo": 4,
+    "sourceStepTitle": "Click on Deactivate",
+    "rawActionText": "If a confirmation dialog or modal appears (e.g., \"Are you sure you want to deactivate this user?\", \"Confirm Deactivation\"), click the affirmative button (e.g., \"Deactivate\", \"Confirm\", \"Yes\")",
+    "actionType": "click",
+    "target": "Deactivate",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": "Optional (if visible): A success toast, snackbar, or brief banner message appears, e.g., \"User 'adithya j' has been deactivated successfully.\" Must: The user's Status displayed on the page (or upon returning to the User Management list and refreshing) changes to \"Deactivated\""
+  }
+]

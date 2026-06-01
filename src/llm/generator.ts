@@ -1,10 +1,6 @@
 import path from 'node:path';
 import type { ReconSnapshot, Scenario } from '../types';
-<<<<<<< Updated upstream
-import { inferUiStability } from '../recon/locatorCandidateBuilder';
-=======
 import { extractReconActions, type ReconAction } from '../recon/reconActionExtractor';
->>>>>>> Stashed changes
 import {
   buildDeterministicReconTest,
   buildGeneratorPrompt,
@@ -40,19 +36,12 @@ export async function generateTests(options: {
     const safeScenarioId = toSafeFileName(scenario.scenario_id);
     const specPath = path.join(specDir, `${safeScenarioId}.md`);
     const reconPath = path.join(reconDir, safeScenarioId);
-<<<<<<< Updated upstream
+    const outputPath = path.join(outputDir, `${safeScenarioId}.spec.ts`);
+
     logger.info(`Generating test for ${scenario.scenario_id} (spec: ${path.basename(specPath)})...`);
     const plan = await readTextFile(specPath);
-    const snapshots = await readReconSnapshots(reconPath);
-    logger.info(`Loaded ${snapshots.length} recon snapshot(s) for ${scenario.scenario_id}.`);
-    const prompt = buildGeneratorPrompt(scenario, plan, snapshots);
-    const generated = await callLLM(prompt);
-    const code = normalizeNestedTestImports(stripCodeFence(generated));
-=======
->>>>>>> Stashed changes
-    const outputPath = path.join(outputDir, `${safeScenarioId}.spec.ts`);
-    const plan = await readTextFile(specPath);
     const reconActions = await extractReconActions(scenario.scenario_id);
+    logger.info(`Loaded ${reconActions.length} recon action(s) for ${scenario.scenario_id}.`);
 
     if (reconActions.length === 0) {
       throw new Error(`No recon decisions found for ${scenario.scenario_id}. Run npm run recon first.`);
@@ -66,11 +55,13 @@ export async function generateTests(options: {
       dropdownSnapshots
     });
 
-    const code = await generateReconDrivenCode({
-      scenario,
-      reconActions,
-      prompt
-    });
+    const code = normalizeNestedTestImports(
+      await generateReconDrivenCode({
+        scenario,
+        reconActions,
+        prompt
+      })
+    );
 
     await writeTextFile(outputPath, code);
     validateGeneratedReconTest(code, scenario, reconActions);
@@ -86,11 +77,9 @@ async function generateReconDrivenCode(input: {
   reconActions: ReconAction[];
   prompt: string;
 }): Promise<string> {
-  let llmCode: string | null = null;
-
   try {
     const generated = await callLLM(input.prompt);
-    llmCode = stripCodeFence(generated);
+    const llmCode = stripCodeFence(generated);
     validateGeneratedReconTest(llmCode, input.scenario, input.reconActions);
     return llmCode;
   } catch (error) {
@@ -106,67 +95,6 @@ async function generateReconDrivenCode(input: {
   return fallbackCode;
 }
 
-<<<<<<< Updated upstream
-function buildGeneratorPrompt(scenario: Scenario, plan: string, snapshots: ReconSnapshot[]): string {
-  const compactSnapshots = snapshots.map((snapshot) => ({
-    scenario_id: snapshot.scenario_id,
-    state: snapshot.state,
-    url: snapshot.url,
-    action_before_snapshot: snapshot.action_before_snapshot,
-    action_error: snapshot.action_error,
-    elements: snapshot.elements.map((element) => ({
-      tag: element.tag,
-      type: element.type,
-      text: element.text,
-      role: element.role,
-      ariaLabel: element.ariaLabel,
-      ariaLive: element.ariaLive,
-      className: element.className,
-      label: element.label,
-      placeholder: element.placeholder,
-      suggestedLocator: element.suggestedLocator,
-      locatorPriority: element.locatorPriority,
-      uiStability: element.uiStability ?? inferUiStability(element)
-    }))
-  }));
-
-  return truncate(
-    [
-      'Generate a runnable Playwright TypeScript test for this scenario.',
-      '',
-      'Rules:',
-      '- Use @playwright/test.',
-      '- Use TypeScript.',
-      '- Use test.step.',
-      '- Use process.env.WEBSITE_URL.',
-      '- Use process.env.LOGIN_EMAIL.',
-      '- Use process.env.LOGIN_PASSWORD.',
-      '- Never hardcode login credentials.',
-      '- Use payload values for business data.',
-      '- Prefer locators from recon snapshot suggestedLocator and locatorPriority.',
-      '- Prefer getByRole, getByLabel, and getByPlaceholder.',
-      '- Avoid XPath unless no stable locator exists.',
-      '- Add assertions from test plan.',
-      '- Assertion priority: mandatory assertions are those stated in the Markdown test plan plus stable UI (URL, route, headings, main content for that step). Toasts, snackbars, inline alerts, and getByRole("alert", ...) are optional unless the plan text explicitly requires proving that message.',
-      '- Transient UI: if you assert a toast/alert, do it immediately after the action that triggers it (same test.step, before unrelated waits) and use expect(...).toBeVisible({ timeout: ... }) with a reasonable timeout.',
-      '- Do not use waitForLoadState("networkidle") before asserting a toast/alert; networkidle can outlast auto-dismiss timers. Avoid blanket networkidle after login or in apps with long-polling or websockets; prefer expect on stable UI or domcontentloaded/load when needed.',
-      '- If the plan does not require proving a success toast: dismiss or skip using a conditional (e.g. locator.isVisible({ timeout: 2000 }) then click close) so the test passes when the toast is already gone.',
-      '- Recon elements include uiStability: when "transient", do not add mandatory visibility assertions for that element unless the Markdown plan explicitly requires that message.',
-      '- Specs are written under tests/generated: imports to repo-root modules (pages/, fixtures/, playwright.config) must use ../../..., never ../... (../ resolves under tests/ and breaks).',
-      '- Do not add unsupported libraries.',
-      '- Output code only, no Markdown fence.',
-      '',
-      'Scenario JSON:',
-      JSON.stringify(scenario, null, 2),
-      '',
-      'Markdown test plan:',
-      plan,
-      '',
-      'Recon snapshots:',
-      JSON.stringify(compactSnapshots, null, 2)
-    ].join('\n'),
-    120_000
-=======
 async function readRelevantDropdownSnapshots(
   reconPath: string,
   reconActions: ReconAction[]
@@ -176,7 +104,6 @@ async function readRelevantDropdownSnapshots(
       .filter((action) => action.actionType === 'select' && action.actionStatus !== 'success')
       .map((action) => action.stepNo)
       .filter((stepNo): stepNo is number => stepNo !== undefined)
->>>>>>> Stashed changes
   );
 
   if (failedSelectSteps.size === 0) {
@@ -191,30 +118,6 @@ async function readRelevantDropdownSnapshots(
 
 function validateGeneratedReconTest(code: string, scenario: Scenario, reconActions: ReconAction[]): void {
   const normalizedCode = code.toLowerCase();
-  const roleValue = String(scenario.payload.Role ?? scenario.payload.role ?? '').trim();
-  const requiredFragments = [
-    { fragment: 'User Management', message: 'Generated test missing required recon action: Step 1 - Navigate to User Management' },
-    { fragment: 'Add User', message: 'Generated test missing required recon action: Step 2 - Click Add User' },
-    { fragment: 'first name', message: 'Generated test missing required field action: First Name' },
-    { fragment: 'last name', message: 'Generated test missing required field action: Last Name' },
-    { fragment: 'email address', message: 'Generated test missing required field action: Email Address' },
-    { fragment: roleValue, message: `Generated test missing required Role value: ${roleValue}` },
-    { fragment: 'Save', message: 'Generated test missing required recon action: Click Save' }
-  ].filter((item) => item.fragment);
-
-  for (const item of requiredFragments) {
-    if (!normalizedCode.includes(item.fragment.toLowerCase())) {
-      throw new Error(item.message);
-    }
-  }
-
-  if (/selectOption\s*\(/.test(code)) {
-    throw new Error('Generated test must not use selectOption for Role custom dropdown.');
-  }
-
-  if (code.includes('${baseURL}/login/') || code.includes('/login/login')) {
-    throw new Error('Generated test must not append /login/ manually or create /login/login URLs.');
-  }
 
   for (const action of reconActions) {
     if (action.stepNo === undefined) {
@@ -226,14 +129,46 @@ function validateGeneratedReconTest(code: string, scenario: Scenario, reconActio
       throw new Error(`Generated test missing required recon action: Step ${action.stepNo} - ${action.rawStep}`);
     }
 
+    const target = action.target?.trim();
+    if (target && target !== '__FORM__' && !normalizedCode.includes(target.toLowerCase())) {
+      throw new Error(`Generated test missing required recon target: Step ${action.stepNo} - ${target}`);
+    }
+
     if (
       action.actionStatus === 'success' &&
       action.selectedLocator &&
       action.actionType !== 'select' &&
-      !/new internal user/i.test(action.rawStep) &&
       !code.includes(action.selectedLocator)
     ) {
       throw new Error(`Generated test missing required recon locator: Step ${action.stepNo} - ${action.rawStep}`);
+    }
+  }
+
+  validateActionPayloadReferences(code, reconActions, scenario.payload);
+
+  if (/selectOption\s*\(/.test(code)) {
+    throw new Error('Generated test must not use selectOption for custom dropdowns.');
+  }
+
+  if (code.includes('${baseURL}/login/') || code.includes('/login/login')) {
+    throw new Error('Generated test must not append /login/ manually or create /login/login URLs.');
+  }
+}
+
+function validateActionPayloadReferences(code: string, reconActions: ReconAction[], payload: Record<string, unknown>): void {
+  for (const action of reconActions) {
+    const value = action.selectedValue ?? action.value;
+    if (!value || !['fill', 'select'].includes(action.actionType)) {
+      continue;
+    }
+
+    const payloadKey = Object.keys(payload).find((key) => String(payload[key]) === String(value));
+    if (!payloadKey || /password|secret|token|jwt|cookie|authorization|api[_-]?key/i.test(payloadKey)) {
+      continue;
+    }
+
+    if (!code.includes(String(value)) && !code.includes(`payload[${JSON.stringify(payloadKey)}]`)) {
+      throw new Error(`Generated test missing payload value or payload reference: Step ${action.stepNo ?? '?'} - ${payloadKey}`);
     }
   }
 }

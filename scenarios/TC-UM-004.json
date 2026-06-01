@@ -1,0 +1,52 @@
+{
+  "scenario_id": "TC-UM-004",
+  "module": "User Management",
+  "raw_steps": [
+    {
+      "step_no": 1,
+      "instruction": "1. Navigate to User Management; 2. Select the user; 3. Click on Deactivate",
+      "expected_result": "1. User Management page is displayed.; 2. User details are displayed.; 3. User status is updated to Deactivated.; Overall: User cannot sign in post-deactivation."
+    }
+  ],
+  "steps": [
+    {
+      "step_no": 1,
+      "instruction": "Navigate to User Management",
+      "raw_instruction": "1. Navigate to User Management; 2. Select the user; 3. Click on Deactivate",
+      "expected_result": "1. User Management page is displayed.; 2. User details are displayed.; 3. User status is updated to Deactivated.; Overall: User cannot sign in post-deactivation."
+    },
+    {
+      "step_no": 2,
+      "instruction": "Click Actions Menu for sanjeevkumar.m00@gmail.com",
+      "raw_instruction": "1. Navigate to User Management; 2. Select the user; 3. Click on Deactivate",
+      "expected_result": "1. User Management page is displayed.; 2. User details are displayed.; 3. User status is updated to Deactivated.; Overall: User cannot sign in post-deactivation."
+    },
+    {
+      "step_no": 3,
+      "instruction": "Click Deactivate",
+      "raw_instruction": "1. Navigate to User Management; 2. Select the user; 3. Click on Deactivate",
+      "expected_result": "1. User Management page is displayed.; 2. User details are displayed.; 3. User status is updated to Deactivated.; Overall: User cannot sign in post-deactivation."
+    }
+  ],
+  "expected_results": [
+    "1. User Management page is displayed.; 2. User details are displayed.; 3. User status is updated to Deactivated.; Overall: User cannot sign in post-deactivation."
+  ],
+  "payload": {
+    "First Name": "adithya",
+    "Last Name": "j",
+    "Full Name": "adithya j",
+    "Email Address": "sanjeevkumar.m00@gmail.com",
+    "Status": "Deactivated"
+  },
+  "metadata": {
+    "execution_order": 4,
+    "data_strategy": "positive_valid_update",
+    "edge_case_type": "status_change",
+    "depends_on": [
+      "TC-UM-001"
+    ],
+    "created_at": "2026-05-29T12:33:22.886Z",
+    "source_excel": "input/test_flow.xlsx",
+    "source_json": "input/test_data.json"
+  }
+}

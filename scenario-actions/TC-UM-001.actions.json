@@ -1,0 +1,82 @@
+[
+  {
+    "stepNo": 1,
+    "sourceStepTitle": "Navigate to User Management",
+    "rawActionText": "Navigate to User Management",
+    "actionType": "navigate",
+    "target": "User Management",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": "Must: The current URL contains /user-management Must: The page title is \"User Management\" or similar Must: A prominent heading (e.g., h1, h2) with the text \"User Management\" is visible"
+  },
+  {
+    "stepNo": 2,
+    "sourceStepTitle": "Click Add User",
+    "rawActionText": "Click Add User",
+    "actionType": "click",
+    "target": "Add User",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": "Optional (if visible): A dropdown menu or modal containing options like \"New Internal User\" and \"New External User\" is displayed"
+  },
+  {
+    "stepNo": 3,
+    "sourceStepTitle": "Click New Internal User",
+    "rawActionText": "Click New Internal User",
+    "actionType": "click",
+    "target": "New Internal User",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": "Must: A form or modal for \"Add New User\" or \"Create Internal User\" is displayed Must: A prominent heading (e.g., h3, h4) with text like \"Add New User\" or \"Create Internal User\" is visible within the form/modal"
+  },
+  {
+    "stepNo": 4,
+    "sourceStepTitle": "Enter First Name",
+    "rawActionText": "Enter First Name",
+    "actionType": "fill",
+    "target": "First Name",
+    "value": "Priya",
+    "payloadKey": "First Name",
+    "assertionHint": "Must: The \"First Name\" input field displays the value Priya"
+  },
+  {
+    "stepNo": 5,
+    "sourceStepTitle": "Enter Last Name",
+    "rawActionText": "Enter Last Name",
+    "actionType": "fill",
+    "target": "Last Name",
+    "value": "Sharma",
+    "payloadKey": "Last Name",
+    "assertionHint": "Must: The \"Last Name\" input field displays the value Sharma"
+  },
+  {
+    "stepNo": 6,
+    "sourceStepTitle": "Enter Email Address",
+    "rawActionText": "Enter Email Address",
+    "actionType": "fill",
+    "target": "Email Address",
+    "value": "priya.sharma+auto001@piraiinfotech.com",
+    "payloadKey": "Email Address",
+    "assertionHint": "Must: The \"Email Address\" input field displays the value priya.sharma+auto001@piraiinfotech.com"
+  },
+  {
+    "stepNo": 7,
+    "sourceStepTitle": "Select Role",
+    "rawActionText": "Select Role",
+    "actionType": "select",
+    "target": "Role",
+    "value": "Executive",
+    "payloadKey": "Role",
+    "assertionHint": "Must: The \"Role\" dropdown/selector visibly displays Executive as the selected value"
+  },
+  {
+    "stepNo": 8,
+    "sourceStepTitle": "Click Save",
+    "rawActionText": "Click Save",
+    "actionType": "click",
+    "target": "Save",
+    "value": null,
+    "payloadKey": null,
+    "assertionHint": "Optional (if visible): A success toast, snackbar, or banner appears with text such as \"User added successfully\" or \"New user created\" Must: The user is redirected back to the User Management list page (or the form closes and the list updates) Must: The user list contains a row or card for Priya Sharma Must: Within the Priya Sharma entry, the email address priya.sharma+auto001@piraiinfotech.com is displayed Must: Within the Priya Sharma entry, the role Executive is displayed Must: Within the Priya Sharma entry, the status Pending is displayed"
+  }
+]
