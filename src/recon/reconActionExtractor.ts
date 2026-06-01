@@ -1,7 +1,8 @@
 import path from 'node:path';
+import { getFrameworkPaths } from '../config/env';
 import type { ReconSnapshot } from '../types';
 import type { LocatorCandidate, ReconDecision } from './reconDecisionTypes';
-import { listFiles, readJsonFile, resolveFromRoot, toSafeFileName, writeJsonFile } from '../utils/fileUtils';
+import { listFiles, readJsonFile, toSafeFileName, writeJsonFile } from '../utils/fileUtils';
 
 export interface ReconAction {
   scenarioId: string;
@@ -33,7 +34,7 @@ interface SnapshotWithFile {
   snapshot: ReconSnapshot;
 }
 
-export async function extractReconActions(scenarioId: string, reconRootDir = resolveFromRoot('recon')): Promise<ReconAction[]> {
+export async function extractReconActions(scenarioId: string, reconRootDir = getFrameworkPaths().reconDir): Promise<ReconAction[]> {
   const safeScenarioId = toSafeFileName(scenarioId);
   const scenarioReconDir = path.join(reconRootDir, safeScenarioId);
   const snapshotFiles = await listFiles(scenarioReconDir, '.json');
@@ -80,7 +81,7 @@ export async function extractReconActions(scenarioId: string, reconRootDir = res
     (left, right) => (left.stepNo ?? Number.MAX_SAFE_INTEGER) - (right.stepNo ?? Number.MAX_SAFE_INTEGER)
   );
 
-  const outputPath = resolveFromRoot('recon-summary', `${safeScenarioId}.actions.json`);
+  const outputPath = path.join(getFrameworkPaths().reconSummaryDir, `${safeScenarioId}.actions.json`);
   await writeJsonFile(outputPath, actions);
   return actions;
 }

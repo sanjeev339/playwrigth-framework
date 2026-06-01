@@ -1,9 +1,11 @@
 import type { Page } from '@playwright/test';
+import { getLocatorPolicy } from '../config/env';
 import type { DomElementSnapshot } from '../types';
 import { addLocatorCandidates, isStableIdentifier } from './locatorCandidateBuilder';
 
 export async function scanVisibleDom(page: Page): Promise<DomElementSnapshot[]> {
-  const elements = await page.evaluate(() => {
+  const locatorPolicy = getLocatorPolicy();
+  const elements = await page.evaluate((policy) => {
     const selector = [
       'input',
       'textarea',
@@ -93,7 +95,7 @@ export async function scanVisibleDom(page: Page): Promise<DomElementSnapshot[]> 
                 }
               : undefined,
           cssCandidate: buildCssCandidate(element),
-          xpathCandidate: buildXPathCandidate(element)
+          xpathCandidate: policy.ALLOW_XPATH_LOCATORS ? buildXPathCandidate(element) : undefined
         };
       })
       .filter((element) => element.isVisible);
@@ -118,7 +120,7 @@ export async function scanVisibleDom(page: Page): Promise<DomElementSnapshot[]> 
       return normalizeText(wrappingLabel?.innerText || '');
     }
 
-    function buildCssCandidate(element: HTMLElement): string {
+    function buildCssCandidate(element: HTMLElement): string | undefined {
       const testId = element.getAttribute('data-testid');
       if (testId) return `[data-testid="${cssEscape(testId)}"]`;
 
@@ -140,7 +142,7 @@ export async function scanVisibleDom(page: Page): Promise<DomElementSnapshot[]> 
       const ariaLabel = element.getAttribute('aria-label');
       if (ariaLabel) return `${element.tagName.toLowerCase()}[aria-label="${cssEscape(ariaLabel)}"]`;
 
-      return nthOfTypeSelector(element);
+      return policy.ALLOW_POSITIONAL_LOCATORS ? nthOfTypeSelector(element) : undefined;
     }
 
     function buildXPathCandidate(element: HTMLElement): string {
@@ -184,7 +186,7 @@ export async function scanVisibleDom(page: Page): Promise<DomElementSnapshot[]> 
     function cssEscape(value: string): string {
       return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     }
-  });
+  }, locatorPolicy);
 
   const sanitized = elements.map((element) => {
     const shouldUseId = element.id ? isStableIdentifier(element.id) : false;

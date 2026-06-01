@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { getFrameworkPaths } from '../config/env';
 import type { ReconSnapshot, Scenario } from '../types';
 import { extractReconActions, type ReconAction } from '../recon/reconActionExtractor';
 import {
@@ -7,7 +8,7 @@ import {
   compactDropdownSnapshot,
   type CompactDropdownSnapshot
 } from './generatorPromptBuilder';
-import { listFiles, readJsonFile, readTextFile, resolveFromRoot, toSafeFileName, writeTextFile } from '../utils/fileUtils';
+import { listFiles, readJsonFile, readTextFile, toSafeFileName, writeTextFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 import { normalizeNestedTestImports } from '../utils/specImportPaths';
 import { callLLM } from './llmClient';
@@ -18,10 +19,11 @@ export async function generateTests(options: {
   reconDir?: string;
   outputDir?: string;
 } = {}): Promise<string[]> {
-  const scenarioDir = options.scenarioDir ?? resolveFromRoot('scenarios');
-  const specDir = options.specDir ?? resolveFromRoot('specs');
-  const reconDir = options.reconDir ?? resolveFromRoot('recon');
-  const outputDir = options.outputDir ?? resolveFromRoot('tests', 'generated');
+  const paths = getFrameworkPaths();
+  const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
+  const specDir = options.specDir ?? paths.specDir;
+  const reconDir = options.reconDir ?? paths.reconDir;
+  const outputDir = options.outputDir ?? paths.generatedTestsDir;
   const scenarioFiles = await listFiles(scenarioDir, '.json');
   const writtenFiles: string[] = [];
 

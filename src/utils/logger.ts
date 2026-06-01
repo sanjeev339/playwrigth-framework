@@ -3,10 +3,14 @@ import { ZodError } from 'zod';
 const secretPatterns = [
   /OPENAI_API_KEY\s*=\s*[^\s]+/gi,
   /GEMINI_API_KEY\s*=\s*[^\s]+/gi,
+  /LOGIN_EMAIL\s*=\s*[^\s]+/gi,
   /LOGIN_PASSWORD\s*=\s*[^\s]+/gi,
+  /[A-Z0-9_]*(?:PASSWORD|SECRET|TOKEN|API_KEY)[A-Z0-9_]*\s*=\s*[^\s]+/gi,
   /Bearer\s+[A-Za-z0-9._~+/=-]+/gi,
   /eyJ[A-Za-z0-9._-]+?\.[A-Za-z0-9._-]+?\.[A-Za-z0-9._-]+/g
 ];
+
+const jsonSecretFieldPattern = /"([^"]*(?:password|secret|token|api[_-]?key)[^"]*)"\s*:\s*"[^"]*"/gi;
 
 export function redactSecrets(value: unknown): string {
   let text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
@@ -14,6 +18,11 @@ export function redactSecrets(value: unknown): string {
   for (const pattern of secretPatterns) {
     text = text.replace(pattern, '[REDACTED]');
   }
+
+  text = text.replace(jsonSecretFieldPattern, (_match, key: string) => {
+    const safeKey = key.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+    return `"${key}": "[REDACTED_${safeKey}]"`;
+  });
 
   if (process.env.OPENAI_API_KEY) {
     text = text.split(process.env.OPENAI_API_KEY).join('[REDACTED_OPENAI_API_KEY]');
@@ -25,6 +34,17 @@ export function redactSecrets(value: unknown): string {
 
   if (process.env.LOGIN_PASSWORD) {
     text = text.split(process.env.LOGIN_PASSWORD).join('[REDACTED_LOGIN_PASSWORD]');
+  }
+
+  if (process.env.LOGIN_EMAIL) {
+    text = text.split(process.env.LOGIN_EMAIL).join('[REDACTED_LOGIN_EMAIL]');
+  }
+
+  for (const [key, secretValue] of Object.entries(process.env)) {
+    if (!secretValue || secretValue.length < 4 || !/(PASSWORD|SECRET|TOKEN|API_KEY|KEY)$/i.test(key)) {
+      continue;
+    }
+    text = text.split(secretValue).join(`[REDACTED_${key}]`);
   }
 
   return text;

@@ -1,9 +1,10 @@
 import path from 'node:path';
 import fs from 'fs-extra';
+import { getFrameworkPaths } from '../config/env';
 import type { ActionType } from '../recon/reconDecisionTypes';
 import type { Scenario } from '../types';
 import { resolvePayloadIdentity } from '../scenario/payloadIdentityResolver';
-import { listFiles, readJsonFile, readTextFile, resolveFromRoot, toSafeFileName, writeJsonFile } from '../utils/fileUtils';
+import { listFiles, readJsonFile, readTextFile, toSafeFileName, writeJsonFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 
 export interface ScenarioAtomicAction {
@@ -60,10 +61,11 @@ export async function extractMarkdownActions(options: {
   reportPath?: string;
   scenarioIds?: string[];
 } = {}): Promise<ExtractedScenarioActions[]> {
-  const specsDir = options.specsDir ?? resolveFromRoot('specs');
-  const scenarioDir = options.scenarioDir ?? resolveFromRoot('scenarios');
-  const outputDir = options.outputDir ?? resolveFromRoot('scenario-actions');
-  const reportPath = options.reportPath ?? resolveFromRoot('reports', 'action-extraction-validation.json');
+  const paths = getFrameworkPaths();
+  const specsDir = options.specsDir ?? paths.specDir;
+  const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
+  const outputDir = options.outputDir ?? paths.scenarioActionDir;
+  const reportPath = options.reportPath ?? paths.actionExtractionReportPath;
   const requestedScenarioIds = new Set((options.scenarioIds ?? []).map(toSafeFileName));
   const specFiles = (await listFiles(specsDir, '.md')).filter((file) => {
     if (requestedScenarioIds.size === 0) {
@@ -133,7 +135,7 @@ export async function ensureScenarioActions(input: {
   scenarioDir?: string;
   outputDir?: string;
 }): Promise<ScenarioAtomicAction[]> {
-  const outputDir = input.outputDir ?? resolveFromRoot('scenario-actions');
+  const outputDir = input.outputDir ?? getFrameworkPaths().scenarioActionDir;
   const safeScenarioId = toSafeFileName(input.scenario.scenario_id);
   const actionPath = path.join(outputDir, `${safeScenarioId}.actions.json`);
 

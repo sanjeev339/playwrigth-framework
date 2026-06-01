@@ -1,8 +1,8 @@
 import fs from 'fs-extra';
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
+import { getFrameworkPaths } from '../config/env';
 import type { TestFlowRow } from '../types';
-import { resolveFromRoot } from '../utils/fileUtils';
 
 const aliases = {
   scenario_id: ['scenario_id', 'scenario id', 'scenarioid', 'tc id', 'test case id', 'testcaseid'],
@@ -22,7 +22,7 @@ const rowSchema = z.object({
   expected_result: z.string().optional()
 });
 
-export async function readExcelRows(filePath = resolveFromRoot('input', 'test_flow.xlsx')): Promise<TestFlowRow[]> {
+export async function readExcelRows(filePath = getFrameworkPaths().inputFlowPath): Promise<TestFlowRow[]> {
   if (!(await fs.pathExists(filePath))) {
     throw new Error(`Excel file not found at ${filePath}`);
   }

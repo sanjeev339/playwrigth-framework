@@ -1,10 +1,10 @@
 import path from 'node:path';
 import { chromium, type Locator, type Page } from '@playwright/test';
 import fs from 'fs-extra';
-import { getWebEnv } from '../config/env';
+import { getFrameworkPaths, getWebEnv } from '../config/env';
 import type { ReconSnapshot, Scenario, ScenarioStep } from '../types';
 import { ensureScenarioActions, type ScenarioAtomicAction } from '../specs/mdActionExtractor';
-import { listFiles, readJsonFile, readTextFile, resolveFromRoot, toSafeFileName } from '../utils/fileUtils';
+import { listFiles, readJsonFile, readTextFile, toSafeFileName } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 import { decideAndExecuteAction } from './actionDecisionEngine';
 import { scanAccessibility } from './accessibilityScanner';
@@ -25,9 +25,10 @@ export async function runInteractiveRecon(options: {
   outputDir?: string;
 } = {}): Promise<string[]> {
   const env = getWebEnv();
-  const scenarioDir = options.scenarioDir ?? resolveFromRoot('scenarios');
-  const specDir = options.specDir ?? resolveFromRoot('specs');
-  const outputDir = options.outputDir ?? resolveFromRoot('recon');
+  const paths = getFrameworkPaths();
+  const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
+  const specDir = options.specDir ?? paths.specDir;
+  const outputDir = options.outputDir ?? paths.reconDir;
   const scenarioFiles = await listFiles(scenarioDir, '.json');
   const writtenSnapshots: string[] = [];
 
@@ -53,11 +54,11 @@ export async function runInteractiveRecon(options: {
         logger.warn(`No Markdown plan found for ${scenario.scenario_id}; recon will use scenario steps only.`);
       }
       const atomicActions = await ensureScenarioActions({
-        scenario,
-        specsDir: specDir,
-        scenarioDir,
-        outputDir: resolveFromRoot('scenario-actions')
-      });
+          scenario,
+          specsDir: specDir,
+          scenarioDir,
+          outputDir: paths.scenarioActionDir
+        });
       const reconSteps = atomicActions.length > 0 ? atomicActions.map(toReconStep) : scenario.steps;
 
       if (atomicActions.length > 0) {
@@ -288,6 +289,7 @@ async function captureSnapshot(input: {
 
 async function performLogin(page: Page, email: string, password: string): Promise<void> {
   await fillFirst(page, email, [
+    () => configuredLocator(page, process.env.LOGIN_EMAIL_SELECTOR),
     () => page.getByLabel(/email|username|user name/i),
     () => page.getByPlaceholder(/email|username|user name/i),
     () => page.locator('input[type="email"]').first(),
@@ -295,6 +297,7 @@ async function performLogin(page: Page, email: string, password: string): Promis
   ]);
 
   await fillFirst(page, password, [
+    () => configuredLocator(page, process.env.LOGIN_PASSWORD_SELECTOR),
     () => page.getByLabel(/password/i),
     () => page.getByPlaceholder(/password/i),
     () => page.locator('input[type="password"]').first(),
@@ -302,12 +305,25 @@ async function performLogin(page: Page, email: string, password: string): Promis
   ]);
 
   await clickFirst(page, [
+    () => configuredLocator(page, process.env.LOGIN_SUBMIT_SELECTOR),
     () => page.getByRole('button', { name: /login|sign in|submit/i }),
     () => page.locator('button[type="submit"]').first(),
-    () => page.getByText(/login|sign in|submit/i).first()
   ]);
 
   await waitForSettledPage(page);
+}
+
+function configuredLocator(page: Page, selector: string | undefined): Locator {
+  if (!selector?.trim()) {
+    return page.locator('__configured_locator_not_set__');
+  }
+
+  const trimmed = selector.trim();
+  if (trimmed.startsWith('testid=')) {
+    return page.getByTestId(trimmed.replace(/^testid=/, ''));
+  }
+
+  return page.locator(trimmed);
 }
 
 async function fillFirst(page: Page, value: string, locatorFactories: Array<() => Locator>): Promise<void> {

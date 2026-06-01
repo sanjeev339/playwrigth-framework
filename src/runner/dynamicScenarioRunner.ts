@@ -1,0 +1,796 @@
+import path from 'node:path';
+import { chromium, type Locator, type Page } from '@playwright/test';
+import fs from 'fs-extra';
+import { getFrameworkPaths, getWebEnv } from '../config/env';
+import { decideAndExecuteAction } from '../recon/actionDecisionEngine';
+import { scanAccessibility } from '../recon/accessibilityScanner';
+import { locatorFromExpression } from '../recon/locatorSafetyValidator';
+import { scanVisibleDom } from '../recon/domScanner';
+import { waitForRafCycles, waitForSnapshotStability } from '../recon/pageStabilizer';
+import type { ReconDecision } from '../recon/reconDecisionTypes';
+import { writeStateSnapshot } from '../recon/stateSnapshotWriter';
+import type { ReconSnapshot, Scenario, ScenarioStep } from '../types';
+import {
+  escapeHtml,
+  listFiles,
+  readJsonFile,
+  slugify,
+  toSafeFileName,
+  writeJsonFile,
+  writeTextFile
+} from '../utils/fileUtils';
+import { logger } from '../utils/logger';
+
+type StepExecutionStatus = 'passed' | 'failed' | 'repaired' | 'skipped';
+type ScenarioExecutionStatus = 'passed' | 'failed';
+
+interface SnapshotReference {
+  state: string;
+  path: string;
+}
+
+interface EffectVerification {
+  status: 'passed' | 'failed' | 'skipped';
+  reason: string;
+}
+
+interface StepExecutionReport {
+  stepNo: number;
+  instruction: string;
+  expectedResult?: string;
+  status: StepExecutionStatus;
+  startedAt: string;
+  endedAt: string;
+  durationMs: number;
+  beforeSnapshotPath?: string;
+  afterSnapshotPath?: string;
+  repairBeforeSnapshotPath?: string;
+  repairAfterSnapshotPath?: string;
+  screenshotPath?: string;
+  repairScreenshotPath?: string;
+  failureReason?: string;
+  repairAttempted: boolean;
+  repairSucceeded: boolean;
+  verification: EffectVerification;
+  repairVerification?: EffectVerification;
+  decision: DecisionSummary;
+  repairDecision?: DecisionSummary;
+}
+
+interface DecisionSummary {
+  decisionSource: ReconDecision['decisionSource'];
+  actionStatus: ReconDecision['actionStatus'];
+  selectedLocator: string | null;
+  selectedValue: string | null;
+  confidence?: ReconDecision['confidence'];
+  selectorRisk?: ReconDecision['selectorRisk'];
+  llmReason?: string;
+  actionError?: string | null;
+  executed: boolean;
+  llmUsed: boolean;
+  llmPromptTokenEstimate?: number;
+  llmResponseTokenEstimate?: number;
+  llmTotalTokenEstimate?: number;
+}
+
+interface ScenarioExecutionReport {
+  scenarioId: string;
+  module?: string;
+  action?: string;
+  status: ScenarioExecutionStatus;
+  startedAt: string;
+  endedAt: string;
+  durationMs: number;
+  loginStatus: 'passed' | 'failed';
+  loginError?: string;
+  stoppedAtStep?: number;
+  failureReason?: string;
+  snapshotSessionId: string;
+  snapshots: SnapshotReference[];
+  steps: StepExecutionReport[];
+}
+
+interface DynamicRunReport {
+  generatedAt: string;
+  command: string;
+  mode: 'hybrid-webwright-step-runner';
+  summary: {
+    total: number;
+    passed: number;
+    failed: number;
+    totalSteps: number;
+    passedSteps: number;
+    failedSteps: number;
+    repairedSteps: number;
+    llmDecisionCount: number;
+    estimatedLlmTokens: number;
+  };
+  scenarios: ScenarioExecutionReport[];
+}
+
+interface CapturedSnapshot {
+  filePath: string;
+  snapshot: ReconSnapshot;
+}
+
+interface DynamicRunnerOptions {
+  scenarioDir?: string;
+  outputDir?: string;
+  reportJsonPath?: string;
+  reportHtmlPath?: string;
+}
+
+export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): Promise<DynamicRunReport> {
+  const env = getWebEnv();
+  const paths = getFrameworkPaths();
+  const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
+  const outputDir = options.outputDir ?? paths.dynamicReconDir;
+  const reportJsonPath = options.reportJsonPath ?? paths.dynamicReportJsonPath;
+  const reportHtmlPath = options.reportHtmlPath ?? paths.dynamicReportHtmlPath;
+  const scenarioFiles = await listFiles(scenarioDir, '.json');
+
+  if (scenarioFiles.length === 0) {
+    throw new Error(`No normalized scenario JSON files found in ${scenarioDir}. Run npm run build:scenarios first.`);
+  }
+
+  const scenarios = (
+    await Promise.all(scenarioFiles.map((scenarioFile) => readJsonFile<Scenario>(scenarioFile)))
+  ).sort((left, right) => (left.metadata.execution_order ?? 0) - (right.metadata.execution_order ?? 0));
+
+  await fs.emptyDir(outputDir);
+
+  const browser = await chromium.launch({
+    headless: env.HEADLESS,
+    slowMo: env.SLOW_MO
+  });
+  const reports: ScenarioExecutionReport[] = [];
+
+  try {
+    for (const scenario of scenarios) {
+      reports.push(await runScenario({ scenario, outputDir, env }));
+    }
+  } finally {
+    await browser.close().catch(() => undefined);
+  }
+
+  async function runScenario(input: {
+    scenario: Scenario;
+    outputDir: string;
+    env: ReturnType<typeof getWebEnv>;
+  }): Promise<ScenarioExecutionReport> {
+    const startedAt = new Date();
+    const scenario = input.scenario;
+    const safeScenarioId = toSafeFileName(scenario.scenario_id);
+    const scenarioOutputDir = path.join(input.outputDir, safeScenarioId);
+    const screenshotDir = path.join(scenarioOutputDir, 'screenshots');
+    const snapshotSessionId = `${safeScenarioId}-${Date.now()}`;
+    const snapshots: SnapshotReference[] = [];
+    const steps: StepExecutionReport[] = [];
+    const previousActionErrors: string[] = [];
+    let sequence = 1;
+    let stoppedAtStep: number | undefined;
+    let failureReason: string | undefined;
+    let loginStatus: 'passed' | 'failed' = 'passed';
+    let loginError: string | undefined;
+
+    await fs.emptyDir(scenarioOutputDir);
+    await fs.ensureDir(screenshotDir);
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    try {
+      await gotoWithRetry(page, input.env.WEBSITE_URL);
+      await recordSnapshot(
+        await captureSnapshot({
+          page,
+          scenarioId: scenario.scenario_id,
+          scenarioDir: scenarioOutputDir,
+          sequence: sequence++,
+          state: 'login-before',
+          actionBeforeSnapshot: 'Open login page',
+          decision: null,
+          actionError: null,
+          snapshotSessionId
+        }),
+        snapshots
+      );
+
+      loginError = await safeAction(() => performLogin(page, input.env.LOGIN_EMAIL, input.env.LOGIN_PASSWORD)) ?? undefined;
+      loginStatus = loginError ? 'failed' : 'passed';
+      await recordSnapshot(
+        await captureSnapshot({
+          page,
+          scenarioId: scenario.scenario_id,
+          scenarioDir: scenarioOutputDir,
+          sequence: sequence++,
+          state: 'login-after',
+          actionBeforeSnapshot: 'Perform login',
+          decision: null,
+          actionError: loginError ?? null,
+          snapshotSessionId
+        }),
+        snapshots
+      );
+
+      if (loginError) {
+        failureReason = `Login failed: ${loginError}`;
+        await captureFailureScreenshot(page, screenshotDir, 'login-failed');
+      } else {
+        for (const step of scenario.steps) {
+          const stepReport = await executeStep({
+            page,
+            scenario,
+            step,
+            scenarioOutputDir,
+            screenshotDir,
+            snapshotSessionId,
+            previousActionErrors,
+            nextSequence: () => sequence++
+          });
+          steps.push(stepReport);
+          snapshots.push(...extractStepSnapshots(stepReport));
+
+          if (stepReport.status === 'failed') {
+            stoppedAtStep = stepReport.stepNo;
+            failureReason = stepReport.failureReason;
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failureReason = `Scenario runner failed before completion: ${message}`;
+      loginStatus = loginStatus === 'passed' && steps.length === 0 ? 'failed' : loginStatus;
+      loginError = steps.length === 0 ? message : loginError;
+      await captureFailureScreenshot(page, screenshotDir, 'scenario-runner-failed').catch(() => undefined);
+    } finally {
+      await context.close().catch(() => undefined);
+    }
+
+    const endedAt = new Date();
+    return {
+      scenarioId: scenario.scenario_id,
+      module: scenario.module,
+      action: scenario.action,
+      status: failureReason ? 'failed' : 'passed',
+      startedAt: startedAt.toISOString(),
+      endedAt: endedAt.toISOString(),
+      durationMs: endedAt.getTime() - startedAt.getTime(),
+      loginStatus,
+      loginError,
+      stoppedAtStep,
+      failureReason,
+      snapshotSessionId,
+      snapshots,
+      steps
+    };
+  }
+
+  const report = createRunReport(reports);
+  await writeJsonFile(reportJsonPath, report);
+  await writeTextFile(reportHtmlPath, renderDynamicReport(report));
+  logger.info(`Wrote dynamic step-runner reports -> ${reportJsonPath}, ${reportHtmlPath}`);
+  return report;
+}
+
+async function executeStep(input: {
+  page: Page;
+  scenario: Scenario;
+  step: ScenarioStep;
+  scenarioOutputDir: string;
+  screenshotDir: string;
+  snapshotSessionId: string;
+  previousActionErrors: string[];
+  nextSequence: () => number;
+}): Promise<StepExecutionReport> {
+  const startedAt = new Date();
+  const stepNo = input.step.step_no ?? 0;
+  const before = await captureSnapshot({
+    page: input.page,
+    scenarioId: input.scenario.scenario_id,
+    scenarioDir: input.scenarioOutputDir,
+    sequence: input.nextSequence(),
+    state: `step-${stepNo}-before`,
+    actionBeforeSnapshot: input.step.instruction,
+    decision: null,
+    actionError: null,
+    snapshotSessionId: input.snapshotSessionId
+  });
+
+  const decision = await decideAndExecuteAction({
+    page: input.page,
+    scenarioId: input.scenario.scenario_id,
+    step: input.step,
+    payload: input.scenario.payload,
+    snapshotElements: before.snapshot.elements,
+    previousActionErrors: input.previousActionErrors,
+    onIntermediateSnapshot: async (state, actionBeforeSnapshot, intermediateDecision) => {
+      await captureSnapshot({
+        page: input.page,
+        scenarioId: input.scenario.scenario_id,
+        scenarioDir: input.scenarioOutputDir,
+        sequence: input.nextSequence(),
+        state,
+        actionBeforeSnapshot,
+        decision: intermediateDecision,
+        actionError: intermediateDecision.actionError ?? null,
+        snapshotSessionId: input.snapshotSessionId
+      });
+    }
+  });
+
+  const after = await captureSnapshot({
+    page: input.page,
+    scenarioId: input.scenario.scenario_id,
+    scenarioDir: input.scenarioOutputDir,
+    sequence: input.nextSequence(),
+    state: `step-${stepNo}-after`,
+    actionBeforeSnapshot: input.step.instruction,
+    decision,
+    actionError: decision.actionError ?? null,
+    snapshotSessionId: input.snapshotSessionId
+  });
+  const verification = await verifyActionEffect(input.page, before.snapshot, after.snapshot, decision);
+
+  if (decision.actionStatus === 'success' && verification.status !== 'failed') {
+    const endedAt = new Date();
+    return {
+      stepNo,
+      instruction: input.step.instruction,
+      expectedResult: input.step.expected_result,
+      status: 'passed',
+      startedAt: startedAt.toISOString(),
+      endedAt: endedAt.toISOString(),
+      durationMs: endedAt.getTime() - startedAt.getTime(),
+      beforeSnapshotPath: before.filePath,
+      afterSnapshotPath: after.filePath,
+      repairAttempted: false,
+      repairSucceeded: false,
+      verification,
+      decision: summarizeDecision(decision)
+    };
+  }
+
+  const firstFailureReason = failureReasonFor(decision, verification);
+  input.previousActionErrors.push(`step ${stepNo}: ${firstFailureReason}`);
+  const screenshotPath = await captureFailureScreenshot(input.page, input.screenshotDir, `step-${stepNo}-failed`);
+
+  const repairBefore = await captureSnapshot({
+    page: input.page,
+    scenarioId: input.scenario.scenario_id,
+    scenarioDir: input.scenarioOutputDir,
+    sequence: input.nextSequence(),
+    state: `step-${stepNo}-repair-before`,
+    actionBeforeSnapshot: `Repair attempt for: ${input.step.instruction}`,
+    decision,
+    actionError: firstFailureReason,
+    snapshotSessionId: input.snapshotSessionId
+  });
+
+  const repairDecision = await decideAndExecuteAction({
+    page: input.page,
+    scenarioId: input.scenario.scenario_id,
+    step: input.step,
+    payload: input.scenario.payload,
+    snapshotElements: repairBefore.snapshot.elements,
+    previousActionErrors: input.previousActionErrors
+  });
+  const repairAfter = await captureSnapshot({
+    page: input.page,
+    scenarioId: input.scenario.scenario_id,
+    scenarioDir: input.scenarioOutputDir,
+    sequence: input.nextSequence(),
+    state: `step-${stepNo}-repair-after`,
+    actionBeforeSnapshot: `Repair attempt for: ${input.step.instruction}`,
+    decision: repairDecision,
+    actionError: repairDecision.actionError ?? null,
+    snapshotSessionId: input.snapshotSessionId
+  });
+  const repairVerification = await verifyActionEffect(input.page, repairBefore.snapshot, repairAfter.snapshot, repairDecision);
+  const repairSucceeded = repairDecision.actionStatus === 'success' && repairVerification.status !== 'failed';
+  const repairFailureReason = repairSucceeded ? undefined : failureReasonFor(repairDecision, repairVerification);
+  const repairScreenshotPath = repairSucceeded
+    ? undefined
+    : await captureFailureScreenshot(input.page, input.screenshotDir, `step-${stepNo}-repair-failed`);
+  const endedAt = new Date();
+
+  return {
+    stepNo,
+    instruction: input.step.instruction,
+    expectedResult: input.step.expected_result,
+    status: repairSucceeded ? 'repaired' : 'failed',
+    startedAt: startedAt.toISOString(),
+    endedAt: endedAt.toISOString(),
+    durationMs: endedAt.getTime() - startedAt.getTime(),
+    beforeSnapshotPath: before.filePath,
+    afterSnapshotPath: after.filePath,
+    repairBeforeSnapshotPath: repairBefore.filePath,
+    repairAfterSnapshotPath: repairAfter.filePath,
+    screenshotPath,
+    repairScreenshotPath,
+    failureReason: repairFailureReason ?? firstFailureReason,
+    repairAttempted: true,
+    repairSucceeded,
+    verification,
+    repairVerification,
+    decision: summarizeDecision(decision),
+    repairDecision: summarizeDecision(repairDecision)
+  };
+}
+
+async function captureSnapshot(input: {
+  page: Page;
+  scenarioId: string;
+  scenarioDir: string;
+  sequence: number;
+  state: string;
+  actionBeforeSnapshot: string;
+  decision: ReconDecision | null;
+  actionError: string | null;
+  snapshotSessionId: string;
+}): Promise<CapturedSnapshot> {
+  const stabilization = await waitForSnapshotStability(input.page);
+  const elements = await scanVisibleDom(input.page);
+  await waitForRafCycles(input.page, 2);
+  const accessibility = await scanAccessibility(input.page);
+  const snapshot: ReconSnapshot = {
+    scenario_id: input.scenarioId,
+    state: input.state,
+    url: input.page.url(),
+    timestamp: new Date().toISOString(),
+    action_before_snapshot: input.actionBeforeSnapshot,
+    decision: input.decision,
+    action_error: input.actionError,
+    snapshotSessionId: input.snapshotSessionId,
+    snapshotSequence: input.sequence,
+    stabilization,
+    elements,
+    accessibility
+  };
+  const filePath = await writeStateSnapshot(snapshot, input.scenarioDir, input.sequence);
+  logger.info(`[dynamic-runner] Captured ${input.state} -> ${filePath}`);
+  return { filePath, snapshot };
+}
+
+async function verifyActionEffect(
+  page: Page,
+  before: ReconSnapshot,
+  after: ReconSnapshot,
+  decision: ReconDecision
+): Promise<EffectVerification> {
+  if (decision.actionStatus === 'failed') {
+    return {
+      status: 'failed',
+      reason: decision.actionError ?? 'Action failed before effect verification.'
+    };
+  }
+
+  if (decision.actionStatus === 'skipped') {
+    return {
+      status: 'skipped',
+      reason: decision.actionError ?? decision.llmReason ?? 'Step was intentionally skipped.'
+    };
+  }
+
+  if (decision.parsedAction.actionType === 'fill' && decision.selectedLocator && decision.selectedValue) {
+    const locator = locatorFromExpression(page, decision.selectedLocator, decision.deterministicCandidates);
+    if (!locator) {
+      return { status: 'failed', reason: `Cannot verify unsupported fill locator: ${decision.selectedLocator}` };
+    }
+
+    const currentValue = await locator.inputValue().catch(() => null);
+    return currentValue === decision.selectedValue
+      ? { status: 'passed', reason: 'Filled control value matches expected payload value.' }
+      : { status: 'failed', reason: `Filled control value mismatch. Expected "${decision.selectedValue}", got "${currentValue}".` };
+  }
+
+  if (decision.parsedAction.actionType === 'select') {
+    if (decision.selectionVerified) {
+      return { status: 'passed', reason: 'Dropdown option selection completed and was verified by the selector flow.' };
+    }
+
+    return afterSnapshotContains(after, decision.selectedValue)
+      ? { status: 'passed', reason: 'Selected value is visible after the step.' }
+      : { status: 'failed', reason: `Selected value "${decision.selectedValue ?? ''}" was not visible after the step.` };
+  }
+
+  if (before.url !== after.url) {
+    return { status: 'passed', reason: 'Page URL changed after the action.' };
+  }
+
+  if (snapshotSignature(before) !== snapshotSignature(after)) {
+    return { status: 'passed', reason: 'DOM/accessibility state changed after the action.' };
+  }
+
+  return { status: 'passed', reason: 'Action executed and page reached a stable state.' };
+}
+
+async function performLogin(page: Page, email: string, password: string): Promise<void> {
+  await fillFirst(page, email, [
+    () => configuredLocator(page, process.env.LOGIN_EMAIL_SELECTOR),
+    () => page.getByLabel(/email|username|user name/i),
+    () => page.getByPlaceholder(/email|username|user name/i),
+    () => page.locator('input[type="email"]').first(),
+    () => page.locator('input[name*="email" i], input[name*="user" i]').first()
+  ]);
+
+  await fillFirst(page, password, [
+    () => configuredLocator(page, process.env.LOGIN_PASSWORD_SELECTOR),
+    () => page.getByLabel(/password/i),
+    () => page.getByPlaceholder(/password/i),
+    () => page.locator('input[type="password"]').first(),
+    () => page.locator('input[name*="password" i]').first()
+  ]);
+
+  await clickFirst(page, [
+    () => configuredLocator(page, process.env.LOGIN_SUBMIT_SELECTOR),
+    () => page.getByRole('button', { name: /login|sign in|submit/i }),
+    () => page.locator('button[type="submit"]').first(),
+  ]);
+
+  await waitForSnapshotStability(page);
+}
+
+function configuredLocator(page: Page, selector: string | undefined): Locator {
+  if (!selector?.trim()) {
+    return page.locator('__configured_locator_not_set__');
+  }
+
+  const trimmed = selector.trim();
+  if (trimmed.startsWith('testid=')) {
+    return page.getByTestId(trimmed.replace(/^testid=/, ''));
+  }
+
+  return page.locator(trimmed);
+}
+
+async function gotoWithRetry(page: Page, url: string, attempts = 3): Promise<void> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) {
+        break;
+      }
+      await page.waitForTimeout(1000 * attempt);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+async function fillFirst(page: Page, value: string, locatorFactories: Array<() => Locator>): Promise<void> {
+  for (const createLocator of locatorFactories) {
+    const locator = createLocator();
+    if (await isUsable(locator)) {
+      await locator.fill(value);
+      return;
+    }
+  }
+
+  throw new Error('No usable input locator found.');
+}
+
+async function clickFirst(page: Page, locatorFactories: Array<() => Locator>): Promise<void> {
+  for (const createLocator of locatorFactories) {
+    const locator = createLocator();
+    if (await isUsable(locator)) {
+      await locator.click();
+      return;
+    }
+  }
+
+  throw new Error('No usable click locator found.');
+}
+
+async function isUsable(locator: Locator): Promise<boolean> {
+  try {
+    const first = locator.first();
+    return (await first.count()) > 0 && (await first.isVisible({ timeout: 750 })) && (await first.isEnabled({ timeout: 750 }));
+  } catch {
+    return false;
+  }
+}
+
+async function safeAction(action: () => Promise<void>): Promise<string | null> {
+  try {
+    await action();
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function captureFailureScreenshot(page: Page, screenshotDir: string, name: string): Promise<string | undefined> {
+  const screenshotPath = path.join(screenshotDir, `${slugify(name)}-${Date.now()}.png`);
+  await fs.ensureDir(screenshotDir);
+  return page
+    .screenshot({ path: screenshotPath, fullPage: true })
+    .then(() => screenshotPath)
+    .catch(() => undefined);
+}
+
+function failureReasonFor(decision: ReconDecision, verification: EffectVerification): string {
+  if (decision.actionStatus === 'failed') {
+    return decision.actionError ?? 'Action failed.';
+  }
+
+  if (verification.status === 'failed') {
+    return verification.reason;
+  }
+
+  return decision.actionError ?? verification.reason;
+}
+
+function summarizeDecision(decision: ReconDecision): DecisionSummary {
+  return {
+    decisionSource: decision.decisionSource,
+    actionStatus: decision.actionStatus,
+    selectedLocator: decision.selectedLocator,
+    selectedValue: decision.selectedValue,
+    confidence: decision.confidence,
+    selectorRisk: decision.selectorRisk,
+    llmReason: decision.llmReason,
+    actionError: decision.actionError,
+    executed: decision.executed,
+    llmUsed: decision.decisionSource === 'llm',
+    llmPromptTokenEstimate: decision.llmPromptTokenEstimate,
+    llmResponseTokenEstimate: decision.llmResponseTokenEstimate,
+    llmTotalTokenEstimate: decision.llmTotalTokenEstimate
+  };
+}
+
+function afterSnapshotContains(snapshot: ReconSnapshot, value: string | null): boolean {
+  if (!value) {
+    return false;
+  }
+
+  return snapshot.elements.some((element) =>
+    [element.text, element.value, element.ariaLabel, element.label]
+      .filter((candidate): candidate is string => Boolean(candidate))
+      .some((candidate) => candidate.toLowerCase().includes(value.toLowerCase()))
+  );
+}
+
+function snapshotSignature(snapshot: ReconSnapshot): string {
+  return snapshot.elements
+    .filter((element) => element.isVisible)
+    .map((element) => `${element.tag}:${element.role ?? ''}:${element.text ?? ''}:${element.value ?? ''}`)
+    .join('|')
+    .slice(0, 8000);
+}
+
+async function recordSnapshot(captured: CapturedSnapshot, snapshots: SnapshotReference[]): Promise<void> {
+  snapshots.push({
+    state: captured.snapshot.state,
+    path: captured.filePath
+  });
+}
+
+function extractStepSnapshots(step: StepExecutionReport): SnapshotReference[] {
+  return [
+    step.beforeSnapshotPath ? { state: `step-${step.stepNo}-before`, path: step.beforeSnapshotPath } : null,
+    step.afterSnapshotPath ? { state: `step-${step.stepNo}-after`, path: step.afterSnapshotPath } : null,
+    step.repairBeforeSnapshotPath ? { state: `step-${step.stepNo}-repair-before`, path: step.repairBeforeSnapshotPath } : null,
+    step.repairAfterSnapshotPath ? { state: `step-${step.stepNo}-repair-after`, path: step.repairAfterSnapshotPath } : null
+  ].filter((item): item is SnapshotReference => item !== null);
+}
+
+function createRunReport(scenarios: ScenarioExecutionReport[]): DynamicRunReport {
+  const allSteps = scenarios.flatMap((scenario) => scenario.steps);
+  const allDecisions = allSteps.flatMap((step) =>
+    [step.decision, step.repairDecision].filter((decision): decision is DecisionSummary => Boolean(decision))
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    command: 'npm run run:webwright',
+    mode: 'hybrid-webwright-step-runner',
+    summary: {
+      total: scenarios.length,
+      passed: scenarios.filter((scenario) => scenario.status === 'passed').length,
+      failed: scenarios.filter((scenario) => scenario.status === 'failed').length,
+      totalSteps: allSteps.length,
+      passedSteps: allSteps.filter((step) => step.status === 'passed').length,
+      failedSteps: allSteps.filter((step) => step.status === 'failed').length,
+      repairedSteps: allSteps.filter((step) => step.status === 'repaired').length,
+      llmDecisionCount: allDecisions.filter((decision) => decision.llmUsed).length,
+      estimatedLlmTokens: allDecisions.reduce((sum, decision) => sum + (decision.llmTotalTokenEstimate ?? 0), 0)
+    },
+    scenarios
+  };
+}
+
+function stepLlmTokenEstimate(step: StepExecutionReport): number {
+  return (step.decision.llmTotalTokenEstimate ?? 0) + (step.repairDecision?.llmTotalTokenEstimate ?? 0);
+}
+
+function renderDynamicReport(report: DynamicRunReport): string {
+  const rows = report.scenarios
+    .map((scenario) => {
+      const stepRows = scenario.steps
+        .map(
+          (step) => `<tr>
+            <td>${step.stepNo}</td>
+            <td>${escapeHtml(step.instruction)}</td>
+            <td><span class="${step.status}">${step.status}</span></td>
+            <td>${escapeHtml(step.decision.selectedLocator ?? '')}</td>
+            <td>${escapeHtml(step.failureReason ?? '')}</td>
+            <td>${step.repairAttempted ? escapeHtml(step.repairSucceeded ? 'yes, succeeded' : 'yes, failed') : 'no'}</td>
+            <td>${escapeHtml(String(stepLlmTokenEstimate(step)))}</td>
+            <td>${escapeHtml(step.beforeSnapshotPath ?? '')}<br />${escapeHtml(step.afterSnapshotPath ?? '')}</td>
+            <td>${escapeHtml(step.screenshotPath ?? step.repairScreenshotPath ?? '')}</td>
+          </tr>`
+        )
+        .join('');
+
+      return `<section>
+        <h2>${escapeHtml(scenario.scenarioId)} - ${escapeHtml(scenario.status)}</h2>
+        <p>${escapeHtml(scenario.module ?? '')} ${escapeHtml(scenario.action ?? '')}</p>
+        <p>Failure: ${escapeHtml(scenario.failureReason ?? '')}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Step</th>
+              <th>Instruction</th>
+              <th>Status</th>
+              <th>Locator</th>
+              <th>Failure</th>
+              <th>Repair</th>
+              <th>Estimated LLM Tokens</th>
+              <th>Snapshots</th>
+              <th>Screenshot</th>
+            </tr>
+          </thead>
+          <tbody>${stepRows}</tbody>
+        </table>
+      </section>`;
+    })
+    .join('');
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Dynamic Step Runner Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #172033; }
+    .summary { display: flex; gap: 12px; margin: 16px 0 24px; }
+    .metric { border: 1px solid #d7dce5; border-radius: 8px; padding: 10px 14px; }
+    .metric strong { display: block; font-size: 22px; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 24px; font-size: 13px; }
+    th, td { border: 1px solid #d7dce5; padding: 8px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+    th { background: #f5f7fb; }
+    .passed, .repaired { color: #047857; font-weight: 700; }
+    .failed { color: #b91c1c; font-weight: 700; }
+    .skipped { color: #92400e; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>Dynamic Step Runner Report</h1>
+  <p>Generated at ${escapeHtml(report.generatedAt)}</p>
+  <div class="summary">
+    <div class="metric"><strong>${report.summary.total}</strong>Scenarios</div>
+    <div class="metric"><strong>${report.summary.passed}</strong>Passed</div>
+    <div class="metric"><strong>${report.summary.failed}</strong>Failed</div>
+    <div class="metric"><strong>${report.summary.totalSteps}</strong>Steps</div>
+    <div class="metric"><strong>${report.summary.repairedSteps}</strong>Repaired</div>
+    <div class="metric"><strong>${report.summary.llmDecisionCount}</strong>LLM Calls</div>
+    <div class="metric"><strong>${report.summary.estimatedLlmTokens}</strong>Est. Tokens</div>
+  </div>
+  ${rows}
+</body>
+</html>`;
+}
+
+if (require.main === module) {
+  runDynamicScenarios().catch((error) => {
+    logger.error('Dynamic scenario runner failed.', error);
+    process.exitCode = 1;
+  });
+}

@@ -1,8 +1,9 @@
 import { execFile } from 'node:child_process';
+import path from 'node:path';
 import { promisify } from 'node:util';
 import type { PlaywrightRunResult } from '../types';
-import { getBaseEnv } from '../config/env';
-import { resolveFromRoot, writeJsonFile } from '../utils/fileUtils';
+import { getBaseEnv, getFrameworkPaths } from '../config/env';
+import { writeJsonFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 
 const execFileAsync = promisify(execFile);
@@ -11,8 +12,10 @@ export async function runGeneratedTests(options: {
   outputPath?: string;
 } = {}): Promise<PlaywrightRunResult> {
   const env = getBaseEnv();
-  const outputPath = options.outputPath ?? resolveFromRoot('reports', 'run-result.json');
-  const args = ['playwright', 'test', 'tests/generated'];
+  const paths = getFrameworkPaths();
+  const outputPath = options.outputPath ?? paths.runResultPath;
+  const generatedTestsDir = path.relative(process.cwd(), paths.generatedTestsDir) || paths.generatedTestsDir;
+  const args = ['playwright', 'test', generatedTestsDir];
 
   if (!env.HEADLESS) {
     args.push('--headed');
@@ -68,9 +71,11 @@ function extractFailedTestFiles(output: string): string[] {
 
 if (require.main === module) {
   runGeneratedTests().catch(async (error) => {
-    const outputPath = resolveFromRoot('reports', 'run-result.json');
+    const paths = getFrameworkPaths();
+    const outputPath = paths.runResultPath;
+    const generatedTestsDir = path.relative(process.cwd(), paths.generatedTestsDir) || paths.generatedTestsDir;
     const failed: PlaywrightRunResult = {
-      command: 'npx playwright test tests/generated',
+      command: `npx playwright test ${generatedTestsDir}`,
       status: 'failed',
       exitCode: 1,
       startedAt: new Date().toISOString(),

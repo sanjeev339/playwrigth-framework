@@ -13,5 +13,17 @@
     "types": ["node", "@playwright/test"]
   },
   "include": ["src/**/*.ts", "tests/**/*.ts", "playwright.config.ts"],
-  "exclude": ["node_modules", "dist", "reports", "recon", "scenarios", "specs"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "reports",
+    "dynamic-recon",
+    "recon",
+    "recon-summary",
+    "scenario-actions",
+    "scenarios",
+    "specs",
+    "tests/generated",
+    "tests/healed"
+  ]
 }

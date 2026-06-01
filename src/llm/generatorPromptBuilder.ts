@@ -157,6 +157,19 @@ async function clickFirst(label: string, locators: Locator[]): Promise<void> {
   throw new Error(\`Unable to find clickable control for \${label}.\`);
 }
 
+function configuredLocator(page: Page, selector: string | undefined): Locator {
+  if (!selector?.trim()) {
+    return page.locator('__configured_locator_not_set__');
+  }
+
+  const trimmed = selector.trim();
+  if (trimmed.startsWith('testid=')) {
+    return page.getByTestId(trimmed.replace(/^testid=/, ''));
+  }
+
+  return page.locator(trimmed);
+}
+
 async function clickMenuItemAfterRowAction(label: string, openMenu: () => Locator, item: () => Locator): Promise<void> {
   let candidate = await firstUsable(item());
 
@@ -181,19 +194,18 @@ async function selectCustomDropdown(page: Page, openDropdown: () => Locator, opt
   await openDropdown().click();
 
   const exactOptionRegex = new RegExp(\`^\${escapeRegex(optionValue)}$\`, 'i');
+  const visiblePopup = page.locator('[role="listbox"], [role="menu"], [role="dialog"]').filter({ hasText: exactOptionRegex });
   const optionCandidates = [
     page.getByRole('option', { name: exactOptionRegex }),
-    page.locator('[role="listbox"], [role="menu"], [role="dialog"]').getByText(exactOptionRegex),
-    page.locator('[aria-selected], [data-option], li').filter({ hasText: exactOptionRegex }),
-    page.locator('li[role="option"]').filter({ hasText: exactOptionRegex }),
-    page.getByText(exactOptionRegex)
+    visiblePopup.getByRole('option', { name: exactOptionRegex }),
+    visiblePopup.getByText(exactOptionRegex),
+    page.locator('[aria-selected], [data-option], li[role="option"]').filter({ hasText: exactOptionRegex })
   ];
 
   for (const locator of optionCandidates) {
     const candidate = await firstUsable(locator);
     if (candidate) {
       await candidate.click();
-      await expect(page.getByText(exactOptionRegex).first()).toBeVisible({ timeout: 5000 });
       return;
     }
   }
@@ -215,20 +227,23 @@ test(${JSON.stringify(title)}, async ({ page }) => {
     await page.goto(loginUrl);
 
     await fillFirst('login email', [
+      configuredLocator(page, process.env.LOGIN_EMAIL_SELECTOR),
       page.getByLabel(/email|username/i),
       page.getByRole('textbox', { name: /email|username/i }),
       page.getByPlaceholder(/email|username/i)
     ], loginEmail);
 
     await fillFirst('login password', [
+      configuredLocator(page, process.env.LOGIN_PASSWORD_SELECTOR),
       page.getByLabel(/password/i),
       page.getByRole('textbox', { name: /password/i }),
       page.getByPlaceholder(/password/i)
     ], loginPassword);
 
     await clickFirst('login submit', [
+      configuredLocator(page, process.env.LOGIN_SUBMIT_SELECTOR),
       page.getByRole('button', { name: /login|sign in|submit/i }),
-      page.getByText(/login|sign in|submit/i)
+      page.locator('button[type="submit"]').first()
     ]);
 
 ${indent(renderPostLoginAssertion(reconActions), 4)}
@@ -311,26 +326,20 @@ function locatorForAction(action: ReconAction): string {
     return action.rowActionLocator;
   }
 
-  return action.selectedLocator ?? fallbackLocator(action);
+  if (!action.selectedLocator) {
+    throw new Error(`Missing recon locator for ${action.actionType} step: ${action.rawStep}`);
+  }
+
+  return action.selectedLocator;
 }
 
 function dropdownLocatorForAction(action: ReconAction): string {
-  return action.dropdownLocator ?? action.selectedLocator ?? fallbackLocator(action);
-}
-
-function fallbackLocator(action: ReconAction): string {
-  const target = action.target ?? action.rawStep;
-  const pattern = regexLiteral(target);
-
-  if (action.actionType === 'fill') {
-    return `page.getByRole('textbox', { name: ${pattern} })`;
+  const locator = action.dropdownLocator ?? action.selectedLocator;
+  if (!locator) {
+    throw new Error(`Missing recon dropdown locator for step: ${action.rawStep}`);
   }
 
-  if (action.actionType === 'select') {
-    return `page.getByText(${pattern})`;
-  }
-
-  return `page.getByText(${pattern})`;
+  return locator;
 }
 
 function payloadValueExpression(action: ReconAction, payload: Record<string, unknown>): string {
@@ -354,14 +363,6 @@ function renderPostLoginAssertion(reconActions: ReconAction[]): string {
   }
 
   return "await expect(page.locator('body')).toBeVisible({ timeout: 15000 });";
-}
-
-function regexLiteral(value: string): string {
-  return `/${escapeRegexForLiteral(value)}/i`;
-}
-
-function escapeRegexForLiteral(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\//g, '\\/');
 }
 
 function indent(value: string, spaces: number): string {

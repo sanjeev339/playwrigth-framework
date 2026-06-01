@@ -1,6 +1,7 @@
 import path from 'node:path';
+import { getFrameworkPaths } from '../config/env';
 import type { LocatorValidationReport, LocatorValidationWarning } from '../types';
-import { listFiles, readTextFile, resolveFromRoot, writeJsonFile } from '../utils/fileUtils';
+import { listFiles, readTextFile, writeJsonFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 
 const locatorRegex =
@@ -12,9 +13,10 @@ export async function validateGeneratedLocators(options: {
   healedDir?: string;
   outputPath?: string;
 } = {}): Promise<LocatorValidationReport> {
-  const generatedDir = options.generatedDir ?? resolveFromRoot('tests', 'generated');
-  const healedDir = options.healedDir ?? resolveFromRoot('tests', 'healed');
-  const outputPath = options.outputPath ?? resolveFromRoot('reports', 'locator-validation.json');
+  const paths = getFrameworkPaths();
+  const generatedDir = options.generatedDir ?? paths.generatedTestsDir;
+  const healedDir = options.healedDir ?? paths.healedTestsDir;
+  const outputPath = options.outputPath ?? paths.locatorValidationReportPath;
   const generatedFiles = await listFiles(generatedDir, '.ts');
   const healedFiles = await listFiles(healedDir, '.ts');
   const testFiles = [...generatedFiles, ...healedFiles];

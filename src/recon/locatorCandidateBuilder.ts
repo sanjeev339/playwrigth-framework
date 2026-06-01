@@ -1,3 +1,4 @@
+import { getLocatorPolicy } from '../config/env';
 import type { DomElementSnapshot } from '../types';
 import type { StructuredLocator } from './reconDecisionTypes';
 
@@ -58,6 +59,7 @@ export function buildLocatorPriority(element: DomElementSnapshot): string[] {
 
 export function buildStructuredLocatorPriority(element: DomElementSnapshot): StructuredLocator[] {
   const candidates: StructuredLocator[] = [];
+  const policy = getLocatorPolicy();
   const testId = firstNonEmpty(element.dataTestId, element.dataTest, element.dataCy, element.dataQa);
 
   if (testId) {
@@ -99,7 +101,7 @@ export function buildStructuredLocatorPriority(element: DomElementSnapshot): Str
     candidates.push({ method: 'css', selector: element.cssCandidate });
   }
 
-  if (element.xpathCandidate) {
+  if (policy.ALLOW_XPATH_LOCATORS && element.xpathCandidate) {
     candidates.push({ method: 'xpath', selector: element.xpathCandidate });
   }
 

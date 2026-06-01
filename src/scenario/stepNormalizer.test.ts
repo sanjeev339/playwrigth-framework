@@ -7,7 +7,7 @@ const input =
 const payload = {
   'First Name': 'Riya',
   'Last Name': 'Sharma',
-  'Email Address': 'Riya.sharma@piraiinfotech.com',
+  'Email Address': 'riya.sharma@example.test',
   Role: 'Executive'
 };
 

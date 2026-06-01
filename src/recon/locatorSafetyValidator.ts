@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { getLocatorPolicy } from '../config/env';
 import type { LocatorCandidate, LocatorValidationResult, StructuredLocator } from './reconDecisionTypes';
 
 export async function validateLocatorCandidate(page: Page, candidate: LocatorCandidate): Promise<LocatorValidationResult> {
@@ -44,6 +45,7 @@ export function locatorFromExpression(page: Page, locatorExpression: string, kno
 
 export function parseLocatorExpression(locatorExpression: string): StructuredLocator | null {
   const trimmed = locatorExpression.trim();
+  const policy = getLocatorPolicy();
 
   const roleMatch = trimmed.match(
     /^page\.getByRole\((['"])([^'"]+)\1(?:,\s*\{\s*name:\s*(\/(.+)\/[a-z]*|(['"])(.*?)\5)\s*\})?\)$/
@@ -75,6 +77,10 @@ export function parseLocatorExpression(locatorExpression: string): StructuredLoc
     }
 
     if (selector.startsWith('xpath=') || selector.startsWith('//') || selector.startsWith('/html/')) {
+      if (!policy.ALLOW_XPATH_LOCATORS) {
+        return null;
+      }
+
       return {
         method: 'xpath',
         selector: selector.replace(/^xpath=/, '')
@@ -102,6 +108,10 @@ export function parseLocatorExpression(locatorExpression: string): StructuredLoc
     /^page\.locator\((['"])label\1\)\.filter\(\{\s*hasText:\s*(\/(.+)\/[a-z]*|(['"])(.*?)\4)\s*\}\)\.locator\((['"])xpath=\.\.\6\)\.locator\((['"])(.*?)\7\)$/
   );
   if (fieldControlMatch) {
+    if (!policy.ALLOW_XPATH_LOCATORS) {
+      return null;
+    }
+
     const selector = fieldControlMatch[8];
     if (!selector || !isSafeSelector(selector)) {
       return null;

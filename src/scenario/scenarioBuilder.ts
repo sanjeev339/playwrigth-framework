@@ -1,9 +1,10 @@
 import path from 'node:path';
 import fs from 'fs-extra';
+import { getFrameworkPaths } from '../config/env';
 import { readExcelRows } from '../input/excelReader';
 import { readTestData } from '../input/jsonReader';
 import type { Scenario, TestDataRecord, TestFlowRow } from '../types';
-import { resolveFromRoot, toSafeFileName, writeJsonFile } from '../utils/fileUtils';
+import { toSafeFileName, writeJsonFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 import { normalizeScenarioSteps } from './stepNormalizer';
 
@@ -14,9 +15,10 @@ export async function buildScenarios(options: {
   jsonPath?: string;
   outputDir?: string;
 } = {}): Promise<Scenario[]> {
-  const excelPath = options.excelPath ?? resolveFromRoot('input', 'test_flow.xlsx');
-  const jsonPath = options.jsonPath ?? resolveFromRoot('input', 'test_data.json');
-  const outputDir = options.outputDir ?? resolveFromRoot('scenarios');
+  const paths = getFrameworkPaths();
+  const excelPath = options.excelPath ?? paths.inputFlowPath;
+  const jsonPath = options.jsonPath ?? paths.inputDataPath;
+  const outputDir = options.outputDir ?? paths.scenarioDir;
 
   const [rows, testData] = await Promise.all([readExcelRows(excelPath), readTestData(jsonPath)]);
   const payloadByScenarioId = new Map(testData.map((record) => [record.scenario_id, record]));

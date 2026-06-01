@@ -1,12 +1,12 @@
 import path from 'node:path';
 import fs from 'fs-extra';
+import { getFrameworkPaths } from '../config/env';
 import type { PlaywrightRunResult, ReconSnapshot, Scenario } from '../types';
 import { inferUiStability } from '../recon/locatorCandidateBuilder';
 import {
   listFiles,
   readJsonFile,
   readTextFile,
-  resolveFromRoot,
   toSafeFileName,
   truncate,
   writeJsonFile,
@@ -31,12 +31,13 @@ export async function healFailedTests(options: {
   outputDir?: string;
   healingReportPath?: string;
 } = {}): Promise<HealingResult> {
-  const runResultPath = options.runResultPath ?? resolveFromRoot('reports', 'run-result.json');
-  const scenarioDir = options.scenarioDir ?? resolveFromRoot('scenarios');
-  const generatedDir = options.generatedDir ?? resolveFromRoot('tests', 'generated');
-  const reconDir = options.reconDir ?? resolveFromRoot('recon');
-  const outputDir = options.outputDir ?? resolveFromRoot('tests', 'healed');
-  const healingReportPath = options.healingReportPath ?? resolveFromRoot('reports', 'healing-result.json');
+  const paths = getFrameworkPaths();
+  const runResultPath = options.runResultPath ?? paths.runResultPath;
+  const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
+  const generatedDir = options.generatedDir ?? paths.generatedTestsDir;
+  const reconDir = options.reconDir ?? paths.reconDir;
+  const outputDir = options.outputDir ?? paths.healedTestsDir;
+  const healingReportPath = options.healingReportPath ?? paths.healingReportPath;
 
   if (!(await fs.pathExists(runResultPath))) {
     const result = {

@@ -1,7 +1,7 @@
 import fs from 'fs-extra';
 import { z } from 'zod';
+import { getFrameworkPaths } from '../config/env';
 import type { TestDataRecord } from '../types';
-import { resolveFromRoot } from '../utils/fileUtils';
 
 const testDataSchema = z.array(
   z.object({
@@ -14,7 +14,7 @@ const testDataSchema = z.array(
   }).passthrough()
 );
 
-export async function readTestData(filePath = resolveFromRoot('input', 'test_data.json')): Promise<TestDataRecord[]> {
+export async function readTestData(filePath = getFrameworkPaths().inputDataPath): Promise<TestDataRecord[]> {
   if (!(await fs.pathExists(filePath))) {
     throw new Error(`JSON test data file not found at ${filePath}`);
   }
@@ -29,7 +29,30 @@ export async function readTestData(filePath = resolveFromRoot('input', 'test_dat
   }
 
   console.log(`Parsed data records: ${parsed.data.length}`);
-  return parsed.data as TestDataRecord[];
+  return resolveEnvPlaceholders(parsed.data) as TestDataRecord[];
+}
+
+function resolveEnvPlaceholders(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(resolveEnvPlaceholders);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => [key, resolveEnvPlaceholders(nestedValue)])
+    );
+  }
+
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const envName = value.match(/^\{\{\s*([A-Z][A-Z0-9_]*)\s*\}\}$/)?.[1] ?? value.match(/^\$\{\s*([A-Z][A-Z0-9_]*)\s*\}$/)?.[1];
+  if (!envName) {
+    return value;
+  }
+
+  return process.env[envName] ?? value;
 }
 
 if (require.main === module) {

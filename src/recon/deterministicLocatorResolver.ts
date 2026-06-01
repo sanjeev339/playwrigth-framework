@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { getLocatorPolicy } from '../config/env';
 import type { DomElementSnapshot } from '../types';
 import { buildStructuredLocatorPriority, locatorToString } from './locatorCandidateBuilder';
 import type { LocatorCandidate, ParsedAction, StructuredLocator } from './reconDecisionTypes';
@@ -64,6 +65,10 @@ function buildNearbyLabeledControlCandidates(
   snapshotElements: DomElementSnapshot[]
 ): LocatorCandidate[] {
   if (!parsedAction.target || parsedAction.actionType !== 'select') {
+    return [];
+  }
+
+  if (!getLocatorPolicy().ALLOW_XPATH_LOCATORS) {
     return [];
   }
 

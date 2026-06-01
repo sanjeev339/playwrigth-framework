@@ -1,6 +1,7 @@
 import path from 'node:path';
+import { getFrameworkPaths } from '../config/env';
 import type { Scenario } from '../types';
-import { listFiles, readJsonFile, resolveFromRoot, toSafeFileName, writeTextFile } from '../utils/fileUtils';
+import { listFiles, readJsonFile, toSafeFileName, writeTextFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 import { callLLM } from './llmClient';
 
@@ -8,8 +9,9 @@ export async function generatePlans(options: {
   scenarioDir?: string;
   outputDir?: string;
 } = {}): Promise<string[]> {
-  const scenarioDir = options.scenarioDir ?? resolveFromRoot('scenarios');
-  const outputDir = options.outputDir ?? resolveFromRoot('specs');
+  const paths = getFrameworkPaths();
+  const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
+  const outputDir = options.outputDir ?? paths.specDir;
   const scenarioFiles = await listFiles(scenarioDir, '.json');
   const writtenFiles: string[] = [];
 

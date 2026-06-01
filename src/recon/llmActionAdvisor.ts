@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { getLLMLoggingConfig } from '../config/env';
 import type { DomElementSnapshot } from '../types';
 import { callLLM } from '../llm/llmClient';
 import { truncate } from '../utils/fileUtils';
@@ -32,26 +33,61 @@ const decisionSchema = z.object({
   confidence: z.enum(['high', 'medium', 'low']).default('low')
 });
 
+let llmDisabledReason: string | null = null;
+
 export async function askLLMForActionDecision(input: LLMAdvisorInput): Promise<LLMActionDecision> {
   const prompt = buildPrompt(input);
+  const promptTokenEstimate = estimateTokens(prompt);
+
+  if (llmDisabledReason) {
+    logLLMInfo('SKIPPED', input, llmDisabledReason);
+    return {
+      actionType: 'error',
+      target: input.parsedAction.target ?? '',
+      value: input.parsedAction.value,
+      selectedLocator: null,
+      reason: llmDisabledReason,
+      confidence: 'low',
+      rawResponsePreview: '',
+      parseError: llmDisabledReason,
+      retryUsed: false,
+      retryStatus: 'not_used',
+      promptTokenEstimate: 0,
+      responseTokenEstimate: 0,
+      totalTokenEstimate: 0
+    };
+  }
 
   try {
+    logLLMExchange('REQUEST', input, prompt, promptTokenEstimate);
     const response = await callLLM(prompt);
+    const responseTokenEstimate = estimateTokens(response);
+    logLLMExchange('RESPONSE', input, response, responseTokenEstimate);
     const firstParse = parseLLMDecision(response);
 
     if (!firstParse.parseError) {
       return {
         ...firstParse,
         retryUsed: false,
-        retryStatus: 'not_used'
+        retryStatus: 'not_used',
+        promptTokenEstimate,
+        responseTokenEstimate,
+        totalTokenEstimate: promptTokenEstimate + responseTokenEstimate
       };
     }
 
     logger.warn(`[Recon] LLM parse failed: ${firstParse.parseError}`);
     logger.warn(`[Recon] LLM raw response preview: ${firstParse.rawResponsePreview ?? ''}`);
 
-    const correctionResponse = await callLLM(buildCorrectionPrompt(response));
+    const correctionPrompt = buildCorrectionPrompt(response);
+    const correctionPromptTokenEstimate = estimateTokens(correctionPrompt);
+    logLLMExchange('CORRECTION_REQUEST', input, correctionPrompt, correctionPromptTokenEstimate);
+    const correctionResponse = await callLLM(correctionPrompt);
+    const correctionResponseTokenEstimate = estimateTokens(correctionResponse);
+    logLLMExchange('CORRECTION_RESPONSE', input, correctionResponse, correctionResponseTokenEstimate);
     const secondParse = parseLLMDecision(correctionResponse);
+    const totalPromptTokenEstimate = promptTokenEstimate + correctionPromptTokenEstimate;
+    const totalResponseTokenEstimate = responseTokenEstimate + correctionResponseTokenEstimate;
 
     if (!secondParse.parseError) {
       logger.info('[Recon] LLM JSON correction retry succeeded.');
@@ -60,7 +96,10 @@ export async function askLLMForActionDecision(input: LLMAdvisorInput): Promise<L
         rawResponsePreview: secondParse.rawResponsePreview ?? preview(correctionResponse),
         parseError: null,
         retryUsed: true,
-        retryStatus: 'success'
+        retryStatus: 'success',
+        promptTokenEstimate: totalPromptTokenEstimate,
+        responseTokenEstimate: totalResponseTokenEstimate,
+        totalTokenEstimate: totalPromptTokenEstimate + totalResponseTokenEstimate
       };
     }
 
@@ -76,10 +115,16 @@ export async function askLLMForActionDecision(input: LLMAdvisorInput): Promise<L
       rawResponsePreview: secondParse.rawResponsePreview ?? preview(correctionResponse),
       parseError: secondParse.parseError,
       retryUsed: true,
-      retryStatus: 'failed'
+      retryStatus: 'failed',
+      promptTokenEstimate: totalPromptTokenEstimate,
+      responseTokenEstimate: totalResponseTokenEstimate,
+      totalTokenEstimate: totalPromptTokenEstimate + totalResponseTokenEstimate
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
+    if (isQuotaExhausted(reason)) {
+      llmDisabledReason = `LLM fallback disabled for this run because provider quota is exhausted: ${reason}`;
+    }
     logger.warn('LLM action advisor failed.', error);
     return {
       actionType: 'error',
@@ -91,7 +136,10 @@ export async function askLLMForActionDecision(input: LLMAdvisorInput): Promise<L
       rawResponsePreview: '',
       parseError: reason,
       retryUsed: false,
-      retryStatus: 'not_used'
+      retryStatus: 'not_used',
+      promptTokenEstimate,
+      responseTokenEstimate: 0,
+      totalTokenEstimate: promptTokenEstimate
     };
   }
 }
@@ -277,4 +325,55 @@ function buildCorrectionPrompt(invalidResponse: string): string {
 
 function preview(value: string): string {
   return redactSecrets(value).slice(0, 500);
+}
+
+function logLLMExchange(
+  direction: 'REQUEST' | 'RESPONSE' | 'CORRECTION_REQUEST' | 'CORRECTION_RESPONSE',
+  input: LLMAdvisorInput,
+  content: string,
+  tokenEstimate: number
+): void {
+  const config = getLLMLoggingConfig();
+  if (!config.LOG_LLM_IO) {
+    return;
+  }
+
+  const safeContent = truncate(redactSecrets(content), config.LLM_IO_MAX_CHARS);
+  const metadata = [
+    `scenario=${input.scenarioId}`,
+    `step=${input.parsedAction.stepNo}`,
+    `action=${input.parsedAction.actionType}`,
+    `target=${input.parsedAction.target ?? ''}`,
+    `candidates=${input.locatorCandidates.length}`,
+    `validations=${input.validationResults.length}`,
+    `estimatedTokens=${tokenEstimate}`
+  ].join(' ');
+
+  logger.info(
+    [
+      `[LLM][${direction}] ${metadata}`,
+      `----- ${direction} START -----`,
+      safeContent,
+      `----- ${direction} END -----`
+    ].join('\n')
+  );
+}
+
+function logLLMInfo(kind: 'SKIPPED', input: LLMAdvisorInput, message: string): void {
+  const config = getLLMLoggingConfig();
+  if (!config.LOG_LLM_IO) {
+    return;
+  }
+
+  logger.info(
+    `[LLM][${kind}] scenario=${input.scenarioId} step=${input.parsedAction.stepNo} action=${input.parsedAction.actionType} reason=${redactSecrets(message)}`
+  );
+}
+
+function estimateTokens(value: string): number {
+  return Math.ceil(value.length / 4);
+}
+
+function isQuotaExhausted(message: string): boolean {
+  return /quota|resource_exhausted|free_tier_requests|exceeded your current quota/i.test(message);
 }

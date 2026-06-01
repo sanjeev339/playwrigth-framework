@@ -78,6 +78,9 @@ export interface LLMActionDecision {
   parseError?: string | null;
   retryUsed?: boolean;
   retryStatus?: 'success' | 'failed' | 'not_used';
+  promptTokenEstimate?: number;
+  responseTokenEstimate?: number;
+  totalTokenEstimate?: number;
 }
 
 export interface ReconDecision {
@@ -105,6 +108,9 @@ export interface ReconDecision {
   llmParseError?: string | null;
   llmRetryUsed?: boolean;
   llmRetryStatus?: 'success' | 'failed' | 'not_used';
+  llmPromptTokenEstimate?: number;
+  llmResponseTokenEstimate?: number;
+  llmTotalTokenEstimate?: number;
   executed: boolean;
   actionStatus: ActionStatus;
   actionError?: string | null;

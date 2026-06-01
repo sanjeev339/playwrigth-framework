@@ -51,12 +51,16 @@ export async function callGemini(prompt: string): Promise<string> {
 }
 
 function isRetryableLlmError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/quota|resource_exhausted|free_tier_requests|exceeded your current quota/i.test(message)) {
+    return false;
+  }
+
   const status = getErrorStatus(error);
   if (status === 408 || status === 429 || status === 502 || status === 503 || status === 504) {
     return true;
   }
 
-  const message = error instanceof Error ? error.message : String(error);
   return (
     /rate limit|429|resource_exhausted|too many requests|quota/i.test(message) ||
     /(^|\b)(503|502|504|408)(\b|$)/i.test(message) ||

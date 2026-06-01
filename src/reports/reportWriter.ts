@@ -1,8 +1,9 @@
 import path from 'node:path';
 import fs from 'fs-extra';
+import { getFrameworkPaths } from '../config/env';
 import type { LocatorValidationReport, PlaywrightRunResult, Scenario } from '../types';
 import type { ReconDecision } from '../recon/reconDecisionTypes';
-import { escapeHtml, listFiles, readJsonFile, resolveFromRoot, toSafeFileName, writeJsonFile, writeTextFile } from '../utils/fileUtils';
+import { escapeHtml, listFiles, readJsonFile, toSafeFileName, writeJsonFile, writeTextFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 
 interface ReconDecisionDetail {
@@ -60,14 +61,15 @@ export async function writeFinalReport(options: {
   outputJsonPath?: string;
   outputHtmlPath?: string;
 } = {}): Promise<FinalReport> {
-  const scenarioDir = options.scenarioDir ?? resolveFromRoot('scenarios');
-  const generatedDir = options.generatedDir ?? resolveFromRoot('tests', 'generated');
-  const healedDir = options.healedDir ?? resolveFromRoot('tests', 'healed');
-  const reconDir = options.reconDir ?? resolveFromRoot('recon');
-  const runResultPath = options.runResultPath ?? resolveFromRoot('reports', 'run-result.json');
-  const validationPath = options.validationPath ?? resolveFromRoot('reports', 'locator-validation.json');
-  const outputJsonPath = options.outputJsonPath ?? resolveFromRoot('reports', 'result.json');
-  const outputHtmlPath = options.outputHtmlPath ?? resolveFromRoot('reports', 'result.html');
+  const paths = getFrameworkPaths();
+  const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
+  const generatedDir = options.generatedDir ?? paths.generatedTestsDir;
+  const healedDir = options.healedDir ?? paths.healedTestsDir;
+  const reconDir = options.reconDir ?? paths.reconDir;
+  const runResultPath = options.runResultPath ?? paths.runResultPath;
+  const validationPath = options.validationPath ?? paths.locatorValidationReportPath;
+  const outputJsonPath = options.outputJsonPath ?? paths.finalReportJsonPath;
+  const outputHtmlPath = options.outputHtmlPath ?? paths.finalReportHtmlPath;
 
   const scenarios = await Promise.all((await listFiles(scenarioDir, '.json')).map((file) => readJsonFile<Scenario>(file)));
   const runResult = (await fs.pathExists(runResultPath)) ? await readJsonFile<PlaywrightRunResult>(runResultPath) : undefined;

@@ -1,6 +1,6 @@
 # Playwright AI Framework
 
-Production-style AI-powered Playwright automation framework that converts manual Excel flows and JSON payloads into scenario files, asks OpenAI to plan and generate tests, performs interactive state-based UI recon, validates locators, runs tests, heals failures, and writes JSON/HTML reports.
+Production-style AI-powered Playwright automation framework that converts manual Excel flows and JSON payloads into normalized scenario JSON, then executes each scenario through a Webwright-style hybrid step runner. The runner scans the live UI at every step, sends the current step and locator candidates to the configured LLM, validates the LLM-selected locator, executes the action, verifies the UI effect, captures artifacts, attempts one repair on failure, and writes JSON/HTML reports with estimated LLM token usage.
 
 ## Requirements
 
@@ -22,11 +22,31 @@ Fill `.env`:
 ```bash
 OPENAI_API_KEY=your-key
 OPENAI_MODEL=gpt-4.1-mini
+LLM_PROVIDER=openai
+ACTION_DECISION_MODE=llm_first
+LOG_LLM_IO=true
+LLM_IO_MAX_CHARS=20000
 WEBSITE_URL=https://your-app.example.com
 LOGIN_EMAIL=your-login
 LOGIN_PASSWORD=your-password
 HEADLESS=false
 SLOW_MO=100
+
+# Optional path overrides
+INPUT_FLOW_PATH=input/test_flow.xlsx
+INPUT_DATA_PATH=input/test_data.json
+SCENARIO_OUTPUT_DIR=scenarios
+DYNAMIC_RECON_OUTPUT_DIR=dynamic-recon
+REPORT_OUTPUT_DIR=reports
+
+# Optional stable login locators, preferably frontend data-testid selectors
+LOGIN_EMAIL_SELECTOR=[data-testid="login-email"]
+LOGIN_PASSWORD_SELECTOR=[data-testid="login-password"]
+LOGIN_SUBMIT_SELECTOR=[data-testid="login-submit"]
+
+# Disabled by default. Enable only when no stable locator exists.
+ALLOW_XPATH_LOCATORS=false
+ALLOW_POSITIONAL_LOCATORS=false
 ```
 
 Never commit `.env`.
@@ -51,13 +71,16 @@ Place payloads in `input/test_data.json`:
     "payload": {
       "First Name": "Riya",
       "Last Name": "Sharma",
-      "Email Address": "Riya.sharma@piraiinfotech.com",
+      "Email Address": "riya.sharma@example.test",
       "Role": "Executive",
-      "Status": "Pending"
+      "Status": "Pending",
+      "Password": "{{TEST_USER_PASSWORD}}"
     }
   }
 ]
 ```
+
+Payload values may use env placeholders like `{{TEST_USER_PASSWORD}}` or `${TEST_USER_PASSWORD}`. Password-like payload keys are redacted before normalized scenario files are written.
 
 ## Commands
 
@@ -67,17 +90,11 @@ Run the seed login test:
 npm run test:seed
 ```
 
-Run each pipeline stage:
+Run the dynamic step-runner pipeline:
 
 ```bash
 npm run build:scenarios
-npm run plan
-npm run recon
-npm run generate
-npm run validate
-npm run run:generated
-npm run heal
-npm run report
+npm run run:webwright
 ```
 
 Run the full pipeline:
@@ -86,40 +103,57 @@ Run the full pipeline:
 npm run pipeline
 ```
 
+The older static generation flow is still available for comparison:
+
+```bash
+npm run pipeline:static
+```
+
 ## How The Pipeline Works
 
-1. `build:scenarios` reads `input/test_flow.xlsx` and `input/test_data.json`, matches rows by `scenario_id`, and writes clean scenario JSON files to `scenarios/`.
-2. `plan` sends each sanitized scenario to OpenAI and writes Markdown plans to `specs/`.
-3. `recon` opens the app with Playwright, captures login and dashboard states, then follows scenario steps using deterministic heuristics.
-4. Recon captures every meaningful UI state: before and after actions, modal/form states, and opened dropdown states such as Role or Status.
-5. `generate` sends scenario, plan, payload, and recon snapshots to OpenAI and writes tests to `tests/generated/`.
-6. `validate` performs static locator risk checks and writes `reports/locator-validation.json`.
-7. `run:generated` runs `tests/generated` with Playwright and writes `reports/run-result.json`.
-8. `heal` asks OpenAI to repair only locator, wait, and assertion failures, then writes repaired tests to `tests/healed/`.
-9. `report` writes `reports/result.json` and `reports/result.html`.
+1. `build:scenarios` reads the configured Excel/JSON input paths, matches rows by `scenario_id`, normalizes manual steps, and writes clean scenario JSON files to the configured scenario output folder.
+2. `run:webwright` opens one live Playwright browser session per scenario and logs in with `.env` credentials.
+3. For every normalized step, the runner captures the current page state, runs fresh DOM/accessibility recon, asks the LLM to decide the action/locator, validates the selected locator, executes it, waits for UI stability, verifies the effect, and captures the next page state.
+4. Recon runs inside the step loop, not only once at the beginning, so modals, dropdowns, and newly rendered controls are discovered only after the earlier steps create them.
+5. If a step fails, the runner records the error, screenshot, DOM/accessibility snapshot, locator decision, and failure reason. It then attempts one repair using a fresh snapshot.
+6. If repair succeeds, the scenario continues and marks the step as `repaired`. If repair fails, the scenario stops with a step-wise failure report.
+7. Reports, snapshots, and screenshots are written to the configured report and recon output folders.
+8. The report includes LLM call count and estimated token usage.
 
-## Recon Behavior
+## Webwright-Style Hybrid Runner Behavior
 
-Recon is state-based, not a single page scan. It follows the actual user journey:
+The runner is state-based, not a single page scan. It follows the actual user journey:
 
 - Open login page, scan it.
 - Log in, scan dashboard.
-- Navigate or click based on scenario steps.
-- Capture state before and after each action.
-- Open dropdowns mentioned in steps and capture available options.
-- If an action cannot be performed, it still writes a snapshot with `action_error` and continues where possible.
-
-The first version intentionally uses heuristic actions such as:
-
-- `navigate to X` or `go to X`
-- `click X`
-- `add user`
-- Role and Status dropdown opening
-- Generic payload field filling when the step asks to fill or enter form data
+- For each step, capture `before` state.
+- Run fresh DOM and accessibility recon for the current page state.
+- Resolve deterministic locator candidates and validate safety.
+- In the current default mode, `ACTION_DECISION_MODE=llm_first`, send every executable step to the LLM.
+- The LLM decides which locator/action to use from the current screen.
+- Deterministic candidates are still built, but they are used as safe options for the LLM instead of being auto-executed first.
+- To switch back to older deterministic-first behavior, set `ACTION_DECISION_MODE=deterministic_first`.
+- Execute the selected Playwright action.
+- Wait until the UI is stable.
+- Capture `after` state.
+- Verify the effect.
+- On failure, capture screenshot and attempt one repair from a fresh page snapshot.
+- Record estimated LLM tokens in the JSON/HTML report.
 
 ## OpenAI Usage
 
-OpenAI is used in three places:
+In the current dynamic flow, LLM usage is first-class: every executable step goes to the LLM by default so the LLM decides which locator/action to use from the current screen. Safety validation still runs before execution.
+
+To see exactly what the framework sends to the LLM and what the LLM returns in the terminal, keep:
+
+```bash
+LOG_LLM_IO=true
+LLM_IO_MAX_CHARS=20000
+```
+
+The terminal output is redacted before printing. API keys, login email, login password, bearer tokens, JWTs, and password/token-like payload fields are masked. Increase `LLM_IO_MAX_CHARS` only when you need a larger prompt/response preview.
+
+The older static generation flow uses OpenAI in three places:
 
 - Planner: scenario JSON to Markdown test plan.
 - Generator: scenario, plan, and recon snapshots to Playwright TypeScript tests.
