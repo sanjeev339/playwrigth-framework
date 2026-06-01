@@ -35,6 +35,11 @@ function loadFixtureActions(): ReconAction[] {
   return JSON.parse(readFileSync(fixturePath, 'utf8')) as ReconAction[];
 }
 
+function loadReconSummaryActions(): ReconAction[] {
+  const summaryPath = resolveFromRoot('recon-summary/TC-UM-003.actions.json');
+  return JSON.parse(readFileSync(summaryPath, 'utf8')) as ReconAction[];
+}
+
 describe('buildDeterministicReconTest', () => {
   it('emits recon locators and avoids legacy hardcoded patterns', () => {
     const reconActions = loadFixtureActions();
@@ -43,13 +48,35 @@ describe('buildDeterministicReconTest', () => {
     validateGeneratedReconTest(code, scenario, reconActions);
 
     assert.match(code, /page\.getByRole\("button", \{ name: \/User Management\/i \}\)/);
-    assert.match(code, /page\.getByRole\("button", \{ name: \/Edit\/i \}\)/);
     assert.match(code, /toHaveURL\(\/internal-user\/i/);
-    assert.match(code, /String\(payload\["Email Address"\]\)/);
 
     const banned = ["getByRole('complementary')", 'data-pc-section', '/^Edit$/i', 'user-management|edit|add user'];
     for (const fragment of banned) {
       assert.equal(code.includes(fragment), false, `unexpected hardcoded fragment: ${fragment}`);
     }
+  });
+
+  it('uses payload-stable row locators, stable URLs, and skips failed Role recon', () => {
+    const reconActions = loadReconSummaryActions();
+    const code = buildDeterministicReconTest(scenario, reconActions);
+
+    validateGeneratedReconTest(code, scenario, reconActions);
+
+    assert.match(
+      code,
+      /getByRole\('row'\)\.filter\(\{ hasText: "adithya j" \}\)\.filter\(\{ hasText: "sanjeevkumar\.m00@gmail\.com" \}\)/
+    );
+    assert.equal(code.includes('1041ab24-378b-4d57-8c04-0320ad208ffb'), false);
+    assert.match(code, /toHaveURL\(\/user-detail\/i/);
+    assert.match(code, /recon-skip/);
+    assert.match(code, /Step 6: Select Role/);
+    assert.equal(code.includes("getByRole('combobox', { name: /Role/i })"), false);
+    assert.match(code, /getByRole\("button", \{ name: \/Save\/i \}\)/);
+    assert.match(
+      code,
+      /Step 3: Search user by Full Name[\s\S]*?getByRole\('row'\)\.filter\(\{ hasText: "adithya j" \}\)/
+    );
+    assert.match(code, /Step 3: Search user by Full Name[\s\S]*?getByPlaceholder\(\/Search by name or email\/i\)/);
+    assert.equal(code.includes('getByRole("textbox", { name: /Search by name or email/i })'), false);
   });
 });

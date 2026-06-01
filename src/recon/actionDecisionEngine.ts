@@ -601,7 +601,10 @@ function selectDeterministicSafeCandidate(safeCandidates: LocatorCandidate[]): L
     return null;
   }
 
-  const sorted = [...safeCandidates].sort((left, right) => left.priority - right.priority);
+  const sorted = [...safeCandidates].sort(
+    (left, right) => deterministicCandidateRank(left) - deterministicCandidateRank(right) || left.priority - right.priority
+  );
+
   if (sorted.length === 1) {
     return sorted[0];
   }
@@ -611,13 +614,47 @@ function selectDeterministicSafeCandidate(safeCandidates: LocatorCandidate[]): L
     return top;
   }
 
+  const bestRank = deterministicCandidateRank(top);
+  const bestRanked = sorted.filter((candidate) => deterministicCandidateRank(candidate) === bestRank);
+  if (bestRanked.length === 1) {
+    return bestRanked[0];
+  }
+
   const elementIndexes = new Set(
-    sorted
+    bestRanked
       .map((candidate) => candidate.elementSummary?.index)
       .filter((index): index is number => typeof index === 'number')
   );
 
-  return elementIndexes.size === 1 ? sorted[0] : null;
+  return elementIndexes.size === 1 ? bestRanked[0] : bestRanked[0] ?? null;
+}
+
+function deterministicCandidateRank(candidate: LocatorCandidate): number {
+  if (candidate.locator.includes('nth-of-type')) {
+    return 100;
+  }
+
+  if (candidate.locatorType === 'getByPlaceholder') {
+    return 0;
+  }
+
+  if (candidate.locatorType === 'getByRole') {
+    return 1;
+  }
+
+  if (candidate.locatorType === 'getByLabel') {
+    return 2;
+  }
+
+  if (candidate.locatorType === 'getByText') {
+    return 3;
+  }
+
+  if (candidate.locatorType === 'xpath') {
+    return 9;
+  }
+
+  return 5;
 }
 
 function isStrongSemanticCandidate(candidate: LocatorCandidate): boolean {
@@ -734,7 +771,9 @@ function selectDeterministicFallbackCandidate(
     return null;
   }
 
-  const sorted = [...candidates].sort((left, right) => left.priority - right.priority);
+  const sorted = [...candidates].sort(
+    (left, right) => deterministicCandidateRank(left) - deterministicCandidateRank(right) || left.priority - right.priority
+  );
   const safeCandidates = sorted.filter((candidate) =>
     validations.some((validation) => validation.locator === candidate.locator && validation.isSafe)
   );
@@ -748,7 +787,8 @@ function selectDeterministicFallbackCandidate(
   );
 
   const mediumConfidence = matchedCandidates.filter(
-    (candidate) => (candidate.selectorConfidenceScore ?? 0) >= 0.55
+    (candidate) =>
+      (candidate.selectorConfidenceScore ?? 0) >= 0.55 && !candidate.locator.includes('nth-of-type')
   );
   if (mediumConfidence.length > 0) {
     return mediumConfidence[0];

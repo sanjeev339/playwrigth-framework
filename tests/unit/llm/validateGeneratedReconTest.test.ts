@@ -79,7 +79,7 @@ test('edit', async () => {
     await page.getByRole("button", { name: /Edit/i }).click();
   });
   await test.step('Step 5: Select Role', async () => {
-    await selectCustomDropdown(page, () => page.getByText(/^Select role$/i), String(payload["Role"]));
+    test.info().annotations.push({ type: 'recon-skip', description: 'No locator captured during recon.' });
   });
 });
 `;

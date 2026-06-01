@@ -111,11 +111,14 @@ Recon executes **`scenarios/*.json` steps** (from Excel via `build:scenarios`), 
 - Recon uses Gemini/OpenAI when deterministic locator resolution is ambiguous. Free-tier Gemini quotas can block later steps; increase quota, switch model, or set `RECON_ALLOW_UNSAFE_FALLBACK=true` to allow validated non-safe locator fallback after LLM failure.
 - After changing Excel or normalizer logic: `npm run build:scenarios && npm run recon`.
 
-Regenerate a single spec from recon summary:
+Regenerate specs from recon **without calling the LLM** (uses `recon-summary` or live `recon/` extraction):
 
 ```bash
 npm run regenerate:spec TC-UM-003
+npm run regenerate:spec
 ```
+
+`generate:deterministic` is an alias for the same command. Use `npm run generate` when you want LLM output with deterministic fallback.
 
 ## Recon Behavior
 

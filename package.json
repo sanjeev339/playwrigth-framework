@@ -8,6 +8,7 @@
     "plan": "ts-node src/llm/planner.ts",
     "recon": "ts-node src/recon/interactiveRecon.ts",
     "generate": "ts-node src/llm/generator.ts",
+    "generate:deterministic": "ts-node scripts/regenerate-spec.ts",
     "regenerate:spec": "ts-node scripts/regenerate-spec.ts",
     "validate": "ts-node src/recon/locatorValidator.ts",
     "test:seed": "playwright test tests/seed/seed.login.spec.ts --headed",

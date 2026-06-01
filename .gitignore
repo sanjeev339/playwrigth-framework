@@ -4,11 +4,10 @@ dist/
 *.log
 playwright-report/
 test-results/
-reports/playwright-html/
-reports/playwright-report.json
-reports/run-result.json
-reports/locator-validation.json
-reports/result.json
-reports/result.html
+reports/**
 recon/**
+recon-summary/**
+scenarios/**
+scripts/**
+specs/**
 .DS_Store

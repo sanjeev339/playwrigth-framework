@@ -31,6 +31,10 @@ export async function resolveDeterministicCandidates(
   const candidates: LocatorCandidate[] = [];
 
   for (const element of snapshotElements) {
+    if (!isElementCompatible(parsedAction, element, payload)) {
+      continue;
+    }
+
     const match = matchElement(parsedAction, element, payload);
     if (!match.matches) {
       continue;
@@ -39,7 +43,7 @@ export async function resolveDeterministicCandidates(
     const structuredLocators = element.structuredLocatorPriority?.length
       ? element.structuredLocatorPriority
       : buildStructuredLocatorPriority(element);
-    const allowedLocators = filterLocatorsForAction(parsedAction, element, structuredLocators);
+    const allowedLocators = filterLocatorsForAction(parsedAction, element, structuredLocators, payload);
 
     allowedLocators.forEach((structuredLocator, index) => {
       const locator = locatorToString(structuredLocator);
@@ -86,7 +90,13 @@ function matchElement(
       const contains = normalizedValue.includes(normalizedTarget);
       const wordMatch = targetWords(targetVariant).every((word) => normalizedValue.includes(word));
 
-      if (contains && !exact && isWeakSubstringMatch(normalizedTarget, normalizedValue)) {
+      if (
+        contains &&
+        !exact &&
+        !/\s/.test(targetVariant) &&
+        isWeakSubstringMatch(normalizedTarget, normalizedValue) &&
+        !isSearchFieldMatch(field, targetVariant)
+      ) {
         continue;
       }
 
@@ -106,7 +116,7 @@ function matchElement(
   }
 
   return {
-    matches: isElementCompatible(parsedAction, element),
+    matches: true,
     score: bestScore + elementKindWeight(parsedAction, element),
     matchFields,
     matchedTarget
@@ -127,9 +137,13 @@ function searchableFields(element: DomElementSnapshot): Record<string, string | 
   };
 }
 
-function isElementCompatible(parsedAction: ParsedAction, element: DomElementSnapshot): boolean {
+function isElementCompatible(
+  parsedAction: ParsedAction,
+  element: DomElementSnapshot,
+  payload: Record<string, unknown> = {}
+): boolean {
   const tag = element.tag.toLowerCase();
-  const role = element.role?.toLowerCase();
+  const role = element.role?.trim().toLowerCase();
   const type = element.type?.toLowerCase();
 
   if (parsedAction.actionType === 'fill') {
@@ -152,6 +166,18 @@ function isElementCompatible(parsedAction: ParsedAction, element: DomElementSnap
   }
 
   if (parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate') {
+    if (isSearchControlTarget(parsedAction.target) && isSearchControlElement(element)) {
+      return true;
+    }
+
+    if (isSearchControlTarget(parsedAction.target) && !isSearchControlElement(element)) {
+      return false;
+    }
+
+    if (isDataTableRowClick(parsedAction, element, payload)) {
+      return true;
+    }
+
     return (
       ['button', 'a', 'li'].includes(tag) ||
       ['button', 'link', 'menuitem', 'tab', 'option'].includes(role ?? '') ||
@@ -162,6 +188,60 @@ function isElementCompatible(parsedAction: ParsedAction, element: DomElementSnap
   }
 
   return false;
+}
+
+function isSearchControlTarget(target: string | null): boolean {
+  if (!target) {
+    return false;
+  }
+
+  const normalized = normalize(target);
+  return normalized === 'search' || normalized.includes('search');
+}
+
+function isSearchControlElement(element: DomElementSnapshot): boolean {
+  const tag = element.tag.toLowerCase();
+  if (!['input', 'textarea'].includes(tag)) {
+    return false;
+  }
+
+  const fields = searchableFields(element);
+  const hints = [fields.placeholder, fields.label, fields.ariaLabel, fields.name, element.type]
+    .filter((value): value is string => Boolean(value))
+    .join(' ');
+
+  return /\bsearch\b/i.test(hints) || element.type === 'search' || fields.role === 'searchbox';
+}
+
+function isDataTableRowClick(
+  parsedAction: ParsedAction,
+  element: DomElementSnapshot,
+  payload: Record<string, unknown>
+): boolean {
+  const target = parsedAction.target ?? '';
+  if (!target.trim()) {
+    return false;
+  }
+
+  const displayValues = Object.values(sanitizePayload(payload)).filter((value) => value.length > 2);
+  const looksLikeRowTarget =
+    target.includes(' ') || displayValues.some((value) => normalize(value) === normalize(target));
+
+  if (!looksLikeRowTarget) {
+    return false;
+  }
+
+  const tag = element.tag.toLowerCase();
+  const role = element.role?.trim().toLowerCase() ?? '';
+  const isRowLike =
+    ['tr', 'tbody'].includes(tag) || ['row', 'rowgroup', 'cell', 'gridcell'].includes(role) || tag === 'td';
+
+  if (!isRowLike) {
+    return false;
+  }
+
+  const elementText = element.text ?? '';
+  return normalize(elementText).includes(normalize(target));
 }
 
 function hasSelectCue(parsedAction: ParsedAction, element: DomElementSnapshot): boolean {
@@ -180,7 +260,8 @@ function hasSelectCue(parsedAction: ParsedAction, element: DomElementSnapshot): 
 function filterLocatorsForAction(
   parsedAction: ParsedAction,
   element: DomElementSnapshot,
-  locators: StructuredLocator[]
+  locators: StructuredLocator[],
+  payload: Record<string, unknown> = {}
 ): StructuredLocator[] {
   if (parsedAction.actionType === 'fill') {
     const preferred = locators.filter((locator) =>
@@ -201,9 +282,27 @@ function filterLocatorsForAction(
 
   if (parsedAction.actionType === 'click' || parsedAction.actionType === 'navigate') {
     const semanticTextLocator = semanticClickTextLocator(parsedAction, element);
+
+    if (isSearchControlTarget(parsedAction.target)) {
+      const searchLocators = locators.filter((locator) =>
+        ['getByPlaceholder', 'getByLabel', 'getByRole'].includes(locator.method)
+      );
+      return searchLocators.length ? searchLocators : locators;
+    }
+
+    if (isDataTableRowClick(parsedAction, element, payload)) {
+      const rowLocators = locators.filter(
+        (locator) =>
+          locator.method === 'getByRole' && ['row', 'rowgroup', 'cell', 'gridcell'].includes(locator.role ?? '')
+      );
+      const textLocators = locators.filter((locator) => locator.method === 'getByText');
+      const combined = [...rowLocators, ...textLocators];
+      return combined.length ? combined : locators;
+    }
+
     const preferred = locators.filter((locator) => {
       if (locator.method === 'getByRole') {
-        return ['button', 'link', 'menuitem', 'tab', 'option'].includes(locator.role);
+        return ['button', 'link', 'menuitem', 'tab', 'option', 'row', 'cell', 'gridcell'].includes(locator.role);
       }
       return ['getByText', 'getByTestId', 'css', 'xpath'].includes(locator.method);
     });
@@ -224,7 +323,7 @@ function semanticClickTextLocator(parsedAction: ParsedAction, element: DomElemen
     return null;
   }
 
-  const matchedTarget = targetVariants(parsedAction.target ?? '').find((target) => {
+  const matchedTarget = targetVariants(parsedAction.target ?? '', parsedAction, {}).find((target) => {
     const normalizedTarget = normalize(target);
     return normalizedTarget.length > 0 && normalize(text).includes(normalizedTarget);
   });
@@ -233,9 +332,18 @@ function semanticClickTextLocator(parsedAction: ParsedAction, element: DomElemen
     return null;
   }
 
-  const role = element.role?.toLowerCase();
-  if (role && ['dialog', 'table', 'row', 'rowgroup', 'cell', 'columnheader'].includes(role)) {
+  const role = element.role?.trim().toLowerCase();
+  if (role && ['dialog', 'table', 'columnheader'].includes(role)) {
     return null;
+  }
+
+  if (role && ['row', 'rowgroup', 'cell', 'gridcell'].includes(role)) {
+    return {
+      method: 'getByRole',
+      role,
+      name: text.slice(0, 120),
+      exact: false
+    };
   }
 
   if (element.tag.toLowerCase() === 'div' && element.isLikelyClickable !== true && text.length > 80) {
@@ -393,13 +501,19 @@ function targetVariants(value: string, parsedAction?: ParsedAction, payload: Rec
   if (parsedAction?.actionType === 'click' || parsedAction?.actionType === 'fill') {
     const sanitized = sanitizePayload(payload);
     for (const payloadValue of Object.values(sanitized)) {
-      if (payloadValue.trim().length > 1) {
+      if (payloadValue.trim().length >= 3) {
         variants.add(payloadValue);
       }
     }
   }
 
   return [...variants];
+}
+
+function isSearchFieldMatch(field: string, target: string): boolean {
+  return (
+    isSearchControlTarget(target) && ['placeholder', 'label', 'ariaLabel', 'name'].includes(field)
+  );
 }
 
 function isWeakSubstringMatch(normalizedTarget: string, normalizedValue: string): boolean {

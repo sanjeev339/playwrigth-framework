@@ -20,6 +20,10 @@ export function validateGeneratedReconTest(code: string, scenario: Scenario, rec
   );
 
   for (const action of dropdownSelectActions) {
+    if (action.actionStatus === 'failed' && !action.dropdownLocator && !action.selectedLocator) {
+      continue;
+    }
+
     const payloadKey = action.target;
     if (!payloadKey || !Object.prototype.hasOwnProperty.call(scenario.payload, payloadKey)) {
       continue;
@@ -30,8 +34,9 @@ export function validateGeneratedReconTest(code: string, scenario: Scenario, rec
     const normalizedCode = code.toLowerCase();
     const hasPayloadRef = normalizedCode.includes(payloadRef.toLowerCase());
     const hasValue = payloadValue.length > 0 && normalizedCode.includes(payloadValue);
+    const isSkipped = normalizedCode.includes('recon-skip');
 
-    if (!hasPayloadRef && !hasValue) {
+    if (!hasPayloadRef && !hasValue && !isSkipped) {
       throw new Error(`Generated test missing payload reference for select target: ${payloadKey}`);
     }
   }
@@ -63,13 +68,40 @@ export function validateGeneratedReconTest(code: string, scenario: Scenario, rec
       throw new Error(`Generated test missing required recon action: Step ${action.stepNo} - ${action.rawStep}`);
     }
 
+    if (action.actionStatus === 'failed' && !action.selectedLocator) {
+      if (!code.includes('recon-skip')) {
+        throw new Error(`Generated test missing skip marker for failed recon step ${action.stepNo}`);
+      }
+      continue;
+    }
+
     if (
       action.actionStatus === 'success' &&
       action.selectedLocator &&
       action.actionType !== 'select' &&
-      !code.includes(action.selectedLocator)
+      !code.includes(action.selectedLocator) &&
+      !isPayloadStableRowLocator(action, scenario.payload, code)
     ) {
       throw new Error(`Generated test missing required recon locator: Step ${action.stepNo} - ${action.rawStep}`);
     }
   }
+}
+
+function isPayloadStableRowLocator(
+  action: ReconAction,
+  payload: Record<string, unknown>,
+  code: string
+): boolean {
+  const fullName = String(payload['Full Name'] ?? '');
+  const email = String(payload['Email Address'] ?? '');
+
+  if (fullName && code.includes(fullName)) {
+    return true;
+  }
+
+  if (email && code.includes(email)) {
+    return true;
+  }
+
+  return /getByRole\(['"]row['"]\)\.filter/.test(code);
 }

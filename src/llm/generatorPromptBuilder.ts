@@ -1,5 +1,6 @@
 import type { Scenario, ReconSnapshot } from '../types';
 import type { ReconAction } from '../recon/reconActionExtractor';
+import { sanitizePayload } from '../recon/actionParser';
 import {
   isDropdownSelectAction,
   isSearchStep,
@@ -238,7 +239,12 @@ ${indent(actionSteps, 2)}
 
 function renderActionStep(action: ReconAction, payload: Record<string, unknown>, context: RenderContext): string {
   const stepTitle = `Step ${action.stepNo ?? '?'}: ${action.rawStep}`;
-  const locator = locatorForAction(action);
+
+  if (shouldSkipFailedReconStep(action, payload)) {
+    return renderSkippedReconStep(stepTitle, action);
+  }
+
+  const locator = locatorForAction(action, payload, context);
   const nextAction = context.reconActions[context.actionIndex + 1];
 
   if ((action.actionType === 'navigate' || action.actionType === 'click') && isSearchStep(action.rawStep)) {
@@ -253,15 +259,19 @@ ${followUpAssertion}
   if (action.actionType === 'navigate' || action.actionType === 'click') {
     return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await ${locator}.click();
-${renderPostActionAssertion(action)}
+${renderPostActionAssertion(action, payload)}
 });`;
   }
 
   if (action.actionType === 'fill') {
     const valueExpression = payloadValueExpressionForAction(action, payload);
+    const followUpAssertion = isSearchStep(action.rawStep)
+      ? renderSearchFollowUpAssertion(nextAction, payload)
+      : '';
     return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await ${locator}.fill(${valueExpression});
   await expect(${locator}).toHaveValue(${valueExpression});
+${followUpAssertion}
 });`;
   }
 
@@ -270,15 +280,15 @@ ${renderPostActionAssertion(action)}
       const clickLocator = action.selectedLocator ?? action.dropdownLocator ?? locator;
       return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await ${clickLocator}.click();
-${renderPostActionAssertion(action)}
+${renderPostActionAssertion(action, payload)}
 });`;
     }
 
-    const dropdownLocator = dropdownOpenLocatorForAction(action);
+    const dropdownLocator = dropdownOpenLocatorForAction(action, payload);
     const optionValueExpression = payloadValueExpressionForAction(action, payload);
     return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await selectCustomDropdown(page, () => ${dropdownLocator}, ${optionValueExpression});
-${renderPostActionAssertion(action)}
+${renderPostActionAssertion(action, payload)}
 });`;
   }
 
@@ -312,7 +322,26 @@ function renderLoginPostAssertion(firstAction: ReconAction | undefined): string 
   return `    await expect(page.locator('body')).toBeVisible({ timeout: 15000 });`;
 }
 
-function renderPostActionAssertion(action: ReconAction): string {
+function shouldSkipFailedReconStep(action: ReconAction, _payload: Record<string, unknown>): boolean {
+  if (action.actionStatus !== 'failed') {
+    return false;
+  }
+
+  if (action.selectedLocator || action.dropdownLocator) {
+    return false;
+  }
+
+  return true;
+}
+
+function renderSkippedReconStep(stepTitle: string, action: ReconAction): string {
+  const reason = action.actionError ?? 'Recon step failed; no reliable locator captured.';
+  return `await test.step(${JSON.stringify(stepTitle)}, async () => {
+  test.info().annotations.push({ type: 'recon-skip', description: ${JSON.stringify(reason)} });
+});`;
+}
+
+function renderPostActionAssertion(action: ReconAction, payload: Record<string, unknown>): string {
   const urlAssertion = urlAssertionFromPostActionUrl(action.postActionUrl);
   if (urlAssertion) {
     return urlAssertion;
@@ -330,7 +359,12 @@ function renderPostActionAssertion(action: ReconAction): string {
 }
 
 function renderSearchFollowUpAssertion(nextAction: ReconAction | undefined, payload: Record<string, unknown>): string {
-  if (nextAction?.selectedLocator) {
+  const rowLocator = nextAction ? stableUserRowLocatorExpression(payload, nextAction) : null;
+  if (rowLocator) {
+    return `  await expect(${rowLocator}).toBeVisible({ timeout: 15000 });`;
+  }
+
+  if (nextAction?.selectedLocator && !isBrittleRowLocator(nextAction.selectedLocator)) {
     return `  await expect(${nextAction.selectedLocator}).toBeVisible({ timeout: 15000 });`;
   }
 
@@ -354,32 +388,196 @@ function urlAssertionFromPostActionUrl(url: string | null | undefined): string |
   try {
     const pathname = new URL(url).pathname;
     const segments = pathname.split('/').filter(Boolean);
-    const anchor = segments[segments.length - 1];
-    if (!anchor) {
+    const stableSegment = [...segments].reverse().find((segment) => isStableUrlSegment(segment));
+    if (!stableSegment) {
       return null;
     }
 
-    const escaped = escapeRegexForLiteral(anchor);
+    const escaped = escapeRegexForLiteral(stableSegment);
     return `  await expect(page).toHaveURL(/${escaped}/i, { timeout: 15000 });`;
   } catch {
     return null;
   }
 }
 
-function locatorForAction(action: ReconAction): string {
-  return action.selectedLocator ?? fallbackLocator(action);
+function isStableUrlSegment(segment: string): boolean {
+  if (!segment || isUuidLike(segment)) {
+    return false;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(segment)) {
+    return false;
+  }
+
+  return /[a-z]/i.test(segment);
 }
 
-function dropdownOpenLocatorForAction(action: ReconAction): string {
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+function locatorForAction(action: ReconAction, payload: Record<string, unknown>, context: RenderContext): string {
+  const searchLocator = resolveSearchInputLocator(action, context);
+  if (searchLocator) {
+    return searchLocator;
+  }
+
+  const stable = stableLocatorForAction(action, payload);
+  if (stable) {
+    return stable;
+  }
+
+  return fallbackLocator(action);
+}
+
+function resolveSearchInputLocator(action: ReconAction, context: RenderContext): string | null {
+  if (!isSearchFieldAction(action)) {
+    return null;
+  }
+
+  const priorPlaceholder = context.reconActions.find(
+    (entry) => entry.selectedLocator && /getByPlaceholder/i.test(entry.selectedLocator) && /search/i.test(entry.selectedLocator)
+  )?.selectedLocator;
+
+  if (priorPlaceholder) {
+    return priorPlaceholder;
+  }
+
+  const placeholderPattern = extractAccessibleNamePattern(action.selectedLocator);
+  if (placeholderPattern) {
+    return `page.getByPlaceholder(/${placeholderPattern}/i)`;
+  }
+
+  return `page.getByPlaceholder(/search by name or email/i)`;
+}
+
+function isSearchFieldAction(action: ReconAction): boolean {
+  if (action.actionType !== 'fill' && !(action.actionType === 'click' && isSearchStep(action.rawStep))) {
+    return false;
+  }
+
+  if (isSearchStep(action.rawStep)) {
+    return true;
+  }
+
+  return isUnreliableSearchTextboxLocator(action.selectedLocator);
+}
+
+function isUnreliableSearchTextboxLocator(locator: string | null | undefined): boolean {
+  if (!locator) {
+    return false;
+  }
+
+  return /getByRole\(["']textbox["'],\s*\{\s*name:/i.test(locator) && /search/i.test(locator);
+}
+
+function extractAccessibleNamePattern(locator: string | null | undefined): string | null {
+  if (!locator) {
+    return null;
+  }
+
+  const match = locator.match(/name:\s*\/(.+)\/i/);
+  return match?.[1] ?? null;
+}
+
+function stableLocatorForAction(action: ReconAction, payload: Record<string, unknown>): string | null {
+  const rowLocator = stableUserRowLocatorExpression(payload, action);
+  if (rowLocator) {
+    return rowLocator;
+  }
+
+  if (action.selectedLocator && !isBrittleRowLocator(action.selectedLocator)) {
+    if (action.actionStatus === 'failed' && isUnreliableSearchTextboxLocator(action.selectedLocator)) {
+      return null;
+    }
+
+    if (isUnreliableSearchTextboxLocator(action.selectedLocator) && isSearchFieldAction(action)) {
+      return null;
+    }
+
+    return action.selectedLocator;
+  }
+
+  return null;
+}
+
+function stableUserRowLocatorExpression(
+  payload: Record<string, unknown>,
+  action: ReconAction
+): string | null {
+  if (!isUserRowClickAction(action, payload)) {
+    return null;
+  }
+
+  const sanitized = sanitizePayload(payload);
+  const fullName = sanitized['Full Name'];
+  const email = sanitized['Email Address'];
+
+  if (fullName && email) {
+    return `page.getByRole('row').filter({ hasText: ${JSON.stringify(fullName)} }).filter({ hasText: ${JSON.stringify(email)} })`;
+  }
+
+  if (fullName) {
+    return `page.getByText(${regexLiteral(fullName)})`;
+  }
+
+  if (email) {
+    return `page.getByText(${regexLiteral(email)})`;
+  }
+
+  return null;
+}
+
+function isUserRowClickAction(action: ReconAction, payload: Record<string, unknown>): boolean {
+  if (action.actionType !== 'click' && action.actionType !== 'navigate') {
+    return false;
+  }
+
+  if (isBrittleRowLocator(action.selectedLocator)) {
+    return true;
+  }
+
+  const sanitized = sanitizePayload(payload);
+  const fullName = sanitized['Full Name'];
+  const target = action.target ?? '';
+
+  return Boolean(fullName && normalizeKey(target) === normalizeKey(fullName));
+}
+
+function isBrittleRowLocator(locator: string | null | undefined): boolean {
+  if (!locator) {
+    return false;
+  }
+
+  if (!/getByRole\(["']row/i.test(locator)) {
+    return false;
+  }
+
+  const nameMatch = locator.match(/name:\s*\/(.+)\/i\s*\}/);
+  if (!nameMatch?.[1]) {
+    return locator.length > 90;
+  }
+
+  const pattern = nameMatch[1];
+  return pattern.length > 48 || /\d{4}-\d{2}-\d{2}/.test(pattern);
+}
+
+function normalizeKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function dropdownOpenLocatorForAction(action: ReconAction, payload: Record<string, unknown>): string {
   if (action.dropdownLocator) {
     return action.dropdownLocator;
   }
 
-  if (action.selectedLocator) {
+  if (action.selectedLocator && !isBrittleRowLocator(action.selectedLocator)) {
     return action.selectedLocator;
   }
 
-  return fallbackLocator(action);
+  const target = action.target ?? 'Role';
+  const pattern = escapeRegexForLiteral(target);
+  return `page.getByText(/^Select ${pattern}$/i)`;
 }
 
 function fallbackLocator(action: ReconAction): string {

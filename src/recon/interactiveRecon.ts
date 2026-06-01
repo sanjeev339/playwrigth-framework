@@ -175,6 +175,9 @@ function logReconDecision(stepNo: number, instruction: string, decision: ReconDe
   console.log(`[Recon] Safe candidates: ${safeCandidates}`);
   console.log(`[Recon] LLM used: ${llmUsed}`);
   console.log(`[Recon] LLM parse status: ${llmParseStatus}`);
+  if (decision.decisionSource === 'llm' && decision.llmReason && !decision.selectedLocator) {
+    console.log(`[Recon] LLM decision: ${decision.llmReason}`);
+  }
   console.log(`[Recon] Action confidence: ${decision.confidence ?? 'n/a'}`);
   console.log(
     `[Recon] Selector confidence: ${decision.selectorConfidenceScore ?? 'n/a'} (${decision.selectorRisk ?? 'n/a'})`
@@ -262,6 +265,10 @@ async function performLogin(page: Page, email: string, password: string): Promis
     () => page.getByText(/login|sign in|submit/i).first()
   ]);
 
+  await page
+    .waitForURL((url) => !/\/login\/?$/i.test(url.pathname), { timeout: 20_000 })
+    .catch(() => undefined);
+  await page.waitForURL(/dashboard|users/i, { timeout: 20_000 }).catch(() => undefined);
   await waitForSettledPage(page);
 }
 
