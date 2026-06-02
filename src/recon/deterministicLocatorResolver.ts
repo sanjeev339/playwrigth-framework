@@ -1,8 +1,9 @@
 import type { Page } from '@playwright/test';
-import type { DomElementSnapshot } from '../types';
+import type { DomElementSnapshot, AccessibilityNode } from '../types';
 import { sanitizePayload } from './actionParser';
 import { buildStructuredLocatorPriority, locatorToString } from './locatorCandidateBuilder';
 import type { LocatorCandidate, ParsedAction, StructuredLocator } from './reconDecisionTypes';
+import { scanAccessibility } from './accessibilityScanner';
 
 const actionLocatorPreference: Record<string, number> = {
   getByTestId: 1,
@@ -30,7 +31,51 @@ export async function resolveDeterministicCandidates(
 
   const candidates: LocatorCandidate[] = [];
 
-  for (const element of snapshotElements) {
+  try {
+    const axTree = await scanAccessibility(_page);
+    if (axTree && Object.keys(axTree).length > 0) {
+      const axCandidates = resolveAccessibilityCandidates(parsedAction, axTree, payload);
+      candidates.push(...axCandidates);
+    }
+  } catch {
+    // ignore
+  }
+
+  // 1. Filter elements by active overlay if present
+  const overlayXPaths = getActiveOverlayXPaths(snapshotElements);
+  const activeElements = overlayXPaths.length > 0
+    ? snapshotElements.filter(el => isInsideOverlay(el, overlayXPaths))
+    : snapshotElements;
+
+  // 2. Enrich elements with preceding label text if not associated programmatically
+  const enrichedElements = activeElements.map((element, index) => {
+    if (element.label) {
+      return element;
+    }
+
+    const tag = element.tag.toLowerCase();
+    const role = element.role?.trim().toLowerCase();
+    const isControl =
+      ['input', 'select', 'textarea'].includes(tag) ||
+      ['combobox', 'listbox', 'textbox', 'checkbox', 'radio'].includes(role ?? '');
+
+    if (isControl) {
+      // Look backwards up to 3 elements in activeElements for a label
+      for (let i = index - 1; i >= Math.max(0, index - 3); i--) {
+        const prevElement = activeElements[i];
+        if (prevElement.tag.toLowerCase() === 'label' && prevElement.text) {
+          return {
+            ...element,
+            label: prevElement.text
+          };
+        }
+      }
+    }
+
+    return element;
+  });
+
+  for (const element of enrichedElements) {
     if (!isElementCompatible(parsedAction, element, payload)) {
       continue;
     }
@@ -179,8 +224,8 @@ function isElementCompatible(
     }
 
     return (
-      ['button', 'a', 'li'].includes(tag) ||
-      ['button', 'link', 'menuitem', 'tab', 'option'].includes(role ?? '') ||
+      ['button', 'a', 'li', 'input', 'select', 'label'].includes(tag) ||
+      ['button', 'link', 'menuitem', 'tab', 'option', 'combobox', 'checkbox', 'radio', 'textbox'].includes(role ?? '') ||
       type === 'button' ||
       type === 'submit' ||
       (['div', 'span'].includes(tag) && element.isLikelyClickable === true)
@@ -538,3 +583,90 @@ function isRowLikeElement(element: DomElementSnapshot): boolean {
 function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
+
+function resolveAccessibilityCandidates(
+  parsedAction: ParsedAction,
+  root: AccessibilityNode,
+  payload: Record<string, unknown> = {}
+): LocatorCandidate[] {
+  const candidates: LocatorCandidate[] = [];
+  const target = parsedAction.target ?? '';
+  if (!target) return [];
+
+  const targets = targetVariants(target, parsedAction, payload);
+  const normalizedTargets = targets.map(t => normalize(t));
+
+  const PLAYWRIGHT_ROLES = new Set([
+    'button', 'link', 'checkbox', 'radio', 'combobox', 'listbox', 'textbox',
+    'heading', 'tab', 'option', 'menuitem', 'switch', 'dialog', 'alert'
+  ]);
+
+  const traverse = (node: AccessibilityNode) => {
+    if (node.role && PLAYWRIGHT_ROLES.has(node.role) && node.name) {
+      const normalizedName = normalize(node.name);
+      const isMatch = normalizedTargets.some(nt => normalizedName === nt || normalizedName.includes(nt));
+      if (isMatch) {
+        const escapedName = node.name.replace(/"/g, '\\"');
+        const locator = `page.getByRole("${node.role}", { name: "${escapedName}" })`;
+        candidates.push({
+          locator,
+          locatorType: 'getByRole',
+          priority: 40, // High priority (lower priority score)
+          source: 'accessibility-tree',
+          selectorConfidenceScore: 0.95,
+          selectorRisk: 'low',
+          elementSummary: {
+            tagName: node.role.toUpperCase(),
+            text: node.name,
+            attributes: { role: node.role, name: node.name }
+          },
+          structuredLocator: {
+            method: 'getByRole',
+            role: node.role,
+            name: node.name
+          }
+        });
+      }
+    }
+
+    if (node.children) {
+      for (const child of node.children) {
+        traverse(child);
+      }
+    }
+  };
+
+  traverse(root);
+  return candidates;
+}
+
+function getActiveOverlayXPaths(elements: DomElementSnapshot[]): string[] {
+  const overlayXPaths: string[] = [];
+  for (const el of elements) {
+    if (!el.isVisible) continue;
+    const role = el.role?.toLowerCase() || '';
+    const className = el.className?.toLowerCase() || '';
+    
+    const isOverlay = 
+      role === 'dialog' || 
+      role === 'alertdialog' || 
+      className.includes('p-sidebar-visible') || 
+      className.includes('p-sidebar') || 
+      className.includes('p-dialog') || 
+      className.includes('modal') || 
+      className.includes('custom-drawer');
+      
+    if (isOverlay && el.xpathCandidate) {
+      overlayXPaths.push(el.xpathCandidate);
+    }
+  }
+  return overlayXPaths;
+}
+
+function isInsideOverlay(element: DomElementSnapshot, overlayXPaths: string[]): boolean {
+  if (!element.xpathCandidate) return false;
+  return overlayXPaths.some(overlayXPath => {
+    return element.xpathCandidate === overlayXPath || element.xpathCandidate.startsWith(overlayXPath + '/');
+  });
+}
+
