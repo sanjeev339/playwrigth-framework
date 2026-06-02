@@ -664,9 +664,10 @@ function getActiveOverlayXPaths(elements: DomElementSnapshot[]): string[] {
 }
 
 function isInsideOverlay(element: DomElementSnapshot, overlayXPaths: string[]): boolean {
-  if (!element.xpathCandidate) return false;
+  const xpath = element.xpathCandidate;
+  if (!xpath) return false;
   return overlayXPaths.some(overlayXPath => {
-    return element.xpathCandidate === overlayXPath || element.xpathCandidate.startsWith(overlayXPath + '/');
+    return xpath === overlayXPath || xpath.startsWith(overlayXPath + '/');
   });
 }
 
