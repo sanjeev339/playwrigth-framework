@@ -6,6 +6,7 @@ import type { Scenario, TestDataRecord, TestFlowRow } from '../types';
 import { resolveFromRoot, toSafeFileName, writeJsonFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 import { normalizeScenarioSteps } from './stepNormalizer';
+import { mapExpectedResultsToSteps } from './expectationMapper';
 
 const passwordLikeKey = /(password|passcode|secret|token|jwt|cookie|authorization)/i;
 
@@ -44,7 +45,7 @@ export async function buildScenarios(options: {
       logger.warn(`No payload found for scenario ${scenarioId} in JSON; writing scenario with empty payload.`);
     }
 
-    const scenario = createScenario(scenarioId, scenarioRows, dataRecord, excelPath, jsonPath);
+    const scenario = await createScenario(scenarioId, scenarioRows, dataRecord, excelPath, jsonPath);
     const filePath = path.join(outputDir, `${toSafeFileName(scenarioId)}.json`);
     await writeJsonFile(filePath, scenario);
     scenarios.push(scenario);
@@ -72,22 +73,24 @@ function groupRowsByScenario(rows: TestFlowRow[]): Map<string, TestFlowRow[]> {
   return groupedRows;
 }
 
-function createScenario(
+async function createScenario(
   scenarioId: string,
   rows: TestFlowRow[],
   dataRecord: TestDataRecord | undefined,
   excelPath: string,
   jsonPath: string
-): Scenario {
+): Promise<Scenario> {
   const orderedRows = [...rows].sort((left, right) => (left.step_no ?? 0) - (right.step_no ?? 0));
   const firstRow = orderedRows[0];
   const payload = sanitizePayload(dataRecord?.payload ?? {});
   const rawSteps = orderedRows.map((row, index) => ({
     step_no: row.step_no ?? index + 1,
     instruction: row.instruction,
-    expected_result: row.expected_result
+    expected_result: row.expected_result,
+    role: row.role
   }));
-  const steps = normalizeScenarioSteps(rawSteps, payload);
+  const rawStepsNormalized = normalizeScenarioSteps(rawSteps, payload);
+  const steps = await mapExpectedResultsToSteps(rawStepsNormalized, payload);
 
   return {
     scenario_id: scenarioId,

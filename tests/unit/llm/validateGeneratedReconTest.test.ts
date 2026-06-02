@@ -86,6 +86,44 @@ test('edit', async () => {
     validateGeneratedReconTest(editCode, editScenario, editReconActions);
   });
 
+  it('accepts edit-flow generated code with quote and spacing mismatches', () => {
+    const editCode = `
+test('edit', async () => {
+  await test.step('Step 1: Navigate to User Management', async () => {
+    await page.getByRole('button', {    name:    /User Management/i }).click();
+  });
+  await test.step('Step 4: Select Edit', async () => {
+    await page.getByRole( "button" , { name : /Edit/i } ).click();
+  });
+  await test.step('Step 5: Select Role', async () => {
+    test.info().annotations.push({ type: 'recon-skip', description: 'No locator captured during recon.' });
+  });
+});
+`;
+    validateGeneratedReconTest(editCode, editScenario, editReconActions);
+  });
+
+  it('accepts step markers with punctuation differences (trailing dots)', () => {
+    const scenarioWithDots: Scenario = { ...editScenario };
+    const actionsWithDots: ReconAction[] = [
+      {
+        ...editReconActions[0],
+        rawStep: 'Navigate to User Management.' // with dot
+      }
+    ];
+    // In code, step has NO dot
+    const codeWithoutDot = `
+test('edit', async () => {
+  await test.step('Step 1: Navigate to User Management', async () => {
+    await page.getByRole("button", { name: /User Management/i }).click();
+  });
+});
+`;
+    validateGeneratedReconTest(codeWithoutDot, scenarioWithDots, actionsWithDots);
+  });
+
+
+
   it('rejects empty selectCustomDropdown option', () => {
     assert.throws(
       () => validateGeneratedReconTest('await selectCustomDropdown(page, () => page.getByRole("button"), "");', editScenario, []),

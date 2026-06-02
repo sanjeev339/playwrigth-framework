@@ -13,7 +13,8 @@ const aliases = {
   action: ['action', 'business action', 'flow action'],
   step_no: ['step_no', 'step no', 'step number', 'step', 'order', 'sequence'],
   instruction: ['instruction', 'step instruction', 'test step', 'test steps', 'step description', 'step'],
-  expected_result: ['expected_result', 'expected result', 'expected results', 'expected', 'expected outcome']
+  expected_result: ['expected_result', 'expected result', 'expected results', 'expected', 'expected outcome'],
+  role: ['role', 'user role', 'actor', 'profile']
 } as const;
 
 const rowSchema = z.object({
@@ -22,7 +23,8 @@ const rowSchema = z.object({
   action: z.string().optional(),
   step_no: z.number().optional(),
   instruction: z.string().min(1, 'instruction is required'),
-  expected_result: z.string().optional()
+  expected_result: z.string().optional(),
+  role: z.string().optional()
 });
 
 export async function readExcelRows(filePath?: string): Promise<TestFlowRow[]> {
@@ -110,7 +112,8 @@ function normalizeRow(row: Record<string, unknown>, excelRowNumber: number): Tes
     action: stringify(readByAlias(byNormalizedHeader, aliases.action)) || undefined,
     step_no: parseStepNumber(readByAlias(byNormalizedHeader, aliases.step_no)),
     instruction: stringify(readByAlias(byNormalizedHeader, aliases.instruction)),
-    expected_result: stringify(readByAlias(byNormalizedHeader, aliases.expected_result)) || undefined
+    expected_result: stringify(readByAlias(byNormalizedHeader, aliases.expected_result)) || undefined,
+    role: stringify(readByAlias(byNormalizedHeader, aliases.role)) || undefined
   };
 
   const isEmpty = !parsed.scenario_id && !parsed.instruction;

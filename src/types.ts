@@ -7,6 +7,7 @@ export interface TestFlowRow {
   step_no?: number;
   instruction: string;
   expected_result?: string;
+  role?: string;
 }
 
 export interface TestDataRecord {
@@ -25,6 +26,7 @@ export interface ScenarioStep {
   expected_result?: string;
   normalization_strategy?: string;
   normalization_context_from_previous?: boolean;
+  role?: string;
 }
 
 export interface Scenario {
@@ -109,6 +111,16 @@ export interface AccessibilityNode {
   children?: AccessibilityNode[];
 }
 
+export interface NetworkRequestLog {
+  url: string;
+  method: string;
+  status: number;
+  headers: Record<string, string>;
+  durationMs: number;
+  isGraphQLError: boolean;
+  graphQLErrors?: any[];
+}
+
 export interface ReconSnapshot {
   scenario_id: string;
   state: string;
@@ -122,6 +134,7 @@ export interface ReconSnapshot {
   stabilization?: SnapshotStabilizationTelemetry;
   elements: DomElementSnapshot[];
   accessibility: AccessibilityNode | Record<string, never>;
+  failedApiRequests?: NetworkRequestLog[];
 }
 
 export interface LocatorValidationWarning {

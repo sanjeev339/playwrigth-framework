@@ -4,6 +4,10 @@ import type { LocatorValidationReport, PlaywrightRunResult, Scenario } from '../
 import type { ReconDecision } from '../recon/reconDecisionTypes';
 import { escapeHtml, listFiles, readJsonFile, resolveFromRoot, toSafeFileName, writeJsonFile, writeTextFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
+import { loadReconActions } from '../recon/reconActionExtractor';
+import { analyzeScenarioDrift, type DriftAnalysisResult } from '../recon/reconVersioning';
+import { appendRunHistory } from './runHistory';
+import { classifyFailure } from './failureClassifier';
 
 interface ReconDecisionDetail {
   step?: number;
@@ -37,6 +41,12 @@ interface FinalScenarioReport {
   healing_status: 'not-needed' | 'healed' | 'not-run';
   recon_snapshot_paths: string[];
   smart_recon: SmartReconSummary;
+  drift?: DriftAnalysisResult | null;
+  failure_classification?: {
+    category: 'infrastructure_flakiness' | 'functional_regression';
+    reason: string;
+    isFlaky: boolean;
+  };
 }
 
 interface FinalReport {
@@ -88,18 +98,38 @@ export async function writeFinalReport(options: {
         .filter((warning) => warning.file.endsWith(`${safeScenarioId}.spec.ts`))
         .map((warning) => `[${warning.severity}] ${warning.rule}: ${warning.message}`) ?? [];
 
+    const currentActions = await loadReconActions(scenario.scenario_id).catch(() => []);
+    const drift = await analyzeScenarioDrift(scenario.scenario_id, currentActions);
+
+    const status = scenarioStatus(runResult, safeScenarioId);
+    const failureReason = runResult?.status === 'failed' ? summarizeFailure(runResult) : undefined;
+
+    await appendRunHistory({
+      timestamp: new Date().toISOString(),
+      scenarioId: scenario.scenario_id,
+      status,
+      error: failureReason
+    }).catch(() => {});
+
+    let failure_classification;
+    if (status === 'failed' && failureReason) {
+      failure_classification = await classifyFailure(scenario.scenario_id, failureReason).catch(() => undefined);
+    }
+
     scenarioReports.push({
       scenario_id: scenario.scenario_id,
       module: scenario.module,
       action: scenario.action,
       generated_file: generatedRelative,
       healed_file: healedRelative,
-      status: scenarioStatus(runResult, safeScenarioId),
+      status,
       validation_warnings: validationWarnings,
-      failure_reason: runResult?.status === 'failed' ? summarizeFailure(runResult) : undefined,
+      failure_reason: failureReason,
       healing_status: healedRelative ? 'healed' : runResult?.status === 'failed' ? 'not-run' : 'not-needed',
       recon_snapshot_paths: reconSnapshots.map((file) => path.relative(process.cwd(), file)),
-      smart_recon: smartRecon
+      smart_recon: smartRecon,
+      drift,
+      failure_classification
     });
   }
 
@@ -224,8 +254,37 @@ function renderHtml(report: FinalReport): string {
               </div>`
             )
             .join('')}</td>
+          <td>
+            ${scenario.drift?.hasDrift ? `
+              <div style="font-size: 12px; max-width: 320px;">
+                ${scenario.drift.diffs
+                  .map(
+                    (diff) => `<div style="margin-bottom: 6px; padding: 6px; border-radius: 4px; background: #fffbeb; border: 1px solid #fde68a; overflow-wrap: anywhere;">
+                      <strong style="color: #b45309; font-size: 10px; display: block; margin-bottom: 2px;">${escapeHtml(diff.type.replace('_', ' ').toUpperCase())}</strong>
+                      <div>${escapeHtml(diff.description)}</div>
+                    </div>`
+                  )
+                  .join('')}
+                <div style="margin-top: 8px; font-weight: bold; color: ${scenario.drift.confidenceTrend.deteriorated ? '#b91c1c' : '#047857'}">
+                  Confidence Trend: ${scenario.drift.confidenceTrend.prevAverage.toFixed(2)} &rarr; ${scenario.drift.confidenceTrend.currAverage.toFixed(2)}
+                  ${scenario.drift.confidenceTrend.deteriorated ? ' (Deteriorated)' : ''}
+                </div>
+              </div>
+            ` : '<span style="color: #6b7280; font-style: italic;">No drift detected</span>'}
+          </td>
           <td>${scenario.validation_warnings.map((warning) => `<div>${escapeHtml(warning)}</div>`).join('')}</td>
-          <td>${escapeHtml(scenario.failure_reason ?? '')}</td>
+          <td>
+            ${scenario.failure_reason ? `<div>${escapeHtml(scenario.failure_reason)}</div>` : ''}
+            ${scenario.failure_classification ? `
+              <div style="margin-top: 8px; padding: 6px; border-radius: 4px; background: #fef2f2; border: 1px solid #fee2e2; font-size: 12px; max-width: 250px;">
+                <strong style="color: #991b1b; display: block; margin-bottom: 2px;">
+                  ${scenario.failure_classification.category === 'infrastructure_flakiness' ? 'Infrastructure Flakiness' : 'Functional Regression'}
+                </strong>
+                <div style="color: #7f1d1d;">Reason: ${escapeHtml(scenario.failure_classification.reason)}</div>
+                ${scenario.failure_classification.isFlaky ? '<div style="margin-top: 4px; font-weight: bold; color: #b45309;">⚠️ Detected as FLAKY</div>' : ''}
+              </div>
+            ` : ''}
+          </td>
           <td>${scenario.recon_snapshot_paths.map((snapshot) => `<div>${escapeHtml(snapshot)}</div>`).join('')}</td>
         </tr>`
     )
@@ -274,6 +333,7 @@ function renderHtml(report: FinalReport): string {
         <th>Healing</th>
         <th>Smart Recon</th>
         <th>Decision Details</th>
+        <th>Behavioral Drift</th>
         <th>Validation Warnings</th>
         <th>Failure Reason</th>
         <th>Recon Snapshots</th>

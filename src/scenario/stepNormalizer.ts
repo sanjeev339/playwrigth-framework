@@ -8,7 +8,7 @@ export interface NormalizedStep extends ScenarioStep {
   normalization_context_from_previous?: boolean;
 }
 
-type NormalizerInput = Pick<ScenarioStep, 'step_no' | 'instruction' | 'expected_result'>;
+type NormalizerInput = Pick<ScenarioStep, 'step_no' | 'instruction' | 'expected_result' | 'role'>;
 
 const actionStartPattern = /^(navigate|go to|click|enter|fill|type|select|choose|verify|check|assert|wait|open|change|save)\b/i;
 
@@ -37,7 +37,8 @@ export function normalizeScenarioSteps(
           raw_instruction: rawInstruction,
           expected_result: step.expected_result,
           normalization_strategy: atomicInstruction.strategy,
-          normalization_context_from_previous: atomicInstruction.contextFromPrevious
+          normalization_context_from_previous: atomicInstruction.contextFromPrevious,
+          role: step.role
         });
       }
     }

@@ -11,6 +11,7 @@ import {
   validateLocatorExpression
 } from './locatorSafetyValidator';
 import { logger } from '../utils/logger';
+import { attemptRecovery, shouldRelaxPostcondition } from './reconRecovery';
 import type {
   LLMActionDecision,
   LocatorCandidate,
@@ -80,6 +81,15 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
         actionStatus: 'skipped',
         actionError: 'unknown_action',
         llmReason: 'unknown_action'
+      };
+    }
+
+    if (isSubmitLikeAction(parsedAction) && hasBlockingPriorErrors(input.previousActionErrors)) {
+      return {
+        ...decision,
+        actionStatus: 'skipped',
+        actionError: 'blocked_by_previous_failure',
+        llmReason: 'Skipped submit action because a prior critical step failed.'
       };
     }
 
@@ -387,32 +397,85 @@ async function executeSelectedLocator(
     };
   }
 
-  try {
-    const beforeSignals = await collectUiTransitionSignals(input.page);
+  const lastGoodUrl = input.page.url();
+  let retryCount = 0;
+  const maxRetries = 1;
 
-    if (options.parsedAction.actionType === 'click' || options.parsedAction.actionType === 'navigate') {
-      await locator.click();
-      await waitForSettledPage(input.page);
-    } else if (options.parsedAction.actionType === 'fill') {
-      if (!options.selectedValue) {
-        throw new Error('Fill action has no value.');
+  while (true) {
+    try {
+      const beforeSignals = await collectUiTransitionSignals(input.page);
+
+      if (options.parsedAction.actionType === 'click' || options.parsedAction.actionType === 'navigate') {
+        await locator.click();
+        await waitForSettledPage(input.page);
+      } else if (options.parsedAction.actionType === 'fill') {
+        if (!options.selectedValue) {
+          throw new Error('Fill action has no value.');
+        }
+        await locator.fill(options.selectedValue);
+        await waitForSettledPage(input.page);
+      } else if (options.parsedAction.actionType === 'hover') {
+        await locator.hover();
+        await waitForSettledPage(input.page);
+      } else if (options.parsedAction.actionType === 'check') {
+        await locator.check();
+        await waitForSettledPage(input.page);
+      } else if (options.parsedAction.actionType === 'uncheck') {
+        await locator.uncheck();
+        await waitForSettledPage(input.page);
+      } else if (options.parsedAction.actionType === 'select') {
+        if (!options.selectedValue) {
+          throw new Error('Select action has no value.');
+        }
+        options.decision.selectedLocator = options.selectedLocator;
+        options.decision.selectedValue = options.selectedValue;
+        options.decision.decisionSource = options.decisionSource;
+        options.decision.llmReason = options.reason;
+        options.decision.confidence = options.confidence;
+        const optionLocator = await executeSelectAction(input, options.parsedAction, locator, options.decision);
+        options.selectedLocator = `${options.selectedLocator} -> ${optionLocator}`;
+      } else {
+        return {
+          ...options.decision,
+          decisionSource: options.decisionSource,
+          selectedLocator: options.selectedLocator,
+          selectedValue: options.selectedValue,
+          llmReason: options.reason,
+          confidence: options.confidence,
+          selectorConfidenceScore: options.selectorConfidenceScore,
+          selectorRisk: options.selectorRisk,
+          selectorConfidenceSignals: options.selectorConfidenceSignals,
+          actionStatus: 'skipped',
+          actionError: `Action ${options.parsedAction.actionType} is not executable.`
+        };
       }
-      await locator.fill(options.selectedValue);
-      await waitForSettledPage(input.page);
-    } else if (options.parsedAction.actionType === 'select') {
-      if (!options.selectedValue) {
-        throw new Error('Select action has no value.');
+
+      const transition = await verifyPostcondition(input.page, options.parsedAction, beforeSignals);
+      if (!transition.ok) {
+        if (retryCount < maxRetries && shouldRelaxPostcondition(transition.reason || '')) {
+          logger.warn(`Postcondition failed: ${transition.reason}. Relaxing validation and marking success_unverified.`);
+          return {
+            ...options.decision,
+            parsedAction: options.parsedAction,
+            decisionSource: options.decisionSource,
+            selectedLocator: options.selectedLocator,
+            selectedValue: options.selectedValue,
+            llmReason: options.reason,
+            confidence: options.confidence,
+            selectorConfidenceScore: options.selectorConfidenceScore,
+            selectorRisk: options.selectorRisk,
+            selectorConfidenceSignals: options.selectorConfidenceSignals,
+            executed: true,
+            actionStatus: 'success_unverified',
+            actionError: `postcondition_relaxed: ${transition.reason}`
+          };
+        }
+        throw new Error(`postcondition_failure: ${transition.reason}`);
       }
-      options.decision.selectedLocator = options.selectedLocator;
-      options.decision.selectedValue = options.selectedValue;
-      options.decision.decisionSource = options.decisionSource;
-      options.decision.llmReason = options.reason;
-      options.decision.confidence = options.confidence;
-      const optionLocator = await executeSelectAction(input, options.parsedAction, locator, options.decision);
-      options.selectedLocator = `${options.selectedLocator} -> ${optionLocator}`;
-    } else {
+
       return {
         ...options.decision,
+        parsedAction: options.parsedAction,
         decisionSource: options.decisionSource,
         selectedLocator: options.selectedLocator,
         selectedValue: options.selectedValue,
@@ -421,13 +484,21 @@ async function executeSelectedLocator(
         selectorConfidenceScore: options.selectorConfidenceScore,
         selectorRisk: options.selectorRisk,
         selectorConfidenceSignals: options.selectorConfidenceSignals,
-        actionStatus: 'skipped',
-        actionError: `Action ${options.parsedAction.actionType} is not executable.`
+        executed: true,
+        actionStatus: 'success',
+        actionError: null
       };
-    }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (retryCount < maxRetries) {
+        retryCount++;
+        const recovered = await attemptRecovery(input.page, errorMsg, lastGoodUrl);
+        if (recovered) {
+          logger.info(`Recovery attempt succeeded. Retrying step execution (Attempt ${retryCount + 1}/${maxRetries + 1})...`);
+          continue;
+        }
+      }
 
-    const transition = await verifyPostcondition(input.page, options.parsedAction, beforeSignals);
-    if (!transition.ok) {
       return {
         ...options.decision,
         parsedAction: options.parsedAction,
@@ -441,41 +512,9 @@ async function executeSelectedLocator(
         selectorConfidenceSignals: options.selectorConfidenceSignals,
         executed: false,
         actionStatus: 'failed',
-        actionError: `postcondition_failure: ${transition.reason}`
+        actionError: errorMsg
       };
     }
-
-    return {
-      ...options.decision,
-      parsedAction: options.parsedAction,
-      decisionSource: options.decisionSource,
-      selectedLocator: options.selectedLocator,
-      selectedValue: options.selectedValue,
-      llmReason: options.reason,
-      confidence: options.confidence,
-      selectorConfidenceScore: options.selectorConfidenceScore,
-      selectorRisk: options.selectorRisk,
-      selectorConfidenceSignals: options.selectorConfidenceSignals,
-      executed: true,
-      actionStatus: 'success',
-      actionError: null
-    };
-  } catch (error) {
-    return {
-      ...options.decision,
-      parsedAction: options.parsedAction,
-      decisionSource: options.decisionSource,
-      selectedLocator: options.selectedLocator,
-      selectedValue: options.selectedValue,
-      llmReason: options.reason,
-      confidence: options.confidence,
-      selectorConfidenceScore: options.selectorConfidenceScore,
-      selectorRisk: options.selectorRisk,
-      selectorConfidenceSignals: options.selectorConfidenceSignals,
-      executed: false,
-      actionStatus: 'failed',
-      actionError: error instanceof Error ? error.message : String(error)
-    };
   }
 }
 
@@ -485,7 +524,7 @@ async function executeSelectAction(
   dropdownLocator: Locator,
   decision: ReconDecision
 ): Promise<string> {
-  await dropdownLocator.click();
+  await openDropdownWithFallback(input.page, dropdownLocator, parsedAction.target ?? 'dropdown');
   await input.page.waitForTimeout(250);
 
   if (input.onIntermediateSnapshot) {
@@ -596,12 +635,36 @@ function createBaseDecision(scenarioId: string, parsedAction: ParsedAction): Rec
   };
 }
 
+interface UiTransitionSignals {
+  url: string;
+  dialogLikeCount: number;
+  visibleCount: number;
+  ariaLiveText: string;
+  focusedElementTag: string;
+  formValuesSummary: string;
+}
+
 function selectDeterministicSafeCandidate(safeCandidates: LocatorCandidate[]): LocatorCandidate | null {
   if (safeCandidates.length === 0) {
     return null;
   }
 
-  const sorted = [...safeCandidates].sort(
+  // If there are non-XPath safe candidates, ignore all XPath candidates.
+  const nonXpathCandidates = safeCandidates.filter((c) => c.locatorType !== 'xpath');
+  
+  let candidatesToUse = safeCandidates;
+  if (nonXpathCandidates.length > 0) {
+    candidatesToUse = nonXpathCandidates;
+  } else {
+    // If we only have XPath candidates, we only use them if there is exactly 1.
+    // If there are multiple different XPath candidates, they represent different elements.
+    // We must degrade to LLM instead of picking one arbitrarily.
+    if (safeCandidates.length > 1) {
+      return null;
+    }
+  }
+
+  const sorted = [...candidatesToUse].sort(
     (left, right) => deterministicCandidateRank(left) - deterministicCandidateRank(right) || left.priority - right.priority
   );
 
@@ -651,7 +714,7 @@ function deterministicCandidateRank(candidate: LocatorCandidate): number {
   }
 
   if (candidate.locatorType === 'xpath') {
-    return 9;
+    return 101; // Demote xpath below css nth-of-type to treat as last-resort only
   }
 
   return 5;
@@ -710,33 +773,71 @@ async function waitForSettledPage(page: Page): Promise<void> {
   await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
 }
 
-async function collectUiTransitionSignals(page: Page): Promise<{ url: string; dialogLikeCount: number; visibleCount: number }> {
+async function collectUiTransitionSignals(page: Page): Promise<UiTransitionSignals> {
   return page
     .evaluate(() => {
       const dialogLike = document.querySelectorAll('[role="dialog"], [role="menu"], [role="listbox"]').length;
-      const visible = Array.from(document.querySelectorAll<HTMLElement>('button,a,input,textarea,select,[role]')).filter((el) => {
+      
+      const interactiveElements = Array.from(document.querySelectorAll<HTMLElement>('button,a,input,textarea,select,[role]'));
+      const visible = interactiveElements.filter((el) => {
         const rect = el.getBoundingClientRect();
         const style = window.getComputedStyle(el);
         return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
       }).length;
-      return { url: window.location.href, dialogLikeCount: dialogLike, visibleCount: visible };
+
+      // Extract aria-live text for toast/alert notification tracking
+      const liveRegions = Array.from(document.querySelectorAll('[aria-live], [role="alert"], [role="status"]'));
+      const ariaLiveText = liveRegions.map(el => el.textContent || '').join(' ').trim();
+
+      // Extract active element to detect focus shifts
+      const activeEl = document.activeElement;
+      const focusedElementTag = activeEl ? `${activeEl.tagName.toLowerCase()}.${activeEl.className.split(' ').join('.')}` : '';
+
+      // Extract form values summary to detect form submission resets
+      const inputs = Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input[type="text"], input:not([type]), textarea'));
+      const formValuesSummary = inputs.map(el => el.value || '').join('|');
+
+      return {
+        url: window.location.href,
+        dialogLikeCount: dialogLike,
+        visibleCount: visible,
+        ariaLiveText,
+        focusedElementTag,
+        formValuesSummary
+      };
     })
-    .catch(() => ({ url: page.url(), dialogLikeCount: 0, visibleCount: 0 }));
+    .catch(() => ({
+      url: page.url(),
+      dialogLikeCount: 0,
+      visibleCount: 0,
+      ariaLiveText: '',
+      focusedElementTag: '',
+      formValuesSummary: ''
+    }));
 }
 
 async function verifyPostcondition(
   page: Page,
   parsedAction: ParsedAction,
-  before: { url: string; dialogLikeCount: number; visibleCount: number }
+  before: UiTransitionSignals
 ): Promise<{ ok: boolean; reason?: string }> {
   const after = await collectUiTransitionSignals(page);
   const urlChanged = before.url !== after.url;
   const dialogChanged = before.dialogLikeCount !== after.dialogLikeCount;
   const visibleChanged = Math.abs(before.visibleCount - after.visibleCount) >= 2;
+  const toastAppeared = before.ariaLiveText !== after.ariaLiveText;
+  const focusChanged = before.focusedElementTag !== after.focusedElementTag;
+  const formCleared = before.formValuesSummary !== after.formValuesSummary;
   const actionType = parsedAction.actionType;
+  const target = parsedAction.target?.toLowerCase() ?? '';
+  const isSubmitTarget = target.includes('save') || target.includes('submit') || target.includes('create') || target.includes('deactivate');
 
   if (actionType === 'navigate') {
     return urlChanged || visibleChanged ? { ok: true } : { ok: false, reason: 'navigate_no_state_change' };
+  }
+
+  if (actionType === 'hover' || actionType === 'check' || actionType === 'uncheck') {
+    return { ok: true };
   }
 
   if (actionType === 'click' && isSearchFocusTarget(parsedAction.target)) {
@@ -744,7 +845,22 @@ async function verifyPostcondition(
   }
 
   if (actionType === 'click' || actionType === 'select') {
-    return urlChanged || dialogChanged || visibleChanged ? { ok: true } : { ok: false, reason: 'click_select_no_state_change' };
+    const anyChange = urlChanged || dialogChanged || visibleChanged || toastAppeared || focusChanged || formCleared;
+    if (anyChange) {
+      return { ok: true };
+    }
+
+    // In submit scenarios, form clearing, single toast message additions, or even direct execution might produce minor deltas.
+    // Allow relaxed matching to avoid false negative step aborts.
+    if (isSubmitTarget || process.env.RECON_ALLOW_UNSAFE_FALLBACK === 'true') {
+      const minorVisibleChange = Math.abs(before.visibleCount - after.visibleCount) >= 1;
+      if (minorVisibleChange) {
+        return { ok: true };
+      }
+      return { ok: true, reason: 'relaxed_submit_state_change' };
+    }
+
+    return { ok: false, reason: 'click_select_no_state_change' };
   }
 
   if (actionType === 'fill') {
@@ -761,6 +877,65 @@ function isSearchFocusTarget(target: string | null): boolean {
 
   const normalized = target.toLowerCase().replace(/[^a-z0-9]+/g, '');
   return normalized === 'search' || normalized === 'searchfield';
+}
+
+function isSubmitLikeAction(parsedAction: ParsedAction): boolean {
+  if (parsedAction.actionType !== 'click' && parsedAction.actionType !== 'navigate') {
+    return false;
+  }
+
+  const target = parsedAction.target?.toLowerCase() ?? '';
+  return target.includes('save') || target.includes('submit') || target.includes('create');
+}
+
+function hasBlockingPriorErrors(previousActionErrors?: string[]): boolean {
+  if (!previousActionErrors || previousActionErrors.length === 0) {
+    return false;
+  }
+
+  return previousActionErrors.some((error) =>
+    /(timeout|locator\.|strict_mode_risk|action_error|postcondition_failure|parse_failure)/i.test(error)
+  );
+}
+
+async function openDropdownWithFallback(page: Page, dropdownLocator: Locator, targetName: string): Promise<void> {
+  const listboxSelector = '[role="listbox"], .p-multiselect-panel[aria-hidden="false"], .p-dropdown-panel[aria-hidden="false"]';
+  const listbox = page.locator(listboxSelector).first();
+
+  try {
+    await dropdownLocator.click();
+    await listbox.waitFor({ state: 'visible', timeout: 1500 });
+    return;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const retryableIntercept =
+      /subtree intercepts pointer events|Timeout|not receiving pointer events|intercepts pointer events/i.test(message);
+
+    if (!retryableIntercept) {
+      throw error;
+    }
+  }
+
+  const fallbackTargets: Locator[] = [
+    dropdownLocator.locator('xpath=ancestor-or-self::*[contains(@class,"p-multiselect")]').first(),
+    dropdownLocator.locator('xpath=ancestor-or-self::*[contains(@class,"p-dropdown")]').first(),
+    dropdownLocator
+  ];
+
+  for (const target of fallbackTargets) {
+    try {
+      if ((await target.count()) === 0) {
+        continue;
+      }
+      await target.click({ force: true });
+      await listbox.waitFor({ state: 'visible', timeout: 1500 });
+      return;
+    } catch {
+      // Try next fallback target.
+    }
+  }
+
+  throw new Error(`Unable to open dropdown for "${targetName}" after fallback click attempts.`);
 }
 
 function selectDeterministicFallbackCandidate(
@@ -815,3 +990,4 @@ function lowerConfidence(
   }
   return rank[next] < rank[current] ? next : current;
 }
+

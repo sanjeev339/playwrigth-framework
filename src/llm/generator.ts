@@ -81,6 +81,7 @@ async function generateReconDrivenCode(input: {
     const llmCode = normalizeGeneratedSelectMisuse(
       normalizeGeneratedWebsiteUrlUsage(normalizeNestedTestImports(stripCodeFence(generated)))
     );
+    await writeTextFile(resolveFromRoot('artifacts', 'debug_llm_code.spec.ts'), llmCode);
     validateGeneratedReconTest(llmCode, input.scenario, input.reconActions);
     return llmCode;
   } catch (error) {
@@ -91,7 +92,7 @@ async function generateReconDrivenCode(input: {
     );
   }
 
-  const fallbackCode = buildDeterministicReconTest(input.scenario, input.reconActions);
+  const fallbackCode = await buildDeterministicReconTest(input.scenario, input.reconActions);
   validateGeneratedReconTest(fallbackCode, input.scenario, input.reconActions);
   return fallbackCode;
 }

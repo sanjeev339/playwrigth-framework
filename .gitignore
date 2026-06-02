@@ -6,8 +6,11 @@ playwright-report/
 test-results/
 reports/**
 recon/**
+recon-history/**
 recon-summary/**
 scenarios/**
 scripts/**
 specs/**
 .DS_Store
+generated/**
+healed/**

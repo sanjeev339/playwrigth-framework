@@ -31,6 +31,7 @@ export async function healFailedTests(options: {
   scenarioDir?: string;
   generatedDir?: string;
   reconDir?: string;
+  reconSummaryDir?: string;
   outputDir?: string;
   healingReportPath?: string;
 } = {}): Promise<HealingResult> {
@@ -38,6 +39,7 @@ export async function healFailedTests(options: {
   const scenarioDir = options.scenarioDir ?? process.env.SCENARIOS_DIR ?? resolveFromRoot('scenarios');
   const generatedDir = options.generatedDir ?? resolveFromRoot('tests', 'generated');
   const reconDir = options.reconDir ?? resolveFromRoot('recon');
+  const reconSummaryDir = options.reconSummaryDir ?? resolveFromRoot('recon-summary');
   const outputDir = options.outputDir ?? resolveFromRoot('tests', 'healed');
   const healingReportPath = options.healingReportPath ?? resolveFromRoot('reports', 'healing-result.json');
 
@@ -76,8 +78,17 @@ export async function healFailedTests(options: {
     const scenario = (await fs.pathExists(scenarioPath)) ? await readJsonFile<Scenario>(scenarioPath) : undefined;
     const snapshots = await readReconSnapshots(path.join(reconDir, scenarioId));
     const generatedCode = await readTextFile(generatedFile);
+    let reconActions: any[] = [];
+    const actionsPath = path.join(reconSummaryDir, `${toSafeFileName(scenarioId)}.actions.json`);
+    if (await fs.pathExists(actionsPath)) {
+      try {
+        reconActions = await readJsonFile<any[]>(actionsPath);
+      } catch {
+        // ignore
+      }
+    }
     logger.info(`Healing ${scenarioId} (${path.basename(generatedFile)}, ${snapshots.length} recon snapshot(s))...`);
-    const prompt = buildHealerPrompt(generatedCode, runResult, snapshots, scenario);
+    const prompt = buildHealerPrompt(generatedCode, runResult, snapshots, scenario, reconActions);
     const healedCode = normalizeGeneratedSelectMisuse(
       normalizeGeneratedWebsiteUrlUsage(normalizeNestedTestImports(stripCodeFence(await callLLM(prompt))))
     );
@@ -113,7 +124,8 @@ function buildHealerPrompt(
   generatedCode: string,
   runResult: PlaywrightRunResult,
   snapshots: ReconSnapshot[],
-  scenario?: Scenario
+  scenario?: Scenario,
+  reconActions: any[] = []
 ): string {
   const entryUrl =
     snapshots.find((snapshot) => snapshot.state === 'login-page')?.url ?? requireEnvValue('WEBSITE_URL');
@@ -137,6 +149,18 @@ function buildHealerPrompt(
     }))
   }));
 
+  const fallbackLocatorsSummary = reconActions && reconActions.length > 0
+    ? reconActions.map(action => ({
+        stepNo: action.stepNo,
+        rawStep: action.rawStep,
+        selectedLocator: action.selectedLocator,
+        fallbackLocators: action.fallbackLocators ?? [],
+        selectorConfidenceScore: action.selectorConfidenceScore,
+        selectorRisk: action.selectorRisk,
+        ambiguityCount: action.ambiguityCount
+      }))
+    : [];
+
   return truncate(
     [
       'Repair the Playwright TypeScript test below.',
@@ -153,6 +177,7 @@ function buildHealerPrompt(
       '- Prefer imports from @playwright/test only; inline locators instead of page objects when possible.',
       '- If the input uses page objects or playwright.config, preserve them but fix paths: healed files live under tests/healed, so repo-root modules must be imported as ../../pages/..., ../../fixtures/..., ../../playwright.config — never ../pages/... or ../playwright.config (that resolves under tests/ and breaks).',
       '- Prefer recon locator candidates.',
+      '- If a locator is failing/unstable, check the "Fallback Locators from Recon" section below to see if there is a verified, higher-priority candidate we found during recon.',
       '- Fix strict mode violations by scoping locators.',
       '- Fix missing waits using Playwright auto-waiting patterns or expect.',
       '- Transient UI / toasts: do not require mandatory expect(alert).toBeVisible() unless the scenario or plan explicitly requires proving that message. Prefer stable assertions (URL, headings). If a toast is asserted, do it immediately after the triggering action, before networkidle or long waits; use expect with timeout.',
@@ -172,6 +197,9 @@ function buildHealerPrompt(
       '',
       'Recon snapshots:',
       JSON.stringify(compactSnapshots, null, 2),
+      '',
+      'Fallback Locators from Recon:',
+      JSON.stringify(fallbackLocatorsSummary, null, 2),
       '',
       'Generated test code:',
       generatedCode

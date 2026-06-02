@@ -36,14 +36,14 @@ function loadFixtureActions(): ReconAction[] {
 }
 
 function loadReconSummaryActions(): ReconAction[] {
-  const summaryPath = resolveFromRoot('recon-summary/TC-UM-003.actions.json');
+  const summaryPath = resolveFromRoot('tests/fixtures/recon-actions/TC-UM-003.summary.json');
   return JSON.parse(readFileSync(summaryPath, 'utf8')) as ReconAction[];
 }
 
 describe('buildDeterministicReconTest', () => {
-  it('emits recon locators and avoids legacy hardcoded patterns', () => {
+  it('emits recon locators and avoids legacy hardcoded patterns', async () => {
     const reconActions = loadFixtureActions();
-    const code = buildDeterministicReconTest(scenario, reconActions);
+    const code = await buildDeterministicReconTest(scenario, reconActions);
 
     validateGeneratedReconTest(code, scenario, reconActions);
 
@@ -56,9 +56,9 @@ describe('buildDeterministicReconTest', () => {
     }
   });
 
-  it('uses payload-stable row locators, stable URLs, and skips failed Role recon', () => {
+  it('uses payload-stable row locators, stable URLs, and skips failed Role recon', async () => {
     const reconActions = loadReconSummaryActions();
-    const code = buildDeterministicReconTest(scenario, reconActions);
+    const code = await buildDeterministicReconTest(scenario, reconActions);
 
     validateGeneratedReconTest(code, scenario, reconActions);
 

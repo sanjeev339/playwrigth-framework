@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { ReconSnapshot } from '../types';
+import type { ReconSnapshot, NetworkRequestLog } from '../types';
 import type { LocatorCandidate, ReconDecision } from './reconDecisionTypes';
 import { listFiles, readJsonFile, resolveFromRoot, toSafeFileName, writeJsonFile } from '../utils/fileUtils';
 
@@ -24,6 +24,11 @@ export interface ReconAction {
   dropdownSnapshotFile?: string | null;
   postActionUrl?: string | null;
   postActionLandmarkLocator?: string | null;
+  failedApiRequests?: NetworkRequestLog[];
+  fallbackLocators?: string[];
+  selectorConfidenceScore?: number;
+  selectorRisk?: 'low' | 'medium' | 'high';
+  ambiguityCount?: number;
 }
 
 interface SnapshotWithFile {
@@ -46,6 +51,7 @@ export async function extractReconActions(scenarioId: string): Promise<ReconActi
 
   const sortedSnapshots = snapshots.sort((left, right) => left.prefix - right.prefix || left.file.localeCompare(right.file));
   const dropdownSnapshotsByStep = new Map<number, SnapshotWithFile>();
+  const beforeSnapshotsByStep = new Map<number, SnapshotWithFile>();
 
   for (const entry of sortedSnapshots) {
     const decision = entry.snapshot.decision;
@@ -55,6 +61,8 @@ export async function extractReconActions(scenarioId: string): Promise<ReconActi
 
     if (isDropdownOpenSnapshot(entry.snapshot)) {
       dropdownSnapshotsByStep.set(decision.stepNo, entry);
+    } else if (/step-\d+-before/i.test(entry.snapshot.state)) {
+      beforeSnapshotsByStep.set(decision.stepNo, entry);
     }
   }
 
@@ -70,7 +78,12 @@ export async function extractReconActions(scenarioId: string): Promise<ReconActi
       continue;
     }
 
-    const action = toReconAction(decision, entry, dropdownSnapshotsByStep.get(decision.stepNo ?? -1));
+    const action = toReconAction(
+      decision,
+      entry,
+      dropdownSnapshotsByStep.get(decision.stepNo ?? -1),
+      beforeSnapshotsByStep.get(decision.stepNo ?? -1)
+    );
     const key = `${action.stepNo ?? 'na'}:${action.rawStep}`;
     actionsByStep.set(key, action);
   }
@@ -82,6 +95,12 @@ export async function extractReconActions(scenarioId: string): Promise<ReconActi
   const outputPath = resolveFromRoot('recon-summary', `${safeScenarioId}.actions.json`);
   if (actions.length > 0) {
     await writeJsonFile(outputPath, actions);
+    try {
+      const { archiveReconRun } = await import('./reconVersioning');
+      await archiveReconRun(scenarioId);
+    } catch (err) {
+      console.error(`Failed to archive recon run for ${scenarioId}`, err);
+    }
   }
 
   return actions;
@@ -110,7 +129,8 @@ export async function loadReconActions(scenarioId: string): Promise<ReconAction[
 function toReconAction(
   decision: ReconDecision,
   entry: SnapshotWithFile,
-  dropdownSnapshot?: SnapshotWithFile
+  dropdownSnapshot?: SnapshotWithFile,
+  beforeSnapshot?: SnapshotWithFile
 ): ReconAction {
   const selectedLocatorParts = splitSelectLocator(decision.selectedLocator);
   const optionValue = decision.parsedAction.actionType === 'select' ? decision.selectedValue ?? decision.parsedAction.value : null;
@@ -143,17 +163,37 @@ function toReconAction(
     snapshotFile: path.relative(process.cwd(), entry.file),
     dropdownSnapshotFile: dropdownSnapshot ? path.relative(process.cwd(), dropdownSnapshot.file) : null,
     postActionUrl: entry.snapshot.url ?? null,
-    postActionLandmarkLocator: extractPostActionLandmark(entry.snapshot)
+    postActionLandmarkLocator: extractPostActionLandmark(entry.snapshot, beforeSnapshot?.snapshot),
+    failedApiRequests: entry.snapshot.failedApiRequests ?? undefined,
+    fallbackLocators: decision.deterministicCandidates?.map(c => c.locator).slice(0, 5) ?? [],
+    selectorConfidenceScore: decision.selectorConfidenceScore,
+    selectorRisk: decision.selectorRisk,
+    ambiguityCount: decision.validatedCandidates?.filter(c => c.count > 1).length ?? 0
   };
 }
 
-function extractPostActionLandmark(snapshot: ReconSnapshot): string | null {
-  const headings = snapshot.elements.filter(
+function extractPostActionLandmark(snapshot: ReconSnapshot, beforeSnapshot?: ReconSnapshot): string | null {
+  let headings = snapshot.elements.filter(
     (element) =>
       element.isVisible &&
       (element.role === 'heading' || /^h[1-3]$/i.test(element.tag)) &&
       Boolean(element.text?.trim())
   );
+
+  if (beforeSnapshot) {
+    const beforeHeadingsText = new Set(
+      beforeSnapshot.elements
+        .filter((el) => el.isVisible && (el.role === 'heading' || /^h[1-3]$/i.test(el.tag)))
+        .map((el) => el.text?.trim().toLowerCase())
+        .filter((text): text is string => Boolean(text))
+    );
+
+    // Only keep headings that were NOT visible in the page prior to action execution
+    headings = headings.filter((el) => {
+      const text = el.text?.trim().toLowerCase();
+      return text && !beforeHeadingsText.has(text);
+    });
+  }
 
   const withSuggested = headings.find((element) => element.suggestedLocator);
   if (withSuggested?.suggestedLocator) {

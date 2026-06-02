@@ -8,6 +8,7 @@ import {
   searchPayloadExpression
 } from '../recon/actionSemantics';
 import { truncate } from '../utils/fileUtils';
+import { urlAssertionFromPostActionUrl, escapeRegexForLiteral, extractStepAssertions } from '../recon/assertionExtractor';
 
 export function buildGeneratorPrompt(input: {
   scenario: Scenario;
@@ -28,10 +29,13 @@ export function buildGeneratorPrompt(input: {
       '',
       'Hard rules:',
       '1. Use @playwright/test with TypeScript.',
-      '2. Use test.step for login and for every reconAction.',
-      '3. Use this safe login URL pattern:',
+      '2. Use test.step for login and for every reconAction. The name of the test.step for each reconAction MUST be exactly "Step [stepNo]: [rawStep]" (for example: "Step 1: Navigate to User Management.").',
+      '3. Perform a full login sequence in the login step. Read credentials from process.env.LOGIN_EMAIL and process.env.LOGIN_PASSWORD. Locate username/password inputs and click submit. Example login sequence pattern:',
       '   const loginUrl = process.env.LOGIN_URL ?? process.env.WEBSITE_URL ?? build from APP_BASE_URL + LOGIN_PATH;',
       '   await page.goto(loginUrl);',
+      '   await page.getByPlaceholder(/email|username/i).fill(process.env.LOGIN_EMAIL || "");',
+      '   await page.getByPlaceholder(/password/i).fill(process.env.LOGIN_PASSWORD || "");',
+      '   await page.getByRole("button", { name: /login|sign in|submit/i }).click();',
       '4. Never call page.goto(`${baseURL}/login/`).',
       '5. Never append /login/ manually when WEBSITE_URL is present.',
       '6. After login, assert visibility of the first recon action selectedLocator (from reconActions[0]).',
@@ -39,11 +43,15 @@ export function buildGeneratorPrompt(input: {
       '8. For custom dropdowns, never use selectOption unless recon proves a native select element.',
       '9. For failed select steps, use dropdownLocator + optionValue from recon and dropdown-open snapshot elements.',
       '10. Use payload values from scenario JSON only via payload[KEY] expressions.',
-      '11. Search steps must fill the search field using payload, not only click the placeholder.',
+      '11. Search steps must fill the search field using payload values (e.g., payload["Email Address"] or similar), not only click the placeholder.',
       '12. Derive post-step assertions from postActionUrl or postActionLandmarkLocator on each reconAction when present.',
       '13. Never call selectCustomDropdown with an empty option value.',
       '14. Use { timeout: 15000 } on post-navigation expect().toBeVisible() / toHaveURL() assertions.',
       '15. Output full code only. No Markdown. No explanation.',
+      '16. When clicking custom dropdown inputs (especially readonly input/combobox elements), always use { force: true } to bypass pointer-event interception by overlays.',
+      '17. Even if a recon action has actionStatus "failed", you MUST still generate the Playwright actions (such as .fill(payload[KEY]), .click(), etc.) using the reconAction.selectedLocator (or a fallback / placeholder locator), rather than skipping the action or leaving the step empty.',
+      '18. Search inputs often have the ARIA role "searchbox" instead of "textbox". If a textbox locator failed during recon, attempt both getByRole("searchbox", ...) and getByRole("textbox", ...), or use getByPlaceholder(/Search by name or email/i) to be resilient.',
+      '19. When asserting input or dropdown values (especially multiselect comboboxes), use RegExp patterns (e.g., toHaveValue(new RegExp(payload[KEY])) or toHaveValue(/value/i)) instead of exact string matches, because the value may contain other/multiple selected items.',
       '',
       'Scenario JSON:',
       JSON.stringify(input.scenario, null, 2),
@@ -103,17 +111,19 @@ interface RenderContext {
   actionIndex: number;
 }
 
-export function buildDeterministicReconTest(scenario: Scenario, reconActions: ReconAction[]): string {
+export async function buildDeterministicReconTest(scenario: Scenario, reconActions: ReconAction[]): Promise<string> {
   const title = `${scenario.scenario_id}: ${scenario.action ?? scenario.module ?? 'Generated scenario'}`;
   const payloadLiteral = JSON.stringify(scenario.payload, null, 2).replace(/\n/g, '\n  ');
-  const actionSteps = reconActions
-    .map((action, actionIndex) =>
-      renderActionStep(action, scenario.payload, {
-        reconActions,
-        actionIndex
-      })
+  const actionSteps = (
+    await Promise.all(
+      reconActions.map((action, actionIndex) =>
+        renderActionStep(action, scenario, {
+          reconActions,
+          actionIndex
+        })
+      )
     )
-    .join('\n\n');
+  ).join('\n\n');
   const loginAssertion = renderLoginPostAssertion(reconActions[0]);
 
   return `import { test, expect, type Locator, type Page } from '@playwright/test';
@@ -200,6 +210,12 @@ async function selectCustomDropdown(page: Page, openDropdown: () => Locator, opt
 }
 
 test(${JSON.stringify(title)}, async ({ page }) => {
+  page.on('response', response => {
+    if (response.status() >= 500) {
+      throw new Error(\`API Request to \${response.url()} failed with status \${response.status()}\`);
+    }
+  });
+
   const loginEmail = process.env.LOGIN_EMAIL;
   const loginPassword = process.env.LOGIN_PASSWORD;
   const payload = ${payloadLiteral} as const;
@@ -237,8 +253,9 @@ ${indent(actionSteps, 2)}
 `;
 }
 
-function renderActionStep(action: ReconAction, payload: Record<string, unknown>, context: RenderContext): string {
+async function renderActionStep(action: ReconAction, scenario: Scenario, context: RenderContext): Promise<string> {
   const stepTitle = `Step ${action.stepNo ?? '?'}: ${action.rawStep}`;
+  const payload = scenario.payload;
 
   if (shouldSkipFailedReconStep(action, payload)) {
     return renderSkippedReconStep(stepTitle, action);
@@ -247,31 +264,44 @@ function renderActionStep(action: ReconAction, payload: Record<string, unknown>,
   const locator = locatorForAction(action, payload, context);
   const nextAction = context.reconActions[context.actionIndex + 1];
 
+  let stableRowLocator: string | null = null;
+  if (isSearchStep(action.rawStep)) {
+    stableRowLocator = nextAction ? stableUserRowLocatorExpression(payload, nextAction) : null;
+    if (!stableRowLocator) {
+      const key = Object.keys(payload).find((entry) => {
+        const value = String(payload[entry] ?? '');
+        return value.length > 0 && !/^(true|false)$/i.test(value);
+      });
+      if (key) {
+        stableRowLocator = `page.getByText(String(payload[${JSON.stringify(key)}]))`;
+      }
+    }
+  }
+
+  const step = scenario.steps.find((s) => s.step_no === action.stepNo) ?? scenario.steps[context.actionIndex] ?? { instruction: action.rawStep };
+  const assertions = await extractStepAssertions(action, step, payload, { stableRowLocator, resolvedLocator: locator });
+  const assertionBlock = assertions.map(a => `  ${a.assertionCode}`).join('\n');
+
   if ((action.actionType === 'navigate' || action.actionType === 'click') && isSearchStep(action.rawStep)) {
     const searchValue = searchPayloadExpression(payload, action.rawStep, action.target);
-    const followUpAssertion = renderSearchFollowUpAssertion(nextAction, payload);
     return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await ${locator}.fill(${searchValue});
-${followUpAssertion}
+${assertionBlock}
 });`;
   }
 
   if (action.actionType === 'navigate' || action.actionType === 'click') {
     return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await ${locator}.click();
-${renderPostActionAssertion(action, payload)}
+${assertionBlock}
 });`;
   }
 
   if (action.actionType === 'fill') {
     const valueExpression = payloadValueExpressionForAction(action, payload);
-    const followUpAssertion = isSearchStep(action.rawStep)
-      ? renderSearchFollowUpAssertion(nextAction, payload)
-      : '';
     return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await ${locator}.fill(${valueExpression});
-  await expect(${locator}).toHaveValue(${valueExpression});
-${followUpAssertion}
+${assertionBlock}
 });`;
   }
 
@@ -280,7 +310,7 @@ ${followUpAssertion}
       const clickLocator = action.selectedLocator ?? action.dropdownLocator ?? locator;
       return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await ${clickLocator}.click();
-${renderPostActionAssertion(action, payload)}
+${assertionBlock}
 });`;
     }
 
@@ -288,7 +318,7 @@ ${renderPostActionAssertion(action, payload)}
     const optionValueExpression = payloadValueExpressionForAction(action, payload);
     return `await test.step(${JSON.stringify(stepTitle)}, async () => {
   await selectCustomDropdown(page, () => ${dropdownLocator}, ${optionValueExpression});
-${renderPostActionAssertion(action, payload)}
+${assertionBlock}
 });`;
   }
 
@@ -341,80 +371,9 @@ function renderSkippedReconStep(stepTitle: string, action: ReconAction): string 
 });`;
 }
 
-function renderPostActionAssertion(action: ReconAction, payload: Record<string, unknown>): string {
-  const urlAssertion = urlAssertionFromPostActionUrl(action.postActionUrl);
-  if (urlAssertion) {
-    return urlAssertion;
-  }
 
-  if (action.postActionLandmarkLocator) {
-    return `  await expect(${action.postActionLandmarkLocator}).toBeVisible({ timeout: 15000 });`;
-  }
 
-  if (action.selectedLocator && action.actionStatus === 'success') {
-    return `  await expect(${action.selectedLocator}).toBeVisible({ timeout: 15000 });`;
-  }
 
-  return "  await page.waitForLoadState('domcontentloaded').catch(() => undefined);";
-}
-
-function renderSearchFollowUpAssertion(nextAction: ReconAction | undefined, payload: Record<string, unknown>): string {
-  const rowLocator = nextAction ? stableUserRowLocatorExpression(payload, nextAction) : null;
-  if (rowLocator) {
-    return `  await expect(${rowLocator}).toBeVisible({ timeout: 15000 });`;
-  }
-
-  if (nextAction?.selectedLocator && !isBrittleRowLocator(nextAction.selectedLocator)) {
-    return `  await expect(${nextAction.selectedLocator}).toBeVisible({ timeout: 15000 });`;
-  }
-
-  const key = Object.keys(payload).find((entry) => {
-    const value = String(payload[entry] ?? '');
-    return value.length > 0 && !/^(true|false)$/i.test(value);
-  });
-
-  if (key) {
-    return `  await expect(page.getByText(String(payload[${JSON.stringify(key)}]))).toBeVisible({ timeout: 15000 });`;
-  }
-
-  return "  await page.waitForLoadState('domcontentloaded').catch(() => undefined);";
-}
-
-function urlAssertionFromPostActionUrl(url: string | null | undefined): string | null {
-  if (!url) {
-    return null;
-  }
-
-  try {
-    const pathname = new URL(url).pathname;
-    const segments = pathname.split('/').filter(Boolean);
-    const stableSegment = [...segments].reverse().find((segment) => isStableUrlSegment(segment));
-    if (!stableSegment) {
-      return null;
-    }
-
-    const escaped = escapeRegexForLiteral(stableSegment);
-    return `  await expect(page).toHaveURL(/${escaped}/i, { timeout: 15000 });`;
-  } catch {
-    return null;
-  }
-}
-
-function isStableUrlSegment(segment: string): boolean {
-  if (!segment || isUuidLike(segment)) {
-    return false;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}/.test(segment)) {
-    return false;
-  }
-
-  return /[a-z]/i.test(segment);
-}
-
-function isUuidLike(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-}
 
 function locatorForAction(action: ReconAction, payload: Record<string, unknown>, context: RenderContext): string {
   const searchLocator = resolveSearchInputLocator(action, context);
@@ -599,9 +558,7 @@ function regexLiteral(value: string): string {
   return `/${escapeRegexForLiteral(value)}/i`;
 }
 
-function escapeRegexForLiteral(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\//g, '\\/');
-}
+
 
 function indent(value: string, spaces: number): string {
   const prefix = ' '.repeat(spaces);

@@ -46,4 +46,22 @@ describe('actionParser', () => {
     assert.equal(focusStep.actionType, 'click');
     assert.equal(focusStep.target, 'Search');
   });
+
+  it('parses hover, check, and uncheck actions', () => {
+    const hoverStep = parseAction('Hover on Profile Button', editPayload);
+    assert.equal(hoverStep.actionType, 'hover');
+    assert.equal(hoverStep.target, 'Profile');
+
+    const checkStep = parseAction('Check active status checkbox', editPayload);
+    assert.equal(checkStep.actionType, 'check');
+    assert.equal(checkStep.target, 'active status');
+
+    const uncheckStep = parseAction('Uncheck newsletter option', editPayload);
+    assert.equal(uncheckStep.actionType, 'uncheck');
+    assert.equal(uncheckStep.target, 'newsletter');
+
+    // Make sure check that maps to verify
+    const verifyStep = parseAction('Check that the success modal is visible', editPayload);
+    assert.equal(verifyStep.actionType, 'verify');
+  });
 });

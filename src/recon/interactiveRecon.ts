@@ -12,6 +12,7 @@ import { scanVisibleDom } from './domScanner';
 import { waitForRafCycles, waitForSnapshotStability } from './pageStabilizer';
 import type { ReconDecision } from './reconDecisionTypes';
 import { writeStateSnapshot } from './stateSnapshotWriter';
+import { NetworkTracker } from './networkTracker';
 
 interface CapturedSnapshot {
   filePath: string;
@@ -52,13 +53,16 @@ export async function runInteractiveRecon(options: {
         logger.warn(`No Markdown plan found for ${scenario.scenario_id}; recon will use scenario steps only.`);
       }
 
-      const context = await browser.newContext();
-      const page = await context.newPage();
+      let currentRole = scenario.steps[0]?.role || 'default';
+      let context = await browser.newContext();
+      let page = await context.newPage();
+      let networkTracker = new NetworkTracker(page);
       const snapshotSessionId = `${safeScenarioId}-${Date.now()}`;
       let sequence = 1;
       const previousActionErrors: string[] = [];
 
       try {
+        const initialCreds = await getCredentialsForRole(scenario, currentRole, env);
         await page.goto(normalizeWebsiteEntryUrl(env.WEBSITE_URL), { waitUntil: 'domcontentloaded' });
         const loginSnapshot = await captureSnapshot({
           page,
@@ -66,14 +70,15 @@ export async function runInteractiveRecon(options: {
           scenarioReconDir,
           sequence: sequence++,
           state: 'login-page',
-          actionBeforeSnapshot: 'Open login page',
+          actionBeforeSnapshot: `Open login page (${currentRole})`,
           decision: null,
           actionError: null,
-          snapshotSessionId
+          snapshotSessionId,
+          networkTracker
         });
         writtenSnapshots.push(loginSnapshot.filePath);
 
-        const loginError = await safeAction(() => performLogin(page, env.LOGIN_EMAIL, env.LOGIN_PASSWORD));
+        const loginError = await safeAction(() => performLogin(page, initialCreds.email, initialCreds.password));
         if (loginError) {
           previousActionErrors.push(`login: ${loginError}`);
         }
@@ -83,15 +88,65 @@ export async function runInteractiveRecon(options: {
           scenarioReconDir,
           sequence: sequence++,
           state: 'dashboard-page',
-          actionBeforeSnapshot: 'Perform login',
+          actionBeforeSnapshot: `Perform login (${currentRole})`,
           decision: null,
           actionError: loginError,
-          snapshotSessionId
+          snapshotSessionId,
+          networkTracker
         });
         writtenSnapshots.push(dashboardSnapshot.filePath);
 
         for (const step of scenario.steps) {
           const stepNo = step.step_no ?? scenario.steps.indexOf(step) + 1;
+          const targetRole = step.role || currentRole;
+
+          if (targetRole !== currentRole) {
+            logger.info(`Switching context from role ${currentRole} to ${targetRole}`);
+            await page.close().catch(() => {});
+            await context.close().catch(() => {});
+
+            context = await browser.newContext();
+            page = await context.newPage();
+            networkTracker = new NetworkTracker(page);
+            currentRole = targetRole;
+
+            const roleCreds = await getCredentialsForRole(scenario, currentRole, env);
+            await page.goto(normalizeWebsiteEntryUrl(env.WEBSITE_URL), { waitUntil: 'domcontentloaded' });
+            
+            const roleLoginSnapshot = await captureSnapshot({
+              page,
+              scenarioId: scenario.scenario_id,
+              scenarioReconDir,
+              sequence: sequence++,
+              state: `role-switch-login-${currentRole}`,
+              actionBeforeSnapshot: `Open login page for ${currentRole}`,
+              decision: null,
+              actionError: null,
+              snapshotSessionId,
+              networkTracker
+            });
+            writtenSnapshots.push(roleLoginSnapshot.filePath);
+
+            const roleLoginError = await safeAction(() => performLogin(page, roleCreds.email, roleCreds.password));
+            if (roleLoginError) {
+              previousActionErrors.push(`login switch to ${currentRole}: ${roleLoginError}`);
+            }
+
+            const roleDashboardSnapshot = await captureSnapshot({
+              page,
+              scenarioId: scenario.scenario_id,
+              scenarioReconDir,
+              sequence: sequence++,
+              state: `role-switch-dashboard-${currentRole}`,
+              actionBeforeSnapshot: `Perform login for ${currentRole}`,
+              decision: null,
+              actionError: roleLoginError,
+              snapshotSessionId,
+              networkTracker
+            });
+            writtenSnapshots.push(roleDashboardSnapshot.filePath);
+          }
+
           const before = await captureSnapshot({
             page,
             scenarioId: scenario.scenario_id,
@@ -101,7 +156,8 @@ export async function runInteractiveRecon(options: {
             actionBeforeSnapshot: step.instruction,
             decision: null,
             actionError: null,
-            snapshotSessionId
+            snapshotSessionId,
+            networkTracker
           });
           writtenSnapshots.push(before.filePath);
 
@@ -122,7 +178,8 @@ export async function runInteractiveRecon(options: {
                 actionBeforeSnapshot,
                 decision: intermediateDecision,
                 actionError: intermediateDecision.actionError ?? null,
-                snapshotSessionId
+                snapshotSessionId,
+                networkTracker
               });
               writtenSnapshots.push(dropdownSnapshot.filePath);
             }
@@ -142,7 +199,8 @@ export async function runInteractiveRecon(options: {
             actionBeforeSnapshot: step.instruction,
             decision,
             actionError: decision.actionError ?? null,
-            snapshotSessionId
+            snapshotSessionId,
+            networkTracker
           });
           writtenSnapshots.push(after.filePath);
         }
@@ -163,7 +221,10 @@ function logReconDecision(stepNo: number, instruction: string, decision: ReconDe
     parsed.value && parsed.target && parsed.target !== '__FORM__' && ['fill', 'select'].includes(parsed.actionType)
       ? parsed.target
       : 'none';
-  const safeCandidates = decision.validatedCandidates.filter((candidate) => candidate.isSafe).length;
+  const deterministicSafeCount = decision.deterministicCandidates.filter((candidate) =>
+    decision.validatedCandidates.some((validation) => validation.locator === candidate.locator && validation.isSafe)
+  ).length;
+  const totalSafeCount = decision.validatedCandidates.filter((candidate) => candidate.isSafe).length;
   const llmUsed = decision.decisionSource === 'llm' ? 'yes' : 'no';
   const llmParseStatus = decision.llmParseError ? 'failed' : decision.decisionSource === 'llm' ? 'success' : 'not_used';
 
@@ -172,9 +233,13 @@ function logReconDecision(stepNo: number, instruction: string, decision: ReconDe
   console.log(`[Recon] Parse status: ${parsed.parseStatus ?? 'n/a'} (${parsed.parseReason ?? 'n/a'})`);
   console.log(`[Recon] Value key used: ${valueKey}`);
   console.log(`[Recon] Deterministic candidates: ${decision.deterministicCandidates.length}`);
-  console.log(`[Recon] Safe candidates: ${safeCandidates}`);
+  console.log(`[Recon] Deterministic safe candidates: ${deterministicSafeCount}`);
+  if (decision.decisionSource === 'llm') {
+    console.log(`[Recon] LLM validated safe candidates: ${totalSafeCount - deterministicSafeCount}`);
+  }
   console.log(`[Recon] LLM used: ${llmUsed}`);
   console.log(`[Recon] LLM parse status: ${llmParseStatus}`);
+
   if (decision.decisionSource === 'llm' && decision.llmReason && !decision.selectedLocator) {
     console.log(`[Recon] LLM decision: ${decision.llmReason}`);
   }
@@ -214,6 +279,7 @@ async function captureSnapshot(input: {
   decision: ReconDecision | null;
   actionError: string | null;
   snapshotSessionId: string;
+  networkTracker?: NetworkTracker;
 }): Promise<CapturedSnapshot> {
   const stabilization = await waitForSnapshotStability(input.page);
   if (stabilization.timedOut) {
@@ -224,6 +290,7 @@ async function captureSnapshot(input: {
   const elements = await scanVisibleDom(input.page);
   await waitForRafCycles(input.page, 2);
   const accessibility = await scanAccessibility(input.page);
+  const failedApiRequests = input.networkTracker ? input.networkTracker.getAndClearFailedRequests() : undefined;
   const snapshot: ReconSnapshot = {
     scenario_id: input.scenarioId,
     state: input.state,
@@ -236,7 +303,8 @@ async function captureSnapshot(input: {
     snapshotSequence: input.sequence,
     stabilization,
     elements,
-    accessibility
+    accessibility,
+    failedApiRequests
   };
 
   const filePath = await writeStateSnapshot(snapshot, input.scenarioReconDir, input.sequence);
@@ -318,6 +386,30 @@ async function waitForSettledPage(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded').catch(() => undefined);
   await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
 }
+
+async function getCredentialsForRole(scenario: Scenario, roleName: string, env: any): Promise<{ email: string; password: string }> {
+  const jsonPath = scenario.metadata?.source_json ? resolveFromRoot(scenario.metadata.source_json) : resolveFromRoot('input/test_data.json');
+  try {
+    if (await fs.pathExists(jsonPath)) {
+      const records = await fs.readJson(jsonPath);
+      if (Array.isArray(records)) {
+        const credsRecord = records.find(
+          (r: any) => r.scenario_id === 'role_credentials' || r.scenario_id === 'GLOBAL_CREDENTIALS'
+        );
+        if (credsRecord && credsRecord.payload && credsRecord.payload[roleName]) {
+          const creds = credsRecord.payload[roleName];
+          if (creds.email && creds.password) {
+            return { email: creds.email, password: creds.password };
+          }
+        }
+      }
+    }
+  } catch (err) {
+    logger.error('Error reading role credentials', err);
+  }
+  return { email: env.LOGIN_EMAIL, password: env.LOGIN_PASSWORD };
+}
+
 
 if (require.main === module) {
   runInteractiveRecon()

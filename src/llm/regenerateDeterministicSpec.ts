@@ -36,7 +36,7 @@ export async function regenerateDeterministicSpec(options: {
       );
     }
 
-    const code = buildDeterministicReconTest(scenario, reconActions);
+    const code = await buildDeterministicReconTest(scenario, reconActions);
     validateGeneratedReconTest(code, scenario, reconActions);
 
     const outputPath = path.join(outputDir, `${toSafeFileName(scenario.scenario_id)}.spec.ts`);

@@ -131,7 +131,15 @@ function detectActionType(normalizedStep: string): ActionType {
   if (/^click\b/.test(normalizedStep)) return 'click';
   if (/^(enter|fill|type)\b/.test(normalizedStep)) return 'fill';
   if (/^(select|choose)\b/.test(normalizedStep)) return 'select';
-  if (/^(verify|check|assert)\b/.test(normalizedStep)) return 'verify';
+  if (/^uncheck\b/.test(normalizedStep)) return 'uncheck';
+  if (/^check\b/.test(normalizedStep)) {
+    if (/\b(that|if|whether|is|has|should)\b/i.test(normalizedStep)) {
+      return 'verify';
+    }
+    return 'check';
+  }
+  if (/^hover\b/.test(normalizedStep) || /^mouse\s*over\b/.test(normalizedStep)) return 'hover';
+  if (/^(verify|assert)\b/.test(normalizedStep)) return 'verify';
   if (/^wait\b/.test(normalizedStep)) return 'wait';
   return 'unknown';
 }
@@ -179,6 +187,18 @@ function extractTarget(rawStep: string, actionType: ActionType, payload: Record<
     return cleanTarget(rawStep.replace(/\b(verify|check|assert)\b/gi, ''));
   }
 
+  if (actionType === 'hover') {
+    return cleanTarget(rawStep.match(/^(?:hover|mouse\s*over)\s+(?:on\s+|the\s+)?(.+)$/i)?.[1] ?? rawStep);
+  }
+
+  if (actionType === 'check') {
+    return cleanTarget(rawStep.match(/^check\s+(?:the\s+)?(.+)$/i)?.[1] ?? rawStep);
+  }
+
+  if (actionType === 'uncheck') {
+    return cleanTarget(rawStep.match(/^uncheck\s+(?:the\s+)?(.+)$/i)?.[1] ?? rawStep);
+  }
+
   if (actionType === 'wait') {
     return lowerStep.includes('network') ? 'networkidle' : null;
   }
@@ -210,9 +230,9 @@ function findPayloadKeyMention(rawStep: string, payloadKeys: string[]): string |
 function cleanTarget(value: string): string | null {
   const cleaned = value
     .replace(/\.$/, '')
-    .replace(/\b(?:click|select|choose|open|enter|fill|type|navigate|go to)\b/gi, '')
+    .replace(/\b(?:click|select|choose|open|enter|fill|type|navigate|go to|hover|mouse over|uncheck|check)\b/gi, '')
     .replace(/\b(and|then)\b/gi, ' ')
-    .replace(/\b(page|screen|menu|section|button|link|field|dropdown|option)\b/gi, '')
+    .replace(/\b(page|screen|menu|section|button|link|field|dropdown|option|checkbox|radio|input|textbox)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -246,7 +266,7 @@ function evaluateParseStatus(
     };
   }
 
-  if (['click', 'fill', 'select', 'navigate'].includes(actionType) && !target) {
+  if (['click', 'fill', 'select', 'navigate', 'hover', 'check', 'uncheck'].includes(actionType) && !target) {
     return {
       parseStatus: 'failed',
       parseReason: 'missing_target',
@@ -254,7 +274,7 @@ function evaluateParseStatus(
     };
   }
 
-  const chainedVerbCount = (rawStep.match(/\b(click|select|choose|enter|fill|type|navigate|go to)\b/gi) ?? []).length;
+  const chainedVerbCount = (rawStep.match(/\b(click|select|choose|enter|fill|type|navigate|go to|hover|mouse over|uncheck|check)\b/gi) ?? []).length;
   if (chainedVerbCount > 1) {
     return {
       parseStatus: target ? 'ambiguous' : 'failed',

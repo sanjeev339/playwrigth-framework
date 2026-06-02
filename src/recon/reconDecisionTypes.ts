@@ -1,10 +1,10 @@
-export type ActionType = 'navigate' | 'click' | 'fill' | 'select' | 'verify' | 'wait' | 'unknown';
+export type ActionType = 'navigate' | 'click' | 'fill' | 'select' | 'verify' | 'wait' | 'hover' | 'check' | 'uncheck' | 'unknown';
 
 export type DecisionActionType = Exclude<ActionType, 'unknown'> | 'skip' | 'error';
 
 export type DecisionSource = 'deterministic' | 'llm' | 'none';
 
-export type ActionStatus = 'success' | 'failed' | 'skipped';
+export type ActionStatus = 'success' | 'failed' | 'skipped' | 'success_unverified';
 
 export interface ParsedAction {
   rawStep: string;

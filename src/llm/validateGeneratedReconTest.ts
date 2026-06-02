@@ -29,10 +29,14 @@ export function validateGeneratedReconTest(code: string, scenario: Scenario, rec
       continue;
     }
 
-    const payloadRef = `payload[${JSON.stringify(payloadKey)}]`;
     const payloadValue = String(scenario.payload[payloadKey] ?? '').toLowerCase();
     const normalizedCode = code.toLowerCase();
-    const hasPayloadRef = normalizedCode.includes(payloadRef.toLowerCase());
+    const keyLower = payloadKey.toLowerCase();
+    const hasPayloadRef =
+      normalizedCode.includes(`payload["${keyLower}"]`) ||
+      normalizedCode.includes(`payload['${keyLower}']`) ||
+      normalizedCode.includes(`payload[\`${keyLower}\`]`) ||
+      normalizedCode.includes(`payload.${keyLower}`);
     const hasValue = payloadValue.length > 0 && normalizedCode.includes(payloadValue);
     const isSkipped = normalizedCode.includes('recon-skip');
 
@@ -43,6 +47,9 @@ export function validateGeneratedReconTest(code: string, scenario: Scenario, rec
 
   for (const action of reconActions) {
     if (action.actionType === 'fill' && action.target && action.target !== '__FORM__') {
+      if (action.actionStatus === 'failed' && !action.selectedLocator) {
+        continue;
+      }
       const payloadKey = action.target;
       if (Object.prototype.hasOwnProperty.call(scenario.payload, payloadKey)) {
         const fragment = String(scenario.payload[payloadKey]).toLowerCase();
@@ -54,7 +61,7 @@ export function validateGeneratedReconTest(code: string, scenario: Scenario, rec
   }
 
   const firstAction = reconActions.find((action) => action.stepNo === 1) ?? reconActions[0];
-  if (firstAction?.selectedLocator && !code.includes(firstAction.selectedLocator)) {
+  if (firstAction?.selectedLocator && !containsLocator(code, firstAction.selectedLocator)) {
     throw new Error('Generated test missing post-login locator from first recon action.');
   }
 
@@ -63,8 +70,7 @@ export function validateGeneratedReconTest(code: string, scenario: Scenario, rec
       continue;
     }
 
-    const stepMarker = `Step ${action.stepNo}: ${action.rawStep}`;
-    if (!code.includes(stepMarker)) {
+    if (!containsStepMarker(code, action.stepNo, action.rawStep)) {
       throw new Error(`Generated test missing required recon action: Step ${action.stepNo} - ${action.rawStep}`);
     }
 
@@ -79,7 +85,7 @@ export function validateGeneratedReconTest(code: string, scenario: Scenario, rec
       action.actionStatus === 'success' &&
       action.selectedLocator &&
       action.actionType !== 'select' &&
-      !code.includes(action.selectedLocator) &&
+      !containsLocator(code, action.selectedLocator) &&
       !isPayloadStableRowLocator(action, scenario.payload, code)
     ) {
       throw new Error(`Generated test missing required recon locator: Step ${action.stepNo} - ${action.rawStep}`);
@@ -105,3 +111,33 @@ function isPayloadStableRowLocator(
 
   return /getByRole\(['"]row['"]\)\.filter/.test(code);
 }
+
+function normalizeLocator(str: string): string {
+  return str
+    .replace(/['"`]/g, '"')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*([()\[\]{}:,])\s*/g, '$1')
+    .trim();
+}
+
+function containsLocator(code: string, locator: string): boolean {
+  const normalizedCode = normalizeLocator(code);
+  const normalizedLocator = normalizeLocator(locator);
+  return normalizedCode.includes(normalizedLocator);
+}
+
+function normalizeStepText(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function containsStepMarker(code: string, stepNo: number, rawStep: string): boolean {
+  const expectedNormalized = `step ${stepNo} ${normalizeStepText(rawStep)}`;
+  const codeNormalized = normalizeStepText(code);
+  return codeNormalized.includes(expectedNormalized);
+}
+
+

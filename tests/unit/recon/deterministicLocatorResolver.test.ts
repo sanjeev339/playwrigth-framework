@@ -101,4 +101,53 @@ describe('deterministicLocatorResolver', () => {
     assert.ok(candidates.length > 0);
     assert.equal(candidates[0].locatorType, 'getByPlaceholder');
   });
+
+  it('resolves candidates from accessibility tree pass first', async () => {
+    const mockCDP = {
+      send: async (method: string) => {
+        if (method === 'Accessibility.getFullAXTree') {
+          return {
+            nodes: [
+              {
+                nodeId: '1',
+                ignored: false,
+                role: { value: 'button' },
+                name: { value: 'Save User Details' }
+              }
+            ]
+          };
+        }
+        return {};
+      },
+      detach: async () => {}
+    };
+
+    const mockPage = {
+      context: () => ({
+        newCDPSession: async () => mockCDP
+      })
+    } as any;
+
+    const parsedAction: ParsedAction = {
+      rawStep: 'Click Save',
+      actionType: 'click',
+      target: 'Save',
+      value: null,
+      parseStatus: 'ok',
+      parseReason: 'parsed_successfully',
+      parseConfidence: 0.9
+    };
+
+    const candidates = await resolveDeterministicCandidates(
+      mockPage,
+      parsedAction,
+      [],
+      {}
+    );
+
+    assert.ok(candidates.length > 0);
+    assert.equal(candidates[0].locator, 'page.getByRole("button", { name: "Save User Details" })');
+    assert.equal(candidates[0].source, 'accessibility-tree');
+    assert.equal(candidates[0].priority, 40);
+  });
 });
