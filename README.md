@@ -30,6 +30,11 @@ LOGIN_EMAIL=your-login
 LOGIN_PASSWORD=your-password
 HEADLESS=false
 SLOW_MO=100
+
+# Input/Output paths
+EXCEL_PATH=input/test_flow.xlsx
+JSON_PATH=input/test_data.json
+SCENARIOS_DIR=scenarios
 ```
 
 `WEBSITE_URL` must be the **full entry URL** (usually the login page). Recon and generated tests navigate to it directly — do not append `/login` in code or env.
@@ -90,6 +95,25 @@ Run the full pipeline:
 ```bash
 npm run pipeline
 ```
+
+## Customizing Input and Output Paths
+
+By default, the framework loads inputs from `input/test_flow.xlsx` and `input/test_data.json`, and writes outputs to `scenarios/`. You can customize these paths in two ways:
+
+1. **Environment Variables** (configured in `.env` or system environment):
+   * `EXCEL_PATH`: Path to the Excel manual flow sheet.
+   * `JSON_PATH`: Path to the JSON test data.
+   * `SCENARIOS_DIR`: Directory where scenario JSON files are written and read.
+
+2. **CLI Arguments** (supported by `build:scenarios`):
+   * `--excel=path/to/flow.xlsx` (or `-e=...`)
+   - `--json=path/to/data.json` (or `-j=...`)
+   - `--out=path/to/scenarios/` (or `-o=...`)
+
+   Example:
+   ```bash
+   npm run build:scenarios -- --excel=custom/flow.xlsx --json=custom/data.json --out=custom_scenarios
+   ```
 
 ## How The Pipeline Works
 

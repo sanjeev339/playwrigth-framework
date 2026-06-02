@@ -20,7 +20,7 @@ export async function generateTests(options: {
   reconDir?: string;
   outputDir?: string;
 } = {}): Promise<string[]> {
-  const scenarioDir = options.scenarioDir ?? resolveFromRoot('scenarios');
+  const scenarioDir = options.scenarioDir ?? process.env.SCENARIOS_DIR ?? resolveFromRoot('scenarios');
   const specDir = options.specDir ?? resolveFromRoot('specs');
   const reconDir = options.reconDir ?? resolveFromRoot('recon');
   const outputDir = options.outputDir ?? resolveFromRoot('tests', 'generated');

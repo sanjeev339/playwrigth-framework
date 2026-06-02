@@ -1,7 +1,10 @@
 import fs from 'fs-extra';
 import { z } from 'zod';
+import dotenv from 'dotenv';
 import type { TestDataRecord } from '../types';
 import { resolveFromRoot } from '../utils/fileUtils';
+
+dotenv.config();
 
 const testDataSchema = z.array(
   z.object({
@@ -14,13 +17,19 @@ const testDataSchema = z.array(
   }).passthrough()
 );
 
-export async function readTestData(filePath = resolveFromRoot('input', 'test_data.json')): Promise<TestDataRecord[]> {
-  if (!(await fs.pathExists(filePath))) {
-    throw new Error(`JSON test data file not found at ${filePath}`);
+export async function readTestData(filePath?: string): Promise<TestDataRecord[]> {
+  const effectivePath = filePath ?? process.env.JSON_PATH;
+
+  if (!effectivePath) {
+    throw new Error('JSON path must be provided via --json argument or JSON_PATH environment variable');
   }
 
-  console.log(`Reading JSON: ${filePath}`);
-  const raw = await fs.readJson(filePath);
+  if (!(await fs.pathExists(effectivePath))) {
+    throw new Error(`JSON test data file not found at ${effectivePath}`);
+  }
+
+  console.log(`Reading JSON: ${effectivePath}`);
+  const raw = await fs.readJson(effectivePath);
   const parsed = testDataSchema.safeParse(raw);
 
   if (!parsed.success) {

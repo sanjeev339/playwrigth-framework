@@ -8,7 +8,7 @@ export async function generatePlans(options: {
   scenarioDir?: string;
   outputDir?: string;
 } = {}): Promise<string[]> {
-  const scenarioDir = options.scenarioDir ?? resolveFromRoot('scenarios');
+  const scenarioDir = options.scenarioDir ?? process.env.SCENARIOS_DIR ?? resolveFromRoot('scenarios');
   const outputDir = options.outputDir ?? resolveFromRoot('specs');
   const scenarioFiles = await listFiles(scenarioDir, '.json');
   const writtenFiles: string[] = [];

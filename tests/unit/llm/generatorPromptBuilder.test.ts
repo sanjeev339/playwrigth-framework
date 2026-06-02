@@ -74,9 +74,9 @@ describe('buildDeterministicReconTest', () => {
     assert.match(code, /getByRole\("button", \{ name: \/Save\/i \}\)/);
     assert.match(
       code,
-      /Step 3: Search user by Full Name[\s\S]*?getByRole\('row'\)\.filter\(\{ hasText: "adithya j" \}\)/
+      /Step 3: Click adithya j[\s\S]*?getByRole\('row'\)\.filter\(\{ hasText: "adithya j" \}\)/
     );
-    assert.match(code, /Step 3: Search user by Full Name[\s\S]*?getByPlaceholder\(\/Search by name or email\/i\)/);
+    assert.match(code, /Step 2: search the user by name or email[\s\S]*?getByPlaceholder\(\/Search by name or email\/i\)/);
     assert.equal(code.includes('getByRole("textbox", { name: /Search by name or email/i })'), false);
   });
 });

@@ -1,8 +1,11 @@
 import fs from 'fs-extra';
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
+import dotenv from 'dotenv';
 import type { TestFlowRow } from '../types';
 import { resolveFromRoot } from '../utils/fileUtils';
+
+dotenv.config();
 
 const aliases = {
   scenario_id: ['scenario_id', 'scenario id', 'scenarioid', 'tc id', 'test case id', 'testcaseid'],
@@ -22,18 +25,24 @@ const rowSchema = z.object({
   expected_result: z.string().optional()
 });
 
-export async function readExcelRows(filePath = resolveFromRoot('input', 'test_flow.xlsx')): Promise<TestFlowRow[]> {
-  if (!(await fs.pathExists(filePath))) {
-    throw new Error(`Excel file not found at ${filePath}`);
+export async function readExcelRows(filePath?: string): Promise<TestFlowRow[]> {
+  const effectivePath = filePath ?? process.env.EXCEL_PATH;
+
+  if (!effectivePath) {
+    throw new Error('Excel path must be provided via --excel argument or EXCEL_PATH environment variable');
   }
 
-  console.log(`Reading Excel: ${filePath}`);
-  const workbook = XLSX.readFile(filePath, { cellDates: false });
+  if (!(await fs.pathExists(effectivePath))) {
+    throw new Error(`Excel file not found at ${effectivePath}`);
+  }
+
+  console.log(`Reading Excel: ${effectivePath}`);
+  const workbook = XLSX.readFile(effectivePath, { cellDates: false });
   console.log(`Detected sheets: ${workbook.SheetNames.join(', ')}`);
   const firstSheetName = workbook.SheetNames[0];
 
   if (!firstSheetName) {
-    throw new Error(`Excel workbook has no sheets: ${filePath}`);
+    throw new Error(`Excel workbook has no sheets: ${effectivePath}`);
   }
 
   console.log(`Selected sheet: ${firstSheetName}`);

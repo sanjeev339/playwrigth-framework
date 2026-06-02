@@ -14,9 +14,19 @@ export async function buildScenarios(options: {
   jsonPath?: string;
   outputDir?: string;
 } = {}): Promise<Scenario[]> {
-  const excelPath = options.excelPath ?? resolveFromRoot('input', 'test_flow.xlsx');
-  const jsonPath = options.jsonPath ?? resolveFromRoot('input', 'test_data.json');
-  const outputDir = options.outputDir ?? resolveFromRoot('scenarios');
+  const excelPath = options.excelPath ?? process.env.EXCEL_PATH;
+  const jsonPath = options.jsonPath ?? process.env.JSON_PATH;
+  const outputDir = options.outputDir ?? process.env.SCENARIOS_DIR;
+
+  if (!excelPath) {
+    throw new Error('Excel path must be provided via options or EXCEL_PATH environment variable');
+  }
+  if (!jsonPath) {
+    throw new Error('JSON path must be provided via options or JSON_PATH environment variable');
+  }
+  if (!outputDir) {
+    throw new Error('Output directory must be provided via options or SCENARIOS_DIR environment variable');
+  }
 
   const [rows, testData] = await Promise.all([readExcelRows(excelPath), readTestData(jsonPath)]);
   const payloadByScenarioId = new Map(testData.map((record) => [record.scenario_id, record]));
@@ -115,7 +125,17 @@ function sanitizePayload(payload: Record<string, unknown>): Record<string, unkno
 }
 
 if (require.main === module) {
-  buildScenarios()
+  const args = process.argv.slice(2);
+  const getArgValue = (flag: string): string | undefined => {
+    const arg = args.find((a) => a.startsWith(`${flag}=`));
+    return arg ? arg.split('=')[1] : undefined;
+  };
+
+  const excelPath = getArgValue('--excel') || getArgValue('-e');
+  const jsonPath = getArgValue('--json') || getArgValue('-j');
+  const outputDir = getArgValue('--out') || getArgValue('-o');
+
+  buildScenarios({ excelPath, jsonPath, outputDir })
     .then((scenarios) => {
       logger.info(`Built ${scenarios.length} scenario file(s).`);
     })

@@ -35,7 +35,7 @@ export async function healFailedTests(options: {
   healingReportPath?: string;
 } = {}): Promise<HealingResult> {
   const runResultPath = options.runResultPath ?? resolveFromRoot('reports', 'run-result.json');
-  const scenarioDir = options.scenarioDir ?? resolveFromRoot('scenarios');
+  const scenarioDir = options.scenarioDir ?? process.env.SCENARIOS_DIR ?? resolveFromRoot('scenarios');
   const generatedDir = options.generatedDir ?? resolveFromRoot('tests', 'generated');
   const reconDir = options.reconDir ?? resolveFromRoot('recon');
   const outputDir = options.outputDir ?? resolveFromRoot('tests', 'healed');

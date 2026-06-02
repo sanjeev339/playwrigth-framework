@@ -60,7 +60,7 @@ export async function writeFinalReport(options: {
   outputJsonPath?: string;
   outputHtmlPath?: string;
 } = {}): Promise<FinalReport> {
-  const scenarioDir = options.scenarioDir ?? resolveFromRoot('scenarios');
+  const scenarioDir = options.scenarioDir ?? process.env.SCENARIOS_DIR ?? resolveFromRoot('scenarios');
   const generatedDir = options.generatedDir ?? resolveFromRoot('tests', 'generated');
   const healedDir = options.healedDir ?? resolveFromRoot('tests', 'healed');
   const reconDir = options.reconDir ?? resolveFromRoot('recon');

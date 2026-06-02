@@ -24,7 +24,7 @@ export async function runInteractiveRecon(options: {
   outputDir?: string;
 } = {}): Promise<string[]> {
   const env = getWebEnv();
-  const scenarioDir = options.scenarioDir ?? resolveFromRoot('scenarios');
+  const scenarioDir = options.scenarioDir ?? process.env.SCENARIOS_DIR ?? resolveFromRoot('scenarios');
   const specDir = options.specDir ?? resolveFromRoot('specs');
   const outputDir = options.outputDir ?? resolveFromRoot('recon');
   const scenarioFiles = await listFiles(scenarioDir, '.json');

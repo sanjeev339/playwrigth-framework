@@ -11,7 +11,7 @@ export async function regenerateDeterministicSpec(options: {
   scenarioDir?: string;
   outputDir?: string;
 } = {}): Promise<string[]> {
-  const scenarioDir = options.scenarioDir ?? resolveFromRoot('scenarios');
+  const scenarioDir = options.scenarioDir ?? process.env.SCENARIOS_DIR ?? resolveFromRoot('scenarios');
   const outputDir = options.outputDir ?? resolveFromRoot('tests', 'generated');
   const scenarioIds = options.scenarioIds?.map((id) => id.trim()).filter(Boolean);
 

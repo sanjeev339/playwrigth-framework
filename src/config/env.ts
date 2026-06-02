@@ -35,7 +35,10 @@ const llmProviderSchema = z.preprocess((value) => {
 const sharedSchema = z.object({
   LLM_PROVIDER: llmProviderSchema,
   HEADLESS: booleanFromString,
-  SLOW_MO: numberFromString
+  SLOW_MO: numberFromString,
+  EXCEL_PATH: z.string(),
+  JSON_PATH: z.string(),
+  SCENARIOS_DIR: z.string()
 });
 
 const openAISchema = sharedSchema.extend({
