@@ -38,6 +38,7 @@
       "Last Name": "j",
       "Full Name": "adithya j",
       "Email Address": "sanjeevkumar.m00@gmail.com",
+      "Add comments": "comment",
       "Status": "Deactivated"
     }
   },
@@ -52,6 +53,20 @@
       "Full Name": "adithya j",
       "Email Address": "sanjeevkumar.m00@gmail.com",
       "Expected Error": "Email already exists"
+    }
+  },
+  {
+    "scenario_id": "TC-UM-005",
+    "execution_order": 5,
+    "data_strategy": "positive_valid_update",
+    "edge_case_type": "status_change",
+    "payload": {
+      "First Name": "adithya",
+      "Last Name": "j",
+      "Full Name": "adithya j",
+      "Email Address": "sanjeevkumar.m00@gmail.com",
+      "Add comments": "comment",
+      "Status": "Active"
     }
   }
 ]

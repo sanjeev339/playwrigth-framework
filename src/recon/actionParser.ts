@@ -216,7 +216,7 @@ function cleanTarget(value: string): string | null {
     .replace(/\s+/g, ' ')
     .trim();
 
-  return cleaned || null;
+  return cleaned || value || null;
 }
 
 function normalizeRawStep(value: string): string {

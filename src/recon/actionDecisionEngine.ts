@@ -758,7 +758,7 @@ async function verifyPostcondition(
     return urlChanged || visibleChanged ? { ok: true } : { ok: false, reason: 'navigate_no_state_change' };
   }
 
-  if (actionType === 'click' && isSearchFocusTarget(parsedAction.target)) {
+  if (actionType === 'click' && (isSearchFocusTarget(parsedAction.target) || isFormActionTarget(parsedAction.target))) {
     return { ok: true };
   }
 
@@ -784,6 +784,27 @@ function isSearchFocusTarget(target: string | null): boolean {
 
   const normalized = target.toLowerCase().replace(/[^a-z0-9]+/g, '');
   return normalized === 'search' || normalized === 'searchfield';
+}
+
+function isFormActionTarget(target: string | null): boolean {
+  if (!target) {
+    return false;
+  }
+  const normalized = target.toLowerCase().trim();
+  const formActions = [
+    'save',
+    'submit',
+    'deactivate',
+    'reactivate',
+    'delete',
+    'confirm',
+    'update',
+    'cancel',
+    'close',
+    'create',
+    'add'
+  ];
+  return formActions.some(action => normalized.includes(action));
 }
 
 function selectDeterministicFallbackCandidate(

@@ -69,7 +69,7 @@ export function buildStructuredLocatorPriority(element: DomElementSnapshot): Str
     }
   }
 
-  const accessibleName = firstNonEmpty(element.ariaLabel, element.text, element.label, element.placeholder, element.title);
+  const accessibleName = firstNonEmpty(element.ariaLabel, element.text, element.label, element.title);
   const role = normalizeRole(element.role || inferRole(element));
   if (role && accessibleName && accessibleName.length <= 80) {
     candidates.push({ method: 'getByRole', role, name: cleanText(accessibleName), exact: false });

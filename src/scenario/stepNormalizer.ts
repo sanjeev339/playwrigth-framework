@@ -43,6 +43,18 @@ export function normalizeScenarioSteps(
     }
   }
 
+  // Post-process to resolve generic clicks on "dropdown" to the label of a subsequent "Select" or "Choose" action
+  for (let i = 0; i < normalized.length - 1; i++) {
+    const current = normalized[i];
+    const next = normalized[i + 1];
+    if (/^Click\s+Dropdown$/i.test(current.instruction)) {
+      const nextMatch = next.instruction.match(/^(?:Select|Choose)\s+(.+)$/i);
+      if (nextMatch) {
+        current.instruction = `Click ${nextMatch[1]}`;
+      }
+    }
+  }
+
   return normalized;
 }
 
@@ -279,10 +291,11 @@ function isActionLike(segment: string): boolean {
 }
 
 function cleanTarget(value: string): string {
-  return value
+  const cleaned = value
     .replace(/\b(button|link|field|dropdown|option|page|screen|menu|section)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
+  return cleaned || value;
 }
 
 function canonicalizeFieldLabel(target: string, payloadLabels: string[]): string {
@@ -315,6 +328,9 @@ function canonicalizeGeneralTarget(target: string, payloadLabels: string[]): str
 
 function findPayloadLabel(target: string, payloadLabels: string[]): string | null {
   const normalizedTarget = normalize(target);
+  if (!normalizedTarget) {
+    return null;
+  }
   const sortedLabels = [...payloadLabels].sort((a, b) => b.length - a.length);
 
   return (
