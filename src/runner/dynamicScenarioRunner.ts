@@ -2,6 +2,7 @@ import path from 'node:path';
 import { chromium, type Locator, type Page } from '@playwright/test';
 import fs from 'fs-extra';
 import { getFrameworkPaths, getWebEnv } from '../config/env';
+import { readTestData } from '../input/jsonReader';
 import { decideAndExecuteAction } from '../recon/actionDecisionEngine';
 import { scanAccessibility } from '../recon/accessibilityScanner';
 import { locatorFromExpression } from '../recon/locatorSafetyValidator';
@@ -136,6 +137,7 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
   const scenarios = (
     await Promise.all(scenarioFiles.map((scenarioFile) => readJsonFile<Scenario>(scenarioFile)))
   ).sort((left, right) => (left.metadata.execution_order ?? 0) - (right.metadata.execution_order ?? 0));
+  const runtimePayloads = await loadRuntimePayloads(paths.inputDataPath);
 
   await fs.emptyDir(outputDir);
 
@@ -147,7 +149,14 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
 
   try {
     for (const scenario of scenarios) {
-      reports.push(await runScenario({ scenario, outputDir, env }));
+      const runtimePayload = runtimePayloads.get(scenario.scenario_id);
+      reports.push(
+        await runScenario({
+          scenario: runtimePayload ? { ...scenario, payload: { ...scenario.payload, ...runtimePayload } } : scenario,
+          outputDir,
+          env
+        })
+      );
     }
   } finally {
     await browser.close().catch(() => undefined);
@@ -333,7 +342,7 @@ async function executeStep(input: {
   });
   const verification = await verifyActionEffect(input.page, before.snapshot, after.snapshot, decision);
 
-  if (decision.actionStatus === 'success' && verification.status !== 'failed') {
+  if (isPassingStep(decision, verification)) {
     const endedAt = new Date();
     return {
       stepNo,
@@ -440,7 +449,7 @@ async function captureSnapshot(input: {
     url: input.page.url(),
     timestamp: new Date().toISOString(),
     action_before_snapshot: input.actionBeforeSnapshot,
-    decision: input.decision,
+    decision: redactDecisionForArtifact(input.decision),
     action_error: input.actionError,
     snapshotSessionId: input.snapshotSessionId,
     snapshotSequence: input.sequence,
@@ -467,6 +476,20 @@ async function verifyActionEffect(
   }
 
   if (decision.actionStatus === 'skipped') {
+    if (decision.parsedAction.actionType === 'verify') {
+      const target = decision.parsedAction.target ?? decision.selectedValue;
+      if (!target) {
+        return {
+          status: 'skipped',
+          reason: 'Verification step had no target to assert.'
+        };
+      }
+
+      return afterSnapshotContains(after, target)
+        ? { status: 'passed', reason: `Verified visible page state contains "${target}".` }
+        : { status: 'failed', reason: `Verification target "${target}" was not visible after the step.` };
+    }
+
     return {
       status: 'skipped',
       reason: decision.actionError ?? decision.llmReason ?? 'Step was intentionally skipped.'
@@ -480,9 +503,11 @@ async function verifyActionEffect(
     }
 
     const currentValue = await locator.inputValue().catch(() => null);
+    const expectedValueForMessage = decision.parsedAction.isSensitiveValue ? '[REDACTED]' : decision.selectedValue;
+    const currentValueForMessage = decision.parsedAction.isSensitiveValue ? '[REDACTED]' : currentValue;
     return currentValue === decision.selectedValue
       ? { status: 'passed', reason: 'Filled control value matches expected payload value.' }
-      : { status: 'failed', reason: `Filled control value mismatch. Expected "${decision.selectedValue}", got "${currentValue}".` };
+      : { status: 'failed', reason: `Filled control value mismatch. Expected "${expectedValueForMessage}", got "${currentValueForMessage}".` };
   }
 
   if (decision.parsedAction.actionType === 'select') {
@@ -490,9 +515,10 @@ async function verifyActionEffect(
       return { status: 'passed', reason: 'Dropdown option selection completed and was verified by the selector flow.' };
     }
 
+    const selectedValueForMessage = decision.parsedAction.isSensitiveValue ? '[REDACTED]' : decision.selectedValue ?? '';
     return afterSnapshotContains(after, decision.selectedValue)
       ? { status: 'passed', reason: 'Selected value is visible after the step.' }
-      : { status: 'failed', reason: `Selected value "${decision.selectedValue ?? ''}" was not visible after the step.` };
+      : { status: 'failed', reason: `Selected value "${selectedValueForMessage}" was not visible after the step.` };
   }
 
   if (before.url !== after.url) {
@@ -504,6 +530,18 @@ async function verifyActionEffect(
   }
 
   return { status: 'passed', reason: 'Action executed and page reached a stable state.' };
+}
+
+function isPassingStep(decision: ReconDecision, verification: EffectVerification): boolean {
+  if (verification.status === 'failed') {
+    return false;
+  }
+
+  if (decision.actionStatus === 'success') {
+    return true;
+  }
+
+  return decision.parsedAction.actionType === 'verify' && verification.status === 'passed';
 }
 
 async function performLogin(page: Page, email: string, password: string): Promise<void> {
@@ -632,7 +670,7 @@ function summarizeDecision(decision: ReconDecision): DecisionSummary {
     decisionSource: decision.decisionSource,
     actionStatus: decision.actionStatus,
     selectedLocator: decision.selectedLocator,
-    selectedValue: decision.selectedValue,
+    selectedValue: decision.parsedAction.isSensitiveValue && decision.selectedValue !== null ? '[REDACTED]' : decision.selectedValue,
     confidence: decision.confidence,
     selectorRisk: decision.selectorRisk,
     llmReason: decision.llmReason,
@@ -642,6 +680,32 @@ function summarizeDecision(decision: ReconDecision): DecisionSummary {
     llmPromptTokenEstimate: decision.llmPromptTokenEstimate,
     llmResponseTokenEstimate: decision.llmResponseTokenEstimate,
     llmTotalTokenEstimate: decision.llmTotalTokenEstimate
+  };
+}
+
+async function loadRuntimePayloads(inputDataPath: string): Promise<Map<string, Record<string, unknown>>> {
+  try {
+    const records = await readTestData(inputDataPath);
+    return new Map(records.map((record) => [record.scenario_id, record.payload]));
+  } catch (error) {
+    logger.warn('Runtime payload reload failed; using scenario artifact payload only.', error);
+    return new Map();
+  }
+}
+
+function redactDecisionForArtifact(decision: ReconDecision | null): ReconDecision | null {
+  if (!decision?.parsedAction.isSensitiveValue) {
+    return decision;
+  }
+
+  return {
+    ...decision,
+    selectedValue: decision.selectedValue === null ? null : '[REDACTED]',
+    optionValue: decision.optionValue === null ? null : decision.optionValue === undefined ? undefined : '[REDACTED]',
+    parsedAction: {
+      ...decision.parsedAction,
+      value: decision.parsedAction.value === null ? null : '[REDACTED]'
+    }
   };
 }
 

@@ -284,11 +284,13 @@ function matchElement(
       const exact = normalizedValue === normalizedTarget;
       const contains = normalizedValue.includes(normalizedTarget);
       const wordMatch = targetWords(targetVariant).every((word) => normalizedValue.includes(word));
+      const semanticScore = semanticSimilarityScore(targetVariant, value);
+      const semanticMatch = semanticScore >= 0.72;
 
-      if (exact || contains || wordMatch) {
-        matchFields.push(field);
+      if (exact || contains || wordMatch || semanticMatch) {
+        matchFields.push(!exact && !contains && (wordMatch || semanticMatch) ? `${field}:semantic` : field);
         matchedTarget = targetVariant;
-        const fieldScore = exact ? 0 : contains ? 10 : 20;
+        const fieldScore = exact ? 0 : contains ? 10 : wordMatch ? 20 : Math.round(35 - semanticScore * 20);
         bestScore = Math.min(bestScore, fieldScore + fieldWeight(field));
       }
     }
@@ -564,7 +566,44 @@ function targetWords(value: string): string[] {
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .map((word) => word.trim())
-    .filter((word) => word.length > 1);
+    .filter((word) => word.length > 1 && !semanticStopWords.has(word));
+}
+
+const semanticStopWords = new Set([
+  'a',
+  'an',
+  'and',
+  'by',
+  'field',
+  'id',
+  'in',
+  'into',
+  'of',
+  'on',
+  'or',
+  'the',
+  'to'
+]);
+
+function semanticSimilarityScore(target: string, value: string): number {
+  const targetTokens = targetWords(target);
+  const valueTokens = targetWords(value);
+
+  if (targetTokens.length === 0 || valueTokens.length === 0) {
+    return 0;
+  }
+
+  const targetSet = new Set(targetTokens);
+  const valueSet = new Set(valueTokens);
+  const shared = [...targetSet].filter((word) => valueSet.has(word)).length;
+  const precision = shared / valueSet.size;
+  const recall = shared / targetSet.size;
+
+  if (shared === 0) {
+    return 0;
+  }
+
+  return (2 * precision * recall) / (precision + recall);
 }
 
 function targetVariants(value: string): string[] {

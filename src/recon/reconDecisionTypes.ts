@@ -15,6 +15,7 @@ export interface ParsedAction {
   target: string | null;
   value: string | null;
   payloadKey?: string | null;
+  isSensitiveValue?: boolean;
   payloadIdentity?: PayloadIdentity | null;
   rowAction?: string | null;
 }

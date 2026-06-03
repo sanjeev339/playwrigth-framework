@@ -248,7 +248,8 @@ function buildPrompt(input: LLMAdvisorInput): string {
       '- Do not use comments.',
       '- Do not use trailing commas.',
       '- Use null, not undefined.',
-      '- selectedLocator must be one of the provided candidate locator strings when possible.',
+      '- selectedLocator must exactly copy one locator string from Locator Candidates.',
+      '- Do not invent locator strings, CSS, XPath, or Playwright expressions.',
       '- If no safe locator is available, return actionType "error" and selectedLocator null.',
       '',
       'Scenario ID:',
@@ -258,7 +259,7 @@ function buildPrompt(input: LLMAdvisorInput): string {
       input.parsedAction.rawStep,
       '',
       'Parsed Action:',
-      JSON.stringify(input.parsedAction, null, 2),
+      JSON.stringify(sanitizeParsedActionForPrompt(input.parsedAction), null, 2),
       '',
       'Payload:',
       JSON.stringify(sanitizePayload(input.payload), null, 2),
@@ -276,10 +277,10 @@ function buildPrompt(input: LLMAdvisorInput): string {
       JSON.stringify(input.previousActionErrors ?? [], null, 2),
       '',
       'Decision Rules:',
-      '1. Prefer locator candidates already provided.',
-      '2. Prefer getByRole, getByLabel, getByPlaceholder, getByTestId.',
-      '3. Avoid XPath unless no safer option exists.',
-      '4. Do not choose a locator that validation says is unsafe.',
+      '1. Choose selectedLocator only by exact string copy from Locator Candidates.',
+      '2. Locator Candidates are already safe candidates; never choose a locator from Visible UI Elements unless the exact same string appears in Locator Candidates.',
+      '3. Prefer getByRole, getByLabel, getByPlaceholder, getByTestId.',
+      '4. Avoid XPath unless no safer candidate represents the intended target.',
       '5. If multiple candidates are safe, choose the one most semantically related to the current step.',
       '6. If no safe locator exists, return actionType "error" and selectedLocator null.',
       '7. Do not modify business flow.',
@@ -298,6 +299,17 @@ function buildPrompt(input: LLMAdvisorInput): string {
     ].join('\n'),
     80_000
   );
+}
+
+function sanitizeParsedActionForPrompt(parsedAction: ParsedAction): ParsedAction {
+  if (!parsedAction.isSensitiveValue) {
+    return parsedAction;
+  }
+
+  return {
+    ...parsedAction,
+    value: parsedAction.value === null ? null : '[REDACTED]'
+  };
 }
 
 function buildCorrectionPrompt(invalidResponse: string): string {

@@ -4,13 +4,17 @@ import { resolvePayloadIdentity } from '../scenario/payloadIdentityResolver';
 
 const secretKeyPattern = /(password|passcode|secret|token|jwt|cookie|authorization|api[_-]?key)/i;
 
+export function isSecretPayloadKey(key: string | null | undefined): boolean {
+  return Boolean(key && secretKeyPattern.test(key));
+}
+
 export function parseAction(step: string | ScenarioStep, payload: Record<string, unknown> = {}): ParsedAction {
   const atomicAction = typeof step === 'string' ? null : getAtomicAction(step);
   if (atomicAction && typeof step !== 'string') {
     const rawStep = normalizeRawStep(step.instruction || normalizeNullableString(atomicAction.rawActionText) || '');
     const actionType = normalizeAtomicActionType(atomicAction.actionType);
     const target = normalizeNullableString(atomicAction.target);
-    const payloadKey = normalizeNullableString(atomicAction.payloadKey) ?? (target ? findPayloadKeyMention(target, Object.keys(sanitizePayload(payload))) : null);
+    const payloadKey = normalizeNullableString(atomicAction.payloadKey) ?? (target ? findPayloadKeyMention(target, Object.keys(payload)) : null);
     const value = normalizeNullableString(atomicAction.value) ?? valueForAction(actionType, target, payload);
     const payloadIdentity = actionType === 'row_action' ? resolveRowActionIdentity(rawStep, payload) : null;
 
@@ -21,6 +25,7 @@ export function parseAction(step: string | ScenarioStep, payload: Record<string,
       target,
       value,
       payloadKey,
+      isSensitiveValue: isSecretPayloadKey(payloadKey),
       payloadIdentity,
       rowAction: actionType === 'row_action' ? extractRowAction(rawStep) : null
     };
@@ -32,7 +37,9 @@ export function parseAction(step: string | ScenarioStep, payload: Record<string,
   const actionType = detectActionType(normalized);
   const target = extractTarget(rawStep, actionType, payload);
   const value = valueForAction(actionType, target, payload);
-  const payloadKey = (actionType === 'fill' || actionType === 'select') && target ? findPayloadKeyMention(target, Object.keys(sanitizePayload(payload))) : null;
+  const payloadKey = ['fill', 'select', 'navigate'].includes(actionType) && target
+    ? findPayloadKeyMention(target, Object.keys(payload))
+    : null;
   const payloadIdentity = actionType === 'row_action' ? resolveRowActionIdentity(rawStep, payload) : null;
 
   return {
@@ -42,6 +49,7 @@ export function parseAction(step: string | ScenarioStep, payload: Record<string,
     target,
     value,
     payloadKey,
+    isSensitiveValue: isSecretPayloadKey(payloadKey),
     payloadIdentity,
     rowAction: actionType === 'row_action' ? extractRowAction(rawStep) : null
   };
@@ -89,10 +97,10 @@ function isRowActionStep(normalizedStep: string): boolean {
 }
 
 function extractTarget(rawStep: string, actionType: ActionType, payload: Record<string, unknown>): string | null {
-  const payloadKeys = Object.keys(sanitizePayload(payload));
+  const payloadKeys = Object.keys(payload);
   const lowerStep = rawStep.toLowerCase();
 
-  if (actionType === 'fill' && /\b(user details|details|all fields|form|payload)\b/i.test(rawStep)) {
+  if (actionType === 'fill' && /\b(user details|details|required fields|all fields|form|payload)\b/i.test(rawStep)) {
     return '__FORM__';
   }
 
@@ -124,6 +132,10 @@ function extractTarget(rawStep: string, actionType: ActionType, payload: Record<
   }
 
   if (actionType === 'fill') {
+    if (/^enter\s+search\s+by\s+name\s+or\s+email$/i.test(rawStep)) {
+      return 'Search by name or email';
+    }
+
     const payloadKeyMatch = findPayloadKeyMention(rawStep, payloadKeys);
     if (payloadKeyMatch) {
       return payloadKeyMatch;
@@ -145,22 +157,35 @@ function extractTarget(rawStep: string, actionType: ActionType, payload: Record<
 }
 
 function valueForAction(actionType: ActionType, target: string | null, payload: Record<string, unknown>): string | null {
-  if ((actionType !== 'fill' && actionType !== 'select') || !target || target === '__FORM__') {
+  if (!['fill', 'select', 'navigate'].includes(actionType) || !target || target === '__FORM__') {
     return null;
   }
 
-  const sanitizedPayload = sanitizePayload(payload);
-  const exactEntry = Object.entries(sanitizedPayload).find(([key]) => normalize(key) === normalize(target));
+  const exactEntry = Object.entries(payload).find(
+    ([key, value]) => value !== undefined && value !== null && normalize(key) === normalize(target)
+  );
   if (exactEntry) {
-    return exactEntry[1];
+    return String(exactEntry[1]);
   }
 
-  const containsEntry = Object.entries(sanitizedPayload).find(([key]) => {
+  const containsEntry = Object.entries(payload).find(([key, value]) => {
+    if (value === undefined || value === null) {
+      return false;
+    }
     const normalizedKey = normalize(key);
     const normalizedTarget = normalize(target);
     return normalizedTarget.includes(normalizedKey) || normalizedKey.includes(normalizedTarget);
   });
-  return containsEntry?.[1] ?? null;
+  if (containsEntry) {
+    return String(containsEntry[1]);
+  }
+
+  if (/search\s*by\s*name\s*or\s*email/i.test(target)) {
+    const searchEntry = ['Email Address', 'Full Name', 'First Name'].find((key) => payload[key] !== undefined && payload[key] !== null);
+    return searchEntry ? String(payload[searchEntry]) : null;
+  }
+
+  return null;
 }
 
 function findPayloadKeyMention(rawStep: string, payloadKeys: string[]): string | null {

@@ -2,7 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import { getActionDecisionMode } from '../config/env';
 import type { DomElementSnapshot, ScenarioStep } from '../types';
 import { scanVisibleDom } from './domScanner';
-import { parseAction, sanitizePayload } from './actionParser';
+import { isSecretPayloadKey, parseAction } from './actionParser';
 import { resolveDeterministicCandidates } from './deterministicLocatorResolver';
 import { askLLMForActionDecision } from './llmActionAdvisor';
 import {
@@ -36,10 +36,6 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
 
   try {
     if (parsedAction.actionType === 'verify') {
-      if (decisionMode === 'llm_first') {
-        return executeLlmSelectedAction(input, decision, parsedAction, [], [], []);
-      }
-
       return {
         ...decision,
         llmReason: 'verify_only',
@@ -56,6 +52,36 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
         actionStatus: 'success',
         actionError: null,
         llmReason: 'safe_wait'
+      };
+    }
+
+    if (parsedAction.actionType === 'navigate' && parsedAction.value && isHttpUrl(parsedAction.value)) {
+      await input.page.goto(parsedAction.value, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      await waitForSettledPage(input.page);
+      return {
+        ...decision,
+        decisionSource: 'deterministic',
+        selectedLocator: null,
+        selectedValue: null,
+        executed: true,
+        actionStatus: 'success',
+        actionError: null,
+        llmReason: `Navigated directly to URL from payload key "${parsedAction.payloadKey ?? parsedAction.target ?? 'unknown'}".`,
+        confidence: 'high'
+      };
+    }
+
+    if (parsedAction.actionType === 'navigate' && parsedAction.target && /registration\s+link/i.test(parsedAction.target)) {
+      return {
+        ...decision,
+        decisionSource: 'deterministic',
+        selectedLocator: null,
+        selectedValue: null,
+        executed: false,
+        actionStatus: 'failed',
+        actionError: 'Registration Link payload must be set to a real http(s) invite URL before this scenario can run.',
+        llmReason: 'registration_link_missing',
+        confidence: 'high'
       };
     }
 
@@ -86,6 +112,23 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
 
     decision.deterministicCandidates = deterministicCandidates;
     decision.validatedCandidates = validatedCandidates;
+
+    const strongDeterministicSelection = selectStrongDeterministicCandidate(safeCandidates);
+    if (strongDeterministicSelection) {
+      return executeSelectedLocator(input, {
+        decision,
+        parsedAction,
+        selectedLocator: strongDeterministicSelection.locator,
+        selectedValue: parsedAction.value,
+        decisionSource: 'deterministic',
+        confidence: 'high',
+        selectorConfidenceScore: strongDeterministicSelection.selectorConfidenceScore,
+        selectorRisk: strongDeterministicSelection.selectorRisk,
+        selectorConfidenceSignals: strongDeterministicSelection.selectorConfidenceSignals,
+        reason: 'Selected one strong deterministic safe locator before LLM fallback.',
+        knownCandidates: deterministicCandidates
+      });
+    }
 
     if (decisionMode === 'llm_first') {
       console.log('[Recon] LLM used: yes (llm_first)');
@@ -146,17 +189,46 @@ async function executeLlmSelectedAction(
   validatedCandidates: LocatorValidationResult[],
   safeCandidates: LocatorCandidate[]
 ): Promise<ReconDecision> {
-  const advisorDecision = await askLLMForActionDecision({
+  if (safeCandidates.length === 0) {
+    return {
+      ...decision,
+      decisionSource: 'llm',
+      executed: false,
+      actionStatus: 'failed',
+      actionError: 'No safe validated locator candidates are available for the LLM to choose.'
+    };
+  }
+
+  let advisorDecision = await askLLMForActionDecision({
     scenarioId: input.scenarioId,
     parsedAction,
     payload: input.payload,
     visibleElements: input.snapshotElements,
-    locatorCandidates: deterministicCandidates,
-    validationResults: validatedCandidates,
+    locatorCandidates: safeCandidates,
+    validationResults: safeValidationResults(safeCandidates, validatedCandidates),
     previousActionErrors: input.previousActionErrors
   });
   applyLLMMetadata(decision, advisorDecision);
   logLLMParseStatus(advisorDecision);
+
+  if (!isSafeCandidateSelection(advisorDecision.selectedLocator, safeCandidates)) {
+    const rejectedLocator = advisorDecision.selectedLocator ?? 'null';
+    console.log(`[Recon] LLM selected outside safe candidates; retrying with safe-only candidates: ${rejectedLocator}`);
+    advisorDecision = await askLLMForActionDecision({
+      scenarioId: input.scenarioId,
+      parsedAction,
+      payload: input.payload,
+      visibleElements: [],
+      locatorCandidates: safeCandidates,
+      validationResults: safeValidationResults(safeCandidates, validatedCandidates),
+      previousActionErrors: [
+        ...(input.previousActionErrors ?? []),
+        `Rejected locator "${rejectedLocator}". selectedLocator must exactly copy one locator from the safe Locator Candidates list.`
+      ]
+    });
+    applyLLMMetadata(decision, advisorDecision);
+    logLLMParseStatus(advisorDecision);
+  }
 
   decision.deterministicCandidates = deterministicCandidates;
   decision.validatedCandidates = validatedCandidates;
@@ -164,7 +236,7 @@ async function executeLlmSelectedAction(
   decision.llmReason = advisorDecision.reason;
   decision.confidence = advisorDecision.confidence;
   decision.selectedLocator = advisorDecision.selectedLocator;
-  decision.selectedValue = advisorDecision.value ?? parsedAction.value;
+  decision.selectedValue = parsedAction.isSensitiveValue ? parsedAction.value : advisorDecision.value ?? parsedAction.value;
   const selectedCandidate = deterministicCandidates.find((candidate) => candidate.locator === advisorDecision.selectedLocator);
   if (selectedCandidate) {
     decision.selectorConfidenceScore = selectedCandidate.selectorConfidenceScore;
@@ -191,12 +263,12 @@ async function executeLlmSelectedAction(
   const selectedValidation = await validateLocatorExpression(input.page, advisorDecision.selectedLocator, deterministicCandidates);
   decision.validatedCandidates = appendValidation(decision.validatedCandidates, selectedValidation);
 
-  if (safeCandidates.length > 0 && !safeCandidates.some((candidate) => candidate.locator === advisorDecision.selectedLocator)) {
+  if (!isSafeCandidateSelection(advisorDecision.selectedLocator, safeCandidates)) {
     return {
       ...decision,
       executed: false,
       actionStatus: 'failed',
-      actionError: `LLM selected locator outside safe candidate list: ${advisorDecision.selectedLocator}`
+      actionError: `LLM failed to select an exact safe candidate after retry: ${advisorDecision.selectedLocator ?? 'null'}`
     };
   }
 
@@ -215,10 +287,10 @@ async function executeLlmSelectedAction(
       ...parsedAction,
       actionType: advisorDecision.actionType,
       target: advisorDecision.target || parsedAction.target,
-      value: advisorDecision.value ?? parsedAction.value
+      value: parsedAction.isSensitiveValue ? parsedAction.value : advisorDecision.value ?? parsedAction.value
     },
     selectedLocator: advisorDecision.selectedLocator,
-    selectedValue: advisorDecision.value ?? parsedAction.value,
+    selectedValue: parsedAction.isSensitiveValue ? parsedAction.value : advisorDecision.value ?? parsedAction.value,
     decisionSource: 'llm',
     confidence: advisorDecision.confidence,
     selectorConfidenceScore: selectedCandidate?.selectorConfidenceScore,
@@ -235,19 +307,26 @@ async function executeFormFill(
   decision: ReconDecision,
   decisionMode: ReturnType<typeof getActionDecisionMode>
 ): Promise<ReconDecision> {
-  const sanitizedPayload = sanitizePayload(input.payload);
   const selectedLocators: string[] = [];
   const errors: string[] = [];
   let llmUsed = false;
   let filledCount = 0;
 
-  for (const [fieldName, value] of Object.entries(sanitizedPayload)) {
+  for (const [fieldName, rawValue] of Object.entries(input.payload)) {
+    if (rawValue === undefined || rawValue === null || isRuntimeOnlyPayloadKey(fieldName)) {
+      continue;
+    }
+
+    const value = String(rawValue);
+    const isSensitiveField = isSecretPayloadKey(fieldName);
     const fieldAction: ParsedAction = {
       ...parsedAction,
       rawStep: `Fill ${fieldName}`,
       actionType: 'fill',
       target: fieldName,
-      value
+      value,
+      payloadKey: fieldName,
+      isSensitiveValue: isSensitiveField
     };
     const visibleElements = filledCount === 0 ? input.snapshotElements : await scanVisibleDom(input.page);
     const candidates = await resolveDeterministicCandidates(input.page, fieldAction, visibleElements);
@@ -262,8 +341,11 @@ async function executeFormFill(
     let selectedLocator: string | null = null;
     let selectedCandidatePool = candidates;
 
-    if (decisionMode === 'deterministic_first' && safeCandidates.length === 1) {
+    if ((decisionMode === 'deterministic_first' || isSensitiveField) && safeCandidates.length === 1) {
       selectedLocator = safeCandidates[0].locator;
+    } else if (isSensitiveField) {
+      errors.push(`${fieldName}: Sensitive field requires exactly one deterministic safe locator; LLM fallback skipped.`);
+      continue;
     } else {
       llmUsed = true;
       const advisorDecision = await askLLMForActionDecision({
@@ -625,6 +707,20 @@ function selectDeterministicSafeCandidate(safeCandidates: LocatorCandidate[]): L
   return elementIndexes.size === 1 ? sorted[0] : null;
 }
 
+function selectStrongDeterministicCandidate(safeCandidates: LocatorCandidate[]): LocatorCandidate | null {
+  const strongCandidates = safeCandidates.filter((candidate) => {
+    const source = candidate.source.toLowerCase();
+    return (
+      candidate.selectorRisk !== 'high' &&
+      !source.includes(':semantic') &&
+      (source.includes('atomic-exact-target') || source.includes('placeholder') || source.includes('label')) &&
+      ['getByTestId', 'getByRole', 'getByLabel', 'getByPlaceholder', 'getByText', 'css'].includes(candidate.locatorType)
+    );
+  });
+
+  return selectDeterministicSafeCandidate(strongCandidates);
+}
+
 function isStrongSemanticCandidate(candidate: LocatorCandidate): boolean {
   return (
     candidate.priority <= 30 &&
@@ -673,6 +769,18 @@ function appendValidation(
   const updated = [...validations];
   updated[index] = nextValidation;
   return updated;
+}
+
+function isSafeCandidateSelection(selectedLocator: string | null, safeCandidates: LocatorCandidate[]): boolean {
+  return Boolean(selectedLocator && safeCandidates.some((candidate) => candidate.locator === selectedLocator));
+}
+
+function safeValidationResults(
+  safeCandidates: LocatorCandidate[],
+  validations: LocatorValidationResult[]
+): LocatorValidationResult[] {
+  const safeLocators = new Set(safeCandidates.map((candidate) => candidate.locator));
+  return validations.filter((validation) => safeLocators.has(validation.locator) && validation.isSafe);
 }
 
 function unsafeLocatorReason(validation: LocatorValidationResult): string {
@@ -754,4 +862,17 @@ function addOptionalNumber(left: number | undefined, right: number | undefined):
     return left;
   }
   return left + right;
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function isRuntimeOnlyPayloadKey(key: string): boolean {
+  return /^(registration|invite|activation)\s+link$/i.test(key.trim());
 }

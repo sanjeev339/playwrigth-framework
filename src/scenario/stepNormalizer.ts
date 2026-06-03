@@ -9,7 +9,7 @@ export interface NormalizedStep extends ScenarioStep {
 
 type NormalizerInput = Pick<ScenarioStep, 'step_no' | 'instruction' | 'expected_result'>;
 
-const actionStartPattern = /^(navigate|go to|click|enter|fill|type|select|choose|verify|check|assert|wait)\b/i;
+const actionStartPattern = /^(navigate|go to|open|click|enter|fill|type|set|confirm|search|select|choose|verify|check|assert|wait)\b/i;
 
 export function normalizeScenarioSteps(
   steps: NormalizerInput[],
@@ -51,7 +51,7 @@ function splitInstructionIntoSegments(instruction: string): string[] {
     .map((segment) => segment.trim())
     .filter(Boolean);
 
-  if (semicolonSegments.length > 1 && semicolonSegments.every(isActionLike)) {
+  if (semicolonSegments.length > 1) {
     return semicolonSegments;
   }
 
@@ -71,6 +71,18 @@ function splitCompoundInstruction(
   payload: Record<string, unknown>
 ): string[] {
   const normalizedInstruction = cleanInstruction(instruction);
+
+  if (isInviteEmailPrecondition(normalizedInstruction)) {
+    return [];
+  }
+
+  if (isRegistrationLinkInstruction(normalizedInstruction) && hasPayloadKey(payload, 'Registration Link')) {
+    return ['Navigate to Registration Link'];
+  }
+
+  if (isRedundantSearchOpenInstruction(normalizedInstruction) || isRedundantDropdownOpenInstruction(normalizedInstruction)) {
+    return [];
+  }
 
   const rowMenuActionSteps = splitRowMenuActionInstruction(normalizedInstruction, payload, payloadLabels);
   if (rowMenuActionSteps.length > 0) {
@@ -140,11 +152,31 @@ function normalizeGenericRowSelectionInstruction(
 }
 
 function splitMixedCompoundActions(instruction: string): string[] {
-  const actionBoundary = /\s+and\s+(?=(?:navigate|go|click|enter|fill|type|select|choose|verify|check|assert|wait)\b)/i;
+  const actionBoundary = /\s+and\s+(?=(?:navigate|go|open|click|enter|fill|type|set|confirm|search|select|choose|verify|check|assert|wait)\b)/i;
   return instruction
     .split(actionBoundary)
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+function isInviteEmailPrecondition(instruction: string): boolean {
+  return /^open\s+(?:the\s+)?invite\s+email$/i.test(instruction);
+}
+
+function isRegistrationLinkInstruction(instruction: string): boolean {
+  return /^(?:click|open)\s+(?:the\s+)?registration\s+link$/i.test(instruction);
+}
+
+function hasPayloadKey(payload: Record<string, unknown>, key: string): boolean {
+  return Object.keys(payload).some((payloadKey) => payloadKey.toLowerCase() === key.toLowerCase());
+}
+
+function isRedundantSearchOpenInstruction(instruction: string): boolean {
+  return /^click\s+(?:the\s+)?search$/i.test(instruction);
+}
+
+function isRedundantDropdownOpenInstruction(instruction: string): boolean {
+  return /^open\s+(?:the\s+)?(?:\w+\s+)?dropdown$/i.test(instruction);
 }
 
 function extractClickOrSelectTarget(instruction: string): string | null {
@@ -211,6 +243,21 @@ function normalizeActionInstruction(
     return `${verb} ${canonicalizeFieldLabel(cleanTarget(fillMatch[2]), payloadLabels)}`;
   }
 
+  const searchMatch = cleaned.match(/^search\s+(?:the\s+)?(?:user\s+)?(?:by\s+)?(.+)$/i);
+  if (searchMatch?.[1]) {
+    return `Enter ${canonicalizeFieldLabel(`Search by ${cleanTarget(searchMatch[1])}`, payloadLabels)}`;
+  }
+
+  const setPasswordMatch = cleaned.match(/^set\s+(?:the\s+)?password$/i);
+  if (setPasswordMatch) {
+    return 'Enter Password';
+  }
+
+  const confirmPasswordMatch = cleaned.match(/^confirm\s+(?:the\s+)?password$/i);
+  if (confirmPasswordMatch) {
+    return 'Enter Confirm Password';
+  }
+
   const selectMatch = cleaned.match(/^(select|choose)\s+(?:the\s+)?(.+)$/i);
   if (selectMatch?.[2]) {
     if (/\bedit\b/i.test(selectMatch[2])) {
@@ -234,7 +281,7 @@ function cleanInstruction(instruction: string): string {
     .replace(/\bclick\s+on\b/gi, 'Click')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/\.$/, '');
+    .replace(/[.;]+$/, '');
 }
 
 function stripLeadingNumbering(value: string): string {
