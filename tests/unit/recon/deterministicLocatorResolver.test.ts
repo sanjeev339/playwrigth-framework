@@ -101,4 +101,65 @@ describe('deterministicLocatorResolver', () => {
     assert.ok(candidates.length > 0);
     assert.equal(candidates[0].locatorType, 'getByPlaceholder');
   });
+
+  it('matches clickable ancestor for custom dropdown control', async () => {
+    const parsedAction: ParsedAction = {
+      rawStep: 'Click Role',
+      actionType: 'click',
+      target: 'Role',
+      value: null,
+      parseStatus: 'ok',
+      parseReason: 'parsed_successfully',
+      parseConfidence: 0.9
+    };
+
+    const dropdownInput: DomElementSnapshot = {
+      index: 53,
+      tag: 'input',
+      type: 'text',
+      role: 'combobox',
+      label: 'Role *',
+      isVisible: true,
+      isEnabled: true,
+      isLikelyClickable: true,
+      xpathCandidate: '/html/body/div[2]/div[1]/div[2]/div[1]/div[2]/div[4]/div[1]/div[1]/div[1]/div[1]/input[1]',
+      structuredLocatorPriority: [
+        {
+          method: 'xpath',
+          selector: '/html/body/div[2]/div[1]/div[2]/div[1]/div[2]/div[4]/div[1]/div[1]/div[1]/div[1]/input[1]'
+        }
+      ]
+    } as any;
+
+    const dropdownWrapper: DomElementSnapshot = {
+      index: 105,
+      tag: 'div',
+      text: 'QA TEST MAGT',
+      isVisible: true,
+      isEnabled: true,
+      isLikelyClickable: true,
+      xpathCandidate: '/html/body/div[2]/div[1]/div[2]/div[1]/div[2]/div[4]/div[1]/div[1]/div[1]',
+      structuredLocatorPriority: [
+        {
+          method: 'xpath',
+          selector: '/html/body/div[2]/div[1]/div[2]/div[1]/div[2]/div[4]/div[1]/div[1]/div[1]'
+        }
+      ]
+    } as any;
+
+    const candidates = await resolveDeterministicCandidates(
+      {} as any,
+      parsedAction,
+      [dropdownInput, dropdownWrapper],
+      {}
+    );
+
+    // Ancestor candidates should be generated and prioritized
+    const ancestorCandidates = candidates.filter(c => c.source.startsWith('deterministic-ancestor:'));
+    assert.ok(ancestorCandidates.length > 0);
+
+    const firstCandidate = candidates[0];
+    assert.ok(firstCandidate.source.startsWith('deterministic-ancestor:'));
+    assert.equal(firstCandidate.locator, 'page.locator("xpath=/html/body/div[2]/div[1]/div[2]/div[1]/div[2]/div[4]/div[1]/div[1]/div[1]")');
+  });
 });

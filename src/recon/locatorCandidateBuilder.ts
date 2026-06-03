@@ -134,6 +134,7 @@ function inferRole(element: DomElementSnapshot): string | undefined {
   if (tag === 'input') {
     if (type === 'checkbox') return 'checkbox';
     if (type === 'radio') return 'radio';
+    if (type === 'search') return 'searchbox';
     if (['button', 'submit', 'reset'].includes(type ?? '')) return 'button';
     return 'textbox';
   }

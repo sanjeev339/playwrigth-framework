@@ -115,7 +115,7 @@ describe('assertionExtractor', () => {
     const assertions = await extractStepAssertions(action, step, payload);
     const customAssertion = assertions.find(a => a.type === 'custom');
     assert.ok(customAssertion);
-    assert.equal(customAssertion?.assertionCode, 'await expect(page.getByText("Custom Assertion")).toBeVisible();');
+    assert.equal(customAssertion?.assertionCode, 'await expect(page.getByText("Custom Assertion")).toBeVisible({ timeout: 15000 });');
   });
 
   it('gates/discards assertions when elements do not exist in post-action snapshot', async () => {
@@ -160,8 +160,8 @@ describe('assertionExtractor', () => {
 
       const assertions = await extractStepAssertions(action, step, payload);
 
-      // Only the Save button assertions should remain. Delete button assertion should be gated.
-      assert.equal(assertions.length, 2);
+      // Only the Save button assertion should remain. Delete button assertion should be gated, and Save is deduplicated.
+      assert.equal(assertions.length, 1);
       assert.ok(assertions.some(a => a.assertionCode.includes('Save')));
       assert.ok(!assertions.some(a => a.assertionCode.includes('Delete')));
     } finally {

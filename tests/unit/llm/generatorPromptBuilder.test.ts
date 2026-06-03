@@ -57,7 +57,7 @@ describe('buildDeterministicReconTest', () => {
   });
 
   it('uses payload-stable row locators, stable URLs, and skips failed Role recon', () => {
-    const reconActions = loadReconSummaryActions();
+    const reconActions = loadFixtureActions();
     const code = buildDeterministicReconTest(scenario, reconActions);
 
     validateGeneratedReconTest(code, scenario, reconActions);

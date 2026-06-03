@@ -102,9 +102,77 @@ export async function resolveDeterministicCandidates(
         structuredLocator
       });
     });
+
+    const tag = element.tag.toLowerCase();
+    const role = element.role?.trim().toLowerCase();
+    const isDropdownControl =
+      tag === 'select' ||
+      ['combobox', 'listbox'].includes(role ?? '') ||
+      element.className?.includes('multiselect') ||
+      element.className?.includes('dropdown');
+
+    if (isDropdownControl && (parsedAction.actionType === 'click' || parsedAction.actionType === 'select')) {
+      const clickableAncestors = findClickableAncestors(element, enrichedElements);
+      for (const ancestor of clickableAncestors) {
+        const ancestorStructured = ancestor.structuredLocatorPriority?.length
+          ? ancestor.structuredLocatorPriority
+          : buildStructuredLocatorPriority(ancestor);
+        const ancestorAllowed = filterLocatorsForAction(parsedAction, ancestor, ancestorStructured, payload);
+        
+        ancestorAllowed.forEach((structuredLocator, index) => {
+          const locator = locatorToString(structuredLocator);
+          candidates.push({
+            locator,
+            locatorType: structuredLocator.method,
+            // Give ancestor slightly better priority (lower score) to prioritize wrapper click
+            priority: match.score + locatorPreference(parsedAction, structuredLocator, ancestor) + index - 3,
+            source: `deterministic-ancestor:${element.index}:${match.matchFields.join(',')}`,
+            ...scoreCandidateConfidence(structuredLocator, ancestor),
+            elementSummary: summarizeElement(ancestor),
+            structuredLocator
+          });
+        });
+      }
+    }
   }
 
   return dedupeCandidates(candidates).sort((left, right) => left.priority - right.priority);
+}
+
+function findClickableAncestors(
+  element: DomElementSnapshot,
+  allElements: DomElementSnapshot[]
+): DomElementSnapshot[] {
+  const ancestors: DomElementSnapshot[] = [];
+  const childXpath = element.xpathCandidate;
+  if (!childXpath) {
+    return ancestors;
+  }
+
+  const parts = childXpath.split('/');
+  let currentParts = [...parts];
+  for (let depth = 1; depth <= 3; depth++) {
+    if (currentParts.length <= 2) {
+      break;
+    }
+    currentParts.pop(); // Remove the last node
+    const parentXpath = currentParts.join('/');
+    
+    // Find the element with this xpathCandidate
+    const parentElement = allElements.find(
+      (el) => el.xpathCandidate === parentXpath || el.xpathCandidate === parentXpath + '[1]'
+    );
+    if (parentElement && parentElement.isVisible) {
+      const tag = parentElement.tag.toLowerCase();
+      const interactiveTags = ['div', 'span', 'button', 'a', 'li', 'td'];
+      if (interactiveTags.includes(tag) && parentElement.isLikelyClickable) {
+        ancestors.push(parentElement);
+      }
+    }
+  }
+
+  // Select only the single closest ancestor
+  return ancestors.slice(0, 1);
 }
 
 function matchElement(
@@ -194,10 +262,9 @@ function isElementCompatible(
   if (parsedAction.actionType === 'fill') {
     return (
       ['input', 'textarea'].includes(tag) ||
-      element.role === 'textbox' ||
+      ['textbox', 'searchbox'].includes(element.role ?? '') ||
       Boolean(element.className?.includes('contenteditable')) ||
-      type === 'email' ||
-      type === 'text'
+      ['email', 'text', 'search'].includes(type ?? '')
     );
   }
 
@@ -225,7 +292,7 @@ function isElementCompatible(
 
     return (
       ['button', 'a', 'li', 'input', 'select', 'label'].includes(tag) ||
-      ['button', 'link', 'menuitem', 'tab', 'option', 'combobox', 'checkbox', 'radio', 'textbox'].includes(role ?? '') ||
+      ['button', 'link', 'menuitem', 'tab', 'option', 'combobox', 'checkbox', 'radio', 'textbox', 'searchbox'].includes(role ?? '') ||
       type === 'button' ||
       type === 'submit' ||
       (['div', 'span'].includes(tag) && element.isLikelyClickable === true)
@@ -650,14 +717,24 @@ function getActiveOverlayXPaths(elements: DomElementSnapshot[]): string[] {
     const isOverlay = 
       role === 'dialog' || 
       role === 'alertdialog' || 
+      role === 'listbox' ||
       className.includes('p-sidebar-visible') || 
       className.includes('p-sidebar') || 
       className.includes('p-dialog') || 
+      className.includes('p-dropdown-panel') || 
+      className.includes('p-multiselect-panel') || 
+      className.includes('p-autocomplete-panel') || 
+      className.includes('p-overlaypanel') || 
       className.includes('modal') || 
       className.includes('custom-drawer');
       
     if (isOverlay && el.xpathCandidate) {
-      overlayXPaths.push(el.xpathCandidate);
+      const bodyChildMatch = el.xpathCandidate.match(/^(\/html\/body\/[^/]+)/);
+      if (bodyChildMatch) {
+        overlayXPaths.push(bodyChildMatch[1]);
+      } else {
+        overlayXPaths.push(el.xpathCandidate);
+      }
     }
   }
   return overlayXPaths;

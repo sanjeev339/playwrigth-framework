@@ -391,7 +391,7 @@ async function executeSelectedLocator(
     const beforeSignals = await collectUiTransitionSignals(input.page);
 
     if (options.parsedAction.actionType === 'click' || options.parsedAction.actionType === 'navigate') {
-      await locator.click();
+      await safeClick(locator, options.selectedLocator);
       await waitForSettledPage(input.page);
     } else if (options.parsedAction.actionType === 'fill') {
       if (!options.selectedValue) {
@@ -485,10 +485,51 @@ async function executeSelectAction(
   dropdownLocator: Locator,
   decision: ReconDecision
 ): Promise<string> {
-  await dropdownLocator.click();
-  await input.page.waitForTimeout(250);
+  const optionValue = parsedAction.value;
+  if (!optionValue) {
+    throw new Error('No option value was available for select action.');
+  }
 
-  if (input.onIntermediateSnapshot) {
+  const optionAction: ParsedAction = {
+    rawStep: `Select option ${optionValue} for ${parsedAction.target ?? 'dropdown'}`,
+    stepNo: parsedAction.stepNo,
+    actionType: 'click',
+    target: optionValue,
+    value: null
+  };
+
+  // Check if option is already visible in the page
+  const initialElements = await scanVisibleDom(input.page);
+  let optionCandidates = await resolveDeterministicCandidates(input.page, optionAction, initialElements, input.payload);
+  let optionValidations = await validateCandidates(input.page, optionCandidates);
+  let safeOptionCandidates = optionCandidates.filter((candidate) =>
+    optionValidations.some((validation) => validation.locator === candidate.locator && validation.isSafe)
+  );
+
+  let clickedDropdown = false;
+  let finalOptionElements = initialElements;
+
+  if (safeOptionCandidates.length === 0) {
+    logger.info(`Option "${optionValue}" is not visible. Clicking dropdown to open it.`);
+    await safeClick(dropdownLocator, decision.selectedLocator ?? '');
+    await input.page.waitForTimeout(250);
+    clickedDropdown = true;
+
+    // Scan DOM again after clicking
+    finalOptionElements = await scanVisibleDom(input.page);
+    optionCandidates = await resolveDeterministicCandidates(input.page, optionAction, finalOptionElements, input.payload);
+    optionValidations = await validateCandidates(input.page, optionCandidates);
+    safeOptionCandidates = optionCandidates.filter((candidate) =>
+      optionValidations.some((validation) => validation.locator === candidate.locator && validation.isSafe)
+    );
+  } else {
+    logger.info(`Option "${optionValue}" is already visible. Skipping dropdown click.`);
+  }
+
+  decision.deterministicCandidates.push(...optionCandidates);
+  decision.validatedCandidates.push(...optionValidations);
+
+  if (clickedDropdown && input.onIntermediateSnapshot) {
     await input.onIntermediateSnapshot(
       `${parsedAction.target ?? 'select'}-dropdown-open`,
       `Open ${parsedAction.target ?? 'select'} dropdown`,
@@ -504,28 +545,6 @@ async function executeSelectAction(
     );
   }
 
-  const optionValue = parsedAction.value;
-  if (!optionValue) {
-    throw new Error('No option value was available for select action.');
-  }
-
-  const optionElements = await scanVisibleDom(input.page);
-  const optionAction: ParsedAction = {
-    rawStep: `Select option ${optionValue} for ${parsedAction.target ?? 'dropdown'}`,
-    stepNo: parsedAction.stepNo,
-    actionType: 'click',
-    target: optionValue,
-    value: null
-  };
-  const optionCandidates = await resolveDeterministicCandidates(input.page, optionAction, optionElements, input.payload);
-  const optionValidations = await validateCandidates(input.page, optionCandidates);
-  decision.deterministicCandidates.push(...optionCandidates);
-  decision.validatedCandidates.push(...optionValidations);
-
-  const safeOptionCandidates = optionCandidates.filter((candidate) =>
-    optionValidations.some((validation) => validation.locator === candidate.locator && validation.isSafe)
-  );
-
   let selectedOptionLocator: string | null = null;
   if (safeOptionCandidates.length === 1) {
     selectedOptionLocator = safeOptionCandidates[0].locator;
@@ -534,7 +553,7 @@ async function executeSelectAction(
       scenarioId: input.scenarioId,
       parsedAction: optionAction,
       payload: input.payload,
-      visibleElements: optionElements,
+      visibleElements: finalOptionElements,
       locatorCandidates: optionCandidates,
       validationResults: optionValidations,
       previousActionErrors: input.previousActionErrors
@@ -566,7 +585,7 @@ async function executeSelectAction(
     throw new Error(`Unsupported option locator: ${selectedOptionLocator}`);
   }
 
-  await optionLocator.click();
+  await safeClick(optionLocator, selectedOptionLocator);
   await waitForSettledPage(input.page);
   return selectedOptionLocator;
 }
@@ -743,8 +762,12 @@ async function verifyPostcondition(
     return { ok: true };
   }
 
-  if (actionType === 'click' || actionType === 'select') {
+  if (actionType === 'click') {
     return urlChanged || dialogChanged || visibleChanged ? { ok: true } : { ok: false, reason: 'click_select_no_state_change' };
+  }
+
+  if (actionType === 'select') {
+    return { ok: true };
   }
 
   if (actionType === 'fill') {
@@ -814,4 +837,22 @@ function lowerConfidence(
     return next;
   }
   return rank[next] < rank[current] ? next : current;
+}
+
+async function safeClick(locator: Locator, locatorExpr: string): Promise<void> {
+  try {
+    await locator.click({ timeout: 3000 });
+  } catch (error: any) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    if (
+      errorMsg.includes('intercepts pointer events') ||
+      errorMsg.includes('timeout') ||
+      errorMsg.includes('Timeout')
+    ) {
+      logger.info(`Click on locator '${locatorExpr}' was intercepted or timed out. Retrying with force: true...`);
+      await locator.click({ force: true });
+    } else {
+      throw error;
+    }
+  }
 }

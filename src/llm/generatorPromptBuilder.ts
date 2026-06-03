@@ -178,22 +178,36 @@ async function clickFirst(label: string, locators: Locator[]): Promise<void> {
 }
 
 async function selectCustomDropdown(page: Page, openDropdown: () => Locator, optionValue: string): Promise<void> {
-  await openDropdown().click({ force: true });
-
   const exactOptionRegex = new RegExp(\`^\${escapeRegex(optionValue)}$\`, 'i');
-  const optionCandidates = [
+  const optionLocators = [
     page.locator('li.p-multiselect-item, li[role="option"]').filter({ hasText: exactOptionRegex }),
     page.getByRole('option', { name: exactOptionRegex }),
-    page.locator('[role="listbox"], .p-dropdown-panel, .p-dropdown-items, .p-multiselect-panel').getByText(exactOptionRegex),
-    page.getByText(exactOptionRegex)
+    page.locator('[role="listbox"], .p-dropdown-panel, .p-dropdown-items, .p-multiselect-panel').getByText(exactOptionRegex)
   ];
 
-  for (const locator of optionCandidates) {
-    const candidate = await firstUsable(locator);
-    if (candidate) {
-      await candidate.click({ force: true });
-      return;
+  let candidate = null;
+  for (const locator of optionLocators) {
+    candidate = await firstUsable(locator);
+    if (candidate) break;
+  }
+
+  if (!candidate) {
+    await openDropdown().click({ force: true });
+    await page.waitForTimeout(250);
+
+    for (const locator of optionLocators) {
+      candidate = await firstUsable(locator);
+      if (candidate) break;
     }
+  }
+
+  if (!candidate) {
+    candidate = await firstUsable(page.getByText(exactOptionRegex));
+  }
+
+  if (candidate) {
+    await candidate.click({ force: true });
+    return;
   }
 
   throw new Error(\`No safe option locator found for dropdown value: \${optionValue}\`);
