@@ -5,14 +5,12 @@
     "data_strategy": "positive_valid_create",
     "edge_case_type": null,
     "payload": {
-      "First Name": "Priya",
+      "First Name": "Riya",
       "Last Name": "Sharma",
-      "Full Name": "Priya Sharma",
-      "Email Address": "priya.sharma+auto001@piraiinfotech.com",
+      "Full Name": "Riya Sharma",
+      "Email Address": "riya.sharma+1@piraiinfotech.com",
       "Role": "Executive",
-      "Status": "Pending",
-      "Created Date": "2026-04-01T12:00:00",
-      "Created By": "Client_admin01"
+      "Status": "Pending"
     }
   },
   {
@@ -31,6 +29,20 @@
   {
     "scenario_id": "TC-UM-003",
     "execution_order": 3,
+    "data_strategy": "negative_invalid_create",
+    "edge_case_type": "duplicate_value",
+    "payload": {
+      "First Name": "adi",
+      "Last Name": "j",
+      "Full Name": "adi j",
+      "Email Address": "sanjeevkumar.m00@gmail.com",
+      "Role": "Workflow Operators",
+      "Expected Error": "Email already exists"
+    }
+  },
+  {
+    "scenario_id": "TC-UM-004",
+    "execution_order": 4,
     "data_strategy": "positive_valid_update",
     "edge_case_type": "status_change",
     "payload": {
@@ -40,19 +52,6 @@
       "Email Address": "sanjeevkumar.m00@gmail.com",
       "Add comments": "comment",
       "Status": "Deactivated"
-    }
-  },
-  {
-    "scenario_id": "TC-UM-004",
-    "execution_order": 4,
-    "data_strategy": "negative_invalid_create",
-    "edge_case_type": "duplicate_value",
-    "payload": {
-      "First Name": "adithya",
-      "Last Name": "j",
-      "Full Name": "adithya j",
-      "Email Address": "sanjeevkumar.m00@gmail.com",
-      "Expected Error": "Email already exists"
     }
   },
   {
@@ -66,7 +65,7 @@
       "Full Name": "adithya j",
       "Email Address": "sanjeevkumar.m00@gmail.com",
       "Add comments": "comment",
-      "Status": "Active"
+      "Status": "Activated"
     }
   }
 ]
