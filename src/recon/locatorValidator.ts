@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { getFrameworkPaths } from '../config/env';
+import { getLatestGenerationSelection } from '../generation/generationSelection';
 import type { LocatorValidationReport, LocatorValidationWarning } from '../types';
 import { listFiles, readTextFile, writeJsonFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
@@ -11,14 +12,20 @@ const genericText = /^(add|edit|delete|save|submit|cancel|ok|yes|no|next|back|cl
 export async function validateGeneratedLocators(options: {
   generatedDir?: string;
   healedDir?: string;
+  generationReportPath?: string;
   outputPath?: string;
 } = {}): Promise<LocatorValidationReport> {
   const paths = getFrameworkPaths();
   const generatedDir = options.generatedDir ?? paths.generatedTestsDir;
   const healedDir = options.healedDir ?? paths.healedTestsDir;
+  const generationReportPath = options.generationReportPath ?? paths.generationReportPath;
   const outputPath = options.outputPath ?? paths.locatorValidationReportPath;
-  const generatedFiles = await listFiles(generatedDir, '.ts');
-  const healedFiles = await listFiles(healedDir, '.ts');
+  const selection = await getLatestGenerationSelection({ generationReportPath, generatedDir });
+  const successfulScenarioIds = new Set(selection.successfulScenarioIds);
+  const generatedFiles = selection.generatedFiles;
+  const healedFiles = (await listFiles(healedDir, '.ts')).filter(
+    (file) => selection.report === null || successfulScenarioIds.has(path.basename(file).replace(/\.spec\.ts$/, ''))
+  );
   const testFiles = [...generatedFiles, ...healedFiles];
   const report: LocatorValidationReport = {
     generated_at: new Date().toISOString(),

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import type { PlaywrightRunResult } from '../types';
 import { getBaseEnv, getFrameworkPaths } from '../config/env';
+import { getLatestGenerationSelection } from '../generation/generationSelection';
 import { writeJsonFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 
@@ -10,12 +11,22 @@ const execFileAsync = promisify(execFile);
 
 export async function runGeneratedTests(options: {
   outputPath?: string;
+  generatedDir?: string;
+  generationReportPath?: string;
 } = {}): Promise<PlaywrightRunResult> {
   const env = getBaseEnv();
   const paths = getFrameworkPaths();
   const outputPath = options.outputPath ?? paths.runResultPath;
-  const generatedTestsDir = path.relative(process.cwd(), paths.generatedTestsDir) || paths.generatedTestsDir;
-  const args = ['playwright', 'test', generatedTestsDir];
+  const generatedDir = options.generatedDir ?? paths.generatedTestsDir;
+  const generationReportPath = options.generationReportPath ?? paths.generationReportPath;
+  const selection = await getLatestGenerationSelection({ generationReportPath, generatedDir });
+  const generatedTestFiles = selection.generatedFiles.map((file) => path.relative(process.cwd(), file) || file);
+
+  if (generatedTestFiles.length === 0) {
+    throw new Error(`No successfully generated test files are available from ${generationReportPath}.`);
+  }
+
+  const args = ['playwright', 'test', ...generatedTestFiles];
 
   if (!env.HEADLESS) {
     args.push('--headed');
@@ -73,9 +84,8 @@ if (require.main === module) {
   runGeneratedTests().catch(async (error) => {
     const paths = getFrameworkPaths();
     const outputPath = paths.runResultPath;
-    const generatedTestsDir = path.relative(process.cwd(), paths.generatedTestsDir) || paths.generatedTestsDir;
     const failed: PlaywrightRunResult = {
-      command: `npx playwright test ${generatedTestsDir}`,
+      command: `npx playwright test <latest-successful-generated-tests>`,
       status: 'failed',
       exitCode: 1,
       startedAt: new Date().toISOString(),
@@ -87,5 +97,6 @@ if (require.main === module) {
     };
     await writeJsonFile(outputPath, failed);
     logger.error('Playwright runner failed before test execution.', error);
+    process.exitCode = 1;
   });
 }

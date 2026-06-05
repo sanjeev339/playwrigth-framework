@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'fs-extra';
 import { getFrameworkPaths } from '../config/env';
+import { getLatestGenerationSelection } from '../generation/generationSelection';
 import type { PlaywrightRunResult, ReconSnapshot, Scenario } from '../types';
 import { inferUiStability } from '../recon/locatorCandidateBuilder';
 import {
@@ -27,6 +28,7 @@ export async function healFailedTests(options: {
   runResultPath?: string;
   scenarioDir?: string;
   generatedDir?: string;
+  generationReportPath?: string;
   reconDir?: string;
   outputDir?: string;
   healingReportPath?: string;
@@ -35,6 +37,7 @@ export async function healFailedTests(options: {
   const runResultPath = options.runResultPath ?? paths.runResultPath;
   const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
   const generatedDir = options.generatedDir ?? paths.generatedTestsDir;
+  const generationReportPath = options.generationReportPath ?? paths.generationReportPath;
   const reconDir = options.reconDir ?? paths.reconDir;
   const outputDir = options.outputDir ?? paths.healedTestsDir;
   const healingReportPath = options.healingReportPath ?? paths.healingReportPath;
@@ -63,7 +66,8 @@ export async function healFailedTests(options: {
     return result;
   }
 
-  const generatedFiles = await filesToHeal(generatedDir, runResult.failedTestFiles);
+  const selection = await getLatestGenerationSelection({ generationReportPath, generatedDir });
+  const generatedFiles = filesToHeal(selection.generatedFiles, runResult.failedTestFiles);
   const healedFiles: string[] = [];
 
   logger.info(`Healing ${generatedFiles.length} failed test file(s) using LLM provider from env.`);
@@ -92,12 +96,14 @@ export async function healFailedTests(options: {
   return result;
 }
 
-async function filesToHeal(generatedDir: string, failedTestFiles: string[]): Promise<string[]> {
+function filesToHeal(generatedFiles: string[], failedTestFiles: string[]): string[] {
   if (failedTestFiles.length === 0) {
-    return listFiles(generatedDir, '.ts');
+    return generatedFiles;
   }
 
-  return failedTestFiles.map((file) => path.resolve(process.cwd(), file)).filter((file) => fs.existsSync(file));
+  const failedPaths = new Set(failedTestFiles.map((file) => path.resolve(process.cwd(), file)));
+  const failedNames = new Set(failedTestFiles.map((file) => path.basename(file)));
+  return generatedFiles.filter((file) => failedPaths.has(path.resolve(file)) || failedNames.has(path.basename(file)));
 }
 
 async function readReconSnapshots(reconPath: string): Promise<ReconSnapshot[]> {

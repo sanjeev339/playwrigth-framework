@@ -140,6 +140,38 @@ export interface LocatorValidationReport {
   warnings: LocatorValidationWarning[];
 }
 
+export type GenerationFailureStage =
+  | 'scenario-read'
+  | 'plan-read'
+  | 'recon-extraction'
+  | 'prompt-build'
+  | 'llm-generation'
+  | 'deterministic-generation'
+  | 'validation'
+  | 'write'
+  | 'quarantine';
+
+export interface GenerationScenarioResult {
+  scenario_id: string;
+  status: 'generated' | 'failed';
+  generated_file?: string;
+  generator_source?: 'llm' | 'deterministic';
+  recon_source?: 'dynamic' | 'static';
+  failed_stage?: GenerationFailureStage;
+  error?: string;
+  quarantined_file?: string;
+}
+
+export interface GenerationReport {
+  generated_at: string;
+  summary: {
+    total: number;
+    generated: number;
+    failed: number;
+  };
+  scenarios: GenerationScenarioResult[];
+}
+
 export interface PlaywrightRunResult {
   command: string;
   status: 'passed' | 'failed';

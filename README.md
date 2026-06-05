@@ -37,7 +37,10 @@ INPUT_FLOW_PATH=input/test_flow.xlsx
 INPUT_DATA_PATH=input/test_data.json
 SCENARIO_OUTPUT_DIR=scenarios
 DYNAMIC_RECON_OUTPUT_DIR=dynamic-recon
+GENERATED_TEST_OUTPUT_DIR=tests/generated
+GENERATED_TEST_QUARANTINE_DIR=generated-quarantine
 REPORT_OUTPUT_DIR=reports
+GENERATION_REPORT_PATH=reports/generation-result.json
 
 # Optional stable login locators, preferably frontend data-testid selectors
 LOGIN_EMAIL_SELECTOR=[data-testid="login-email"]
@@ -108,6 +111,8 @@ The older static generation flow is still available for comparison:
 ```bash
 npm run pipeline:static
 ```
+
+Static generation attempts every scenario independently. If one scenario cannot produce a safe generated test, its failure is written to `reports/generation-result.json`, any older generated script for that scenario is moved to `generated-quarantine/`, and generation continues for the remaining scenarios. Validation, generated-test execution, and healing use only the successful files listed in the latest generation report.
 
 ## How The Pipeline Works
 

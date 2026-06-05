@@ -83,9 +83,11 @@ const frameworkPathSchema = z.object({
   RECON_SUMMARY_OUTPUT_DIR: optionalPath,
   DYNAMIC_RECON_OUTPUT_DIR: optionalPath,
   GENERATED_TEST_OUTPUT_DIR: optionalPath,
+  GENERATED_TEST_QUARANTINE_DIR: optionalPath,
   HEALED_TEST_OUTPUT_DIR: optionalPath,
   REPORT_OUTPUT_DIR: optionalPath,
   ACTION_EXTRACTION_REPORT_PATH: optionalPath,
+  GENERATION_REPORT_PATH: optionalPath,
   RUN_RESULT_PATH: optionalPath,
   LOCATOR_VALIDATION_REPORT_PATH: optionalPath,
   FINAL_REPORT_JSON_PATH: optionalPath,
@@ -140,9 +142,11 @@ export interface FrameworkPaths {
   reconSummaryDir: string;
   dynamicReconDir: string;
   generatedTestsDir: string;
+  generatedTestsQuarantineDir: string;
   healedTestsDir: string;
   reportDir: string;
   actionExtractionReportPath: string;
+  generationReportPath: string;
   runResultPath: string;
   locatorValidationReportPath: string;
   finalReportJsonPath: string;
@@ -190,11 +194,16 @@ export function getFrameworkPaths(): FrameworkPaths {
     reconSummaryDir: resolveProjectPath(env.RECON_SUMMARY_OUTPUT_DIR, 'recon-summary'),
     dynamicReconDir: resolveProjectPath(env.DYNAMIC_RECON_OUTPUT_DIR, 'dynamic-recon'),
     generatedTestsDir: resolveProjectPath(env.GENERATED_TEST_OUTPUT_DIR, 'tests', 'generated'),
+    generatedTestsQuarantineDir: resolveProjectPath(env.GENERATED_TEST_QUARANTINE_DIR, 'generated-quarantine'),
     healedTestsDir: resolveProjectPath(env.HEALED_TEST_OUTPUT_DIR, 'tests', 'healed'),
     reportDir,
     actionExtractionReportPath: resolveProjectPath(
       env.ACTION_EXTRACTION_REPORT_PATH,
       path.relative(process.cwd(), path.join(reportDir, 'action-extraction-validation.json'))
+    ),
+    generationReportPath: resolveProjectPath(
+      env.GENERATION_REPORT_PATH,
+      path.relative(process.cwd(), path.join(reportDir, 'generation-result.json'))
     ),
     runResultPath: resolveProjectPath(env.RUN_RESULT_PATH, path.relative(process.cwd(), path.join(reportDir, 'run-result.json'))),
     locatorValidationReportPath: resolveProjectPath(

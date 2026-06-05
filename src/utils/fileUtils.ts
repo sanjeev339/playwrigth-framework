@@ -25,6 +25,18 @@ export async function writeTextFile(filePath: string, data: string): Promise<voi
   await fs.writeFile(filePath, data, 'utf8');
 }
 
+export async function writeTextFileAtomic(filePath: string, data: string): Promise<void> {
+  await ensureParentDir(filePath);
+  const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+
+  try {
+    await fs.writeFile(temporaryPath, data, 'utf8');
+    await fs.move(temporaryPath, filePath, { overwrite: true });
+  } finally {
+    await fs.remove(temporaryPath).catch(() => undefined);
+  }
+}
+
 export async function readTextFile(filePath: string): Promise<string> {
   return fs.readFile(filePath, 'utf8');
 }

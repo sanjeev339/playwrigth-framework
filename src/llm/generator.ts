@@ -1,6 +1,13 @@
 import path from 'node:path';
+import fs from 'fs-extra';
 import { getFrameworkPaths } from '../config/env';
-import type { ReconSnapshot, Scenario } from '../types';
+import type {
+  GenerationFailureStage,
+  GenerationReport,
+  GenerationScenarioResult,
+  ReconSnapshot,
+  Scenario
+} from '../types';
 import { extractReconActions, type ReconAction } from '../recon/reconActionExtractor';
 import {
   buildDeterministicReconTest,
@@ -8,48 +15,147 @@ import {
   compactDropdownSnapshot,
   type CompactDropdownSnapshot
 } from './generatorPromptBuilder';
-import { listFiles, readJsonFile, readTextFile, toSafeFileName, writeTextFile } from '../utils/fileUtils';
+import {
+  listFiles,
+  readJsonFile,
+  readTextFile,
+  toSafeFileName,
+  writeJsonFile,
+  writeTextFileAtomic
+} from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 import { normalizeNestedTestImports } from '../utils/specImportPaths';
 import { callLLM } from './llmClient';
 
-export async function generateTests(options: {
+interface GeneratedCode {
+  code: string;
+  source: 'llm' | 'deterministic';
+}
+
+export interface GenerateTestsOptions {
   scenarioDir?: string;
   specDir?: string;
   reconDir?: string;
+  dynamicReconDir?: string;
   outputDir?: string;
-} = {}): Promise<string[]> {
+  quarantineDir?: string;
+  reportPath?: string;
+  dependencies?: {
+    callLLM?: typeof callLLM;
+    extractReconActions?: typeof extractReconActions;
+    now?: () => Date;
+  };
+}
+
+class ScenarioGenerationError extends Error {
+  constructor(
+    readonly stage: GenerationFailureStage,
+    cause: unknown
+  ) {
+    super(errorMessage(cause));
+    this.name = 'ScenarioGenerationError';
+  }
+}
+
+export async function generateTests(options: GenerateTestsOptions = {}): Promise<GenerationReport> {
   const paths = getFrameworkPaths();
   const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
   const specDir = options.specDir ?? paths.specDir;
   const reconDir = options.reconDir ?? paths.reconDir;
+  const dynamicReconDir = options.dynamicReconDir ?? paths.dynamicReconDir;
   const outputDir = options.outputDir ?? paths.generatedTestsDir;
+  const quarantineDir = options.quarantineDir ?? paths.generatedTestsQuarantineDir;
+  const reportPath = options.reportPath ?? paths.generationReportPath;
+  const extractActions = options.dependencies?.extractReconActions ?? extractReconActions;
+  const callLLMForGeneration = options.dependencies?.callLLM ?? callLLM;
+  const now = options.dependencies?.now ?? (() => new Date());
   const scenarioFiles = await listFiles(scenarioDir, '.json');
-  const writtenFiles: string[] = [];
 
   if (scenarioFiles.length === 0) {
     throw new Error(`No scenario files found in ${scenarioDir}. Run npm run build:scenarios first.`);
   }
 
   logger.info(`Generating tests for ${scenarioFiles.length} scenario(s) using LLM provider from env.`);
+  const scenarioResults: GenerationScenarioResult[] = [];
 
   for (const scenarioFile of scenarioFiles) {
-    const scenario = await readJsonFile<Scenario>(scenarioFile);
-    const safeScenarioId = toSafeFileName(scenario.scenario_id);
-    const specPath = path.join(specDir, `${safeScenarioId}.md`);
-    const reconPath = path.join(reconDir, safeScenarioId);
-    const outputPath = path.join(outputDir, `${safeScenarioId}.spec.ts`);
+    scenarioResults.push(
+      await generateScenarioIndependently({
+        scenarioFile,
+        specDir,
+        reconDir,
+        dynamicReconDir,
+        outputDir,
+        quarantineDir,
+        extractActions,
+        callLLMForGeneration,
+        now
+      })
+    );
+  }
 
-    logger.info(`Generating test for ${scenario.scenario_id} (spec: ${path.basename(specPath)})...`);
+  const report: GenerationReport = {
+    generated_at: now().toISOString(),
+    summary: {
+      total: scenarioResults.length,
+      generated: scenarioResults.filter((scenario) => scenario.status === 'generated').length,
+      failed: scenarioResults.filter((scenario) => scenario.status === 'failed').length
+    },
+    scenarios: scenarioResults
+  };
+
+  await writeJsonFile(reportPath, report);
+  logger.info(
+    `Wrote generation report -> ${reportPath} (${report.summary.generated} generated, ${report.summary.failed} failed).`
+  );
+  return report;
+}
+
+async function generateScenarioIndependently(input: {
+  scenarioFile: string;
+  specDir: string;
+  reconDir: string;
+  dynamicReconDir: string;
+  outputDir: string;
+  quarantineDir: string;
+  extractActions: typeof extractReconActions;
+  callLLMForGeneration: typeof callLLM;
+  now: () => Date;
+}): Promise<GenerationScenarioResult> {
+  let stage: GenerationFailureStage = 'scenario-read';
+  let scenarioId = path.basename(input.scenarioFile, path.extname(input.scenarioFile));
+  let safeScenarioId = toSafeFileName(scenarioId);
+  let outputPath = path.join(input.outputDir, `${safeScenarioId}.spec.ts`);
+  let reconSource: 'dynamic' | 'static' | undefined;
+
+  try {
+    const scenario = await readJsonFile<Scenario>(input.scenarioFile);
+    scenarioId = scenario.scenario_id;
+    safeScenarioId = toSafeFileName(scenarioId);
+    outputPath = path.join(input.outputDir, `${safeScenarioId}.spec.ts`);
+    const specPath = path.join(input.specDir, `${safeScenarioId}.md`);
+
+    logger.info(`Generating test for ${scenarioId} (spec: ${path.basename(specPath)})...`);
+    stage = 'plan-read';
     const plan = await readTextFile(specPath);
-    const reconActions = await extractReconActions(scenario.scenario_id);
-    logger.info(`Loaded ${reconActions.length} recon action(s) for ${scenario.scenario_id}.`);
 
+    stage = 'recon-extraction';
+    const reconSelection = await readPreferredReconActions({
+      scenarioId,
+      dynamicReconDir: input.dynamicReconDir,
+      staticReconDir: input.reconDir,
+      extractActions: input.extractActions
+    });
+    reconSource = reconSelection.source;
+    const reconActions = reconSelection.actions;
+    logger.info(`Loaded ${reconActions.length} ${reconSelection.source} recon action(s) for ${scenarioId}.`);
     if (reconActions.length === 0) {
-      throw new Error(`No recon decisions found for ${scenario.scenario_id}. Run npm run recon first.`);
+      throw new Error(`No recon decisions found for ${scenarioId}. Run npm run pipeline or npm run recon first.`);
     }
 
+    const reconPath = path.join(reconSelection.rootDir, safeScenarioId);
     const dropdownSnapshots = await readRelevantDropdownSnapshots(reconPath, reconActions);
+    stage = 'prompt-build';
     const prompt = buildGeneratorPrompt({
       scenario,
       plan,
@@ -57,33 +163,84 @@ export async function generateTests(options: {
       dropdownSnapshots
     });
 
-    const code = normalizeNestedTestImports(
-      await generateReconDrivenCode({
-        scenario,
-        reconActions,
-        prompt
-      })
-    );
+    const generated = await generateReconDrivenCode({
+      scenario,
+      reconActions,
+      prompt,
+      callLLMForGeneration: input.callLLMForGeneration
+    });
+    const code = normalizeNestedTestImports(generated.code);
 
-    await writeTextFile(outputPath, code);
+    stage = 'validation';
     validateGeneratedReconTest(code, scenario, reconActions);
-    writtenFiles.push(outputPath);
-    logger.info(`Wrote generated test for ${scenario.scenario_id} -> ${outputPath}`);
+
+    stage = 'write';
+    await writeTextFileAtomic(outputPath, code);
+    logger.info(`Wrote generated test for ${scenarioId} -> ${outputPath}`);
+    return {
+      scenario_id: scenarioId,
+      status: 'generated',
+      generated_file: path.relative(process.cwd(), outputPath),
+      generator_source: generated.source,
+      recon_source: reconSelection.source
+    };
+  } catch (error) {
+    let failureStage = error instanceof ScenarioGenerationError ? error.stage : stage;
+    let failureMessage = errorMessage(error);
+    let quarantinedFile: string | undefined;
+
+    try {
+      quarantinedFile = await quarantineGeneratedTest(outputPath, input.quarantineDir, safeScenarioId, input.now);
+    } catch (quarantineError) {
+      failureStage = 'quarantine';
+      failureMessage = `${failureMessage} Quarantine failed: ${errorMessage(quarantineError)}`;
+    }
+
+    logger.error(`Test generation failed for ${scenarioId} at ${failureStage}; continuing with remaining scenarios.`, error);
+    return {
+      scenario_id: scenarioId,
+      status: 'failed',
+      failed_stage: failureStage,
+      error: failureMessage,
+      recon_source: reconSource,
+      quarantined_file: quarantinedFile
+    };
+  }
+}
+
+async function readPreferredReconActions(input: {
+  scenarioId: string;
+  dynamicReconDir: string;
+  staticReconDir: string;
+  extractActions: typeof extractReconActions;
+}): Promise<{ source: 'dynamic' | 'static'; rootDir: string; actions: ReconAction[] }> {
+  const dynamicActions = await input.extractActions(input.scenarioId, input.dynamicReconDir);
+  if (dynamicActions.length > 0) {
+    return {
+      source: 'dynamic',
+      rootDir: input.dynamicReconDir,
+      actions: dynamicActions
+    };
   }
 
-  return writtenFiles;
+  return {
+    source: 'static',
+    rootDir: input.staticReconDir,
+    actions: await input.extractActions(input.scenarioId, input.staticReconDir)
+  };
 }
 
 async function generateReconDrivenCode(input: {
   scenario: Scenario;
   reconActions: ReconAction[];
   prompt: string;
-}): Promise<string> {
+  callLLMForGeneration: typeof callLLM;
+}): Promise<GeneratedCode> {
   try {
-    const generated = await callLLM(input.prompt);
+    const generated = await input.callLLMForGeneration(input.prompt);
     const llmCode = stripCodeFence(generated);
     validateGeneratedReconTest(llmCode, input.scenario, input.reconActions);
-    return llmCode;
+    return { code: llmCode, source: 'llm' };
   } catch (error) {
     logger.warn(
       `LLM generated test did not satisfy recon-action validation. Falling back to deterministic recon generator. ${
@@ -92,9 +249,13 @@ async function generateReconDrivenCode(input: {
     );
   }
 
-  const fallbackCode = buildDeterministicReconTest(input.scenario, input.reconActions);
-  validateGeneratedReconTest(fallbackCode, input.scenario, input.reconActions);
-  return fallbackCode;
+  try {
+    const fallbackCode = buildDeterministicReconTest(input.scenario, input.reconActions);
+    validateGeneratedReconTest(fallbackCode, input.scenario, input.reconActions);
+    return { code: fallbackCode, source: 'deterministic' };
+  } catch (error) {
+    throw new ScenarioGenerationError('deterministic-generation', error);
+  }
 }
 
 async function readRelevantDropdownSnapshots(
@@ -179,10 +340,35 @@ function stripCodeFence(value: string): string {
   return value.replace(/^```(?:typescript|ts)?\s*/i, '').replace(/```\s*$/i, '').trimEnd() + '\n';
 }
 
+async function quarantineGeneratedTest(
+  generatedFile: string,
+  quarantineRoot: string,
+  safeScenarioId: string,
+  now: () => Date
+): Promise<string | undefined> {
+  if (!(await fs.pathExists(generatedFile))) {
+    return undefined;
+  }
+
+  const timestamp = now().toISOString().replace(/[^0-9A-Za-z.-]+/g, '-');
+  const quarantinePath = path.join(quarantineRoot, safeScenarioId, `${timestamp}-${path.basename(generatedFile)}`);
+  await fs.ensureDir(path.dirname(quarantinePath));
+  await fs.move(generatedFile, quarantinePath, { overwrite: true });
+  logger.warn(`Quarantined stale generated test for ${safeScenarioId} -> ${quarantinePath}`);
+  return path.relative(process.cwd(), quarantinePath);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 if (require.main === module) {
   generateTests()
-    .then((files) => {
-      logger.info(`Generated ${files.length} Playwright test file(s).`);
+    .then((report) => {
+      logger.info(`Generated ${report.summary.generated} Playwright test file(s).`);
+      if (report.summary.generated === 0) {
+        process.exitCode = 1;
+      }
     })
     .catch((error) => {
       logger.error('Test generation failed.', error);

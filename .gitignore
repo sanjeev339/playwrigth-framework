@@ -13,4 +13,5 @@ test-results/
 /specs/
 /tests/generated/
 /tests/healed/
+/generated-quarantine/
 .DS_Store

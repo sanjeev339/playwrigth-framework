@@ -1,7 +1,13 @@
 import path from 'node:path';
 import fs from 'fs-extra';
 import { getFrameworkPaths } from '../config/env';
-import type { LocatorValidationReport, PlaywrightRunResult, Scenario } from '../types';
+import type {
+  GenerationReport,
+  GenerationScenarioResult,
+  LocatorValidationReport,
+  PlaywrightRunResult,
+  Scenario
+} from '../types';
 import type { ReconDecision } from '../recon/reconDecisionTypes';
 import { escapeHtml, listFiles, readJsonFile, toSafeFileName, writeJsonFile, writeTextFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
@@ -32,7 +38,9 @@ interface FinalScenarioReport {
   action?: string;
   generated_file?: string;
   healed_file?: string;
-  status: 'passed' | 'failed' | 'unknown';
+  status: 'passed' | 'failed' | 'blocked' | 'unknown';
+  generation_status: 'generated' | 'failed' | 'not-run';
+  generation_failed_stage?: string;
   validation_warnings: string[];
   failure_reason?: string;
   healing_status: 'not-needed' | 'healed' | 'not-run';
@@ -46,6 +54,7 @@ interface FinalReport {
     total: number;
     passed: number;
     failed: number;
+    blocked: number;
     unknown: number;
   };
   scenarios: FinalScenarioReport[];
@@ -56,6 +65,7 @@ export async function writeFinalReport(options: {
   generatedDir?: string;
   healedDir?: string;
   reconDir?: string;
+  generationReportPath?: string;
   runResultPath?: string;
   validationPath?: string;
   outputJsonPath?: string;
@@ -66,12 +76,16 @@ export async function writeFinalReport(options: {
   const generatedDir = options.generatedDir ?? paths.generatedTestsDir;
   const healedDir = options.healedDir ?? paths.healedTestsDir;
   const reconDir = options.reconDir ?? paths.reconDir;
+  const generationReportPath = options.generationReportPath ?? paths.generationReportPath;
   const runResultPath = options.runResultPath ?? paths.runResultPath;
   const validationPath = options.validationPath ?? paths.locatorValidationReportPath;
   const outputJsonPath = options.outputJsonPath ?? paths.finalReportJsonPath;
   const outputHtmlPath = options.outputHtmlPath ?? paths.finalReportHtmlPath;
 
   const scenarios = await Promise.all((await listFiles(scenarioDir, '.json')).map((file) => readJsonFile<Scenario>(file)));
+  const generationReport = (await fs.pathExists(generationReportPath))
+    ? await readJsonFile<GenerationReport>(generationReportPath)
+    : undefined;
   const runResult = (await fs.pathExists(runResultPath)) ? await readJsonFile<PlaywrightRunResult>(runResultPath) : undefined;
   const validation = (await fs.pathExists(validationPath)) ? await readJsonFile<LocatorValidationReport>(validationPath) : undefined;
 
@@ -81,14 +95,28 @@ export async function writeFinalReport(options: {
     const safeScenarioId = toSafeFileName(scenario.scenario_id);
     const generatedFile = path.join(generatedDir, `${safeScenarioId}.spec.ts`);
     const healedFile = path.join(healedDir, `${safeScenarioId}.spec.ts`);
+    const generationResult = generationReport?.scenarios.find((result) => result.scenario_id === scenario.scenario_id);
     const reconSnapshots = await listFiles(path.join(reconDir, safeScenarioId), '.json');
     const smartRecon = await readSmartReconSummary(reconSnapshots);
-    const generatedRelative = (await fs.pathExists(generatedFile)) ? path.relative(process.cwd(), generatedFile) : undefined;
-    const healedRelative = (await fs.pathExists(healedFile)) ? path.relative(process.cwd(), healedFile) : undefined;
+    const generatedRelative =
+      generationResult?.status !== 'failed' && (await fs.pathExists(generatedFile))
+        ? path.relative(process.cwd(), generatedFile)
+        : undefined;
+    const healedRelative =
+      generationResult?.status !== 'failed' && (await fs.pathExists(healedFile))
+        ? path.relative(process.cwd(), healedFile)
+        : undefined;
     const validationWarnings =
       validation?.warnings
         .filter((warning) => warning.file.endsWith(`${safeScenarioId}.spec.ts`))
         .map((warning) => `[${warning.severity}] ${warning.rule}: ${warning.message}`) ?? [];
+    const status = scenarioStatus(
+      runResult,
+      safeScenarioId,
+      generationResult,
+      Boolean(generationReport),
+      Boolean(generatedRelative)
+    );
 
     scenarioReports.push({
       scenario_id: scenario.scenario_id,
@@ -96,10 +124,12 @@ export async function writeFinalReport(options: {
       action: scenario.action,
       generated_file: generatedRelative,
       healed_file: healedRelative,
-      status: scenarioStatus(runResult, safeScenarioId),
+      status,
+      generation_status: generationResult?.status ?? 'not-run',
+      generation_failed_stage: generationResult?.failed_stage,
       validation_warnings: validationWarnings,
-      failure_reason: runResult?.status === 'failed' ? summarizeFailure(runResult) : undefined,
-      healing_status: healedRelative ? 'healed' : runResult?.status === 'failed' ? 'not-run' : 'not-needed',
+      failure_reason: failureReason(status, generationResult, runResult),
+      healing_status: healedRelative ? 'healed' : status === 'failed' || status === 'blocked' ? 'not-run' : 'not-needed',
       recon_snapshot_paths: reconSnapshots.map((file) => path.relative(process.cwd(), file)),
       smart_recon: smartRecon
     });
@@ -111,6 +141,7 @@ export async function writeFinalReport(options: {
       total: scenarioReports.length,
       passed: scenarioReports.filter((scenario) => scenario.status === 'passed').length,
       failed: scenarioReports.filter((scenario) => scenario.status === 'failed').length,
+      blocked: scenarioReports.filter((scenario) => scenario.status === 'blocked').length,
       unknown: scenarioReports.filter((scenario) => scenario.status === 'unknown').length
     },
     scenarios: scenarioReports
@@ -122,7 +153,25 @@ export async function writeFinalReport(options: {
   return report;
 }
 
-function scenarioStatus(runResult: PlaywrightRunResult | undefined, safeScenarioId: string): 'passed' | 'failed' | 'unknown' {
+function scenarioStatus(
+  runResult: PlaywrightRunResult | undefined,
+  safeScenarioId: string,
+  generationResult: GenerationScenarioResult | undefined,
+  hasGenerationReport: boolean,
+  hasGeneratedFile: boolean
+): 'passed' | 'failed' | 'blocked' | 'unknown' {
+  if (generationResult?.status === 'failed') {
+    return 'blocked';
+  }
+
+  if (hasGenerationReport && generationResult?.status !== 'generated') {
+    return 'unknown';
+  }
+
+  if (hasGenerationReport && generationResult?.status === 'generated' && !hasGeneratedFile) {
+    return 'unknown';
+  }
+
   if (!runResult) {
     return 'unknown';
   }
@@ -133,6 +182,18 @@ function scenarioStatus(runResult: PlaywrightRunResult | undefined, safeScenario
 
   const failedThisScenario = runResult.failedTestFiles.some((file) => file.includes(`${safeScenarioId}.spec.ts`));
   return failedThisScenario || runResult.failedTestFiles.length === 0 ? 'failed' : 'unknown';
+}
+
+function failureReason(
+  status: FinalScenarioReport['status'],
+  generationResult: GenerationScenarioResult | undefined,
+  runResult: PlaywrightRunResult | undefined
+): string | undefined {
+  if (status === 'blocked' && generationResult?.status === 'failed') {
+    return `${generationResult.failed_stage ?? 'generation'}: ${generationResult.error ?? 'Test generation failed.'}`;
+  }
+
+  return status === 'failed' && runResult ? summarizeFailure(runResult) : undefined;
 }
 
 function summarizeFailure(runResult: PlaywrightRunResult): string {
@@ -203,6 +264,7 @@ function renderHtml(report: FinalReport): string {
           <td>${escapeHtml(scenario.module ?? '')}</td>
           <td>${escapeHtml(scenario.action ?? '')}</td>
           <td><span class="status ${scenario.status}">${escapeHtml(scenario.status)}</span></td>
+          <td>${escapeHtml(scenario.generation_status)}</td>
           <td>${escapeHtml(scenario.generated_file ?? '')}</td>
           <td>${escapeHtml(scenario.healed_file ?? '')}</td>
           <td>${escapeHtml(scenario.healing_status)}</td>
@@ -251,6 +313,7 @@ function renderHtml(report: FinalReport): string {
     .status { font-weight: 700; text-transform: uppercase; }
     .passed { color: #047857; }
     .failed { color: #b91c1c; }
+    .blocked { color: #7c3aed; }
     .unknown { color: #92400e; }
     .decision { border-bottom: 1px solid #e5e7eb; margin-bottom: 8px; padding-bottom: 8px; max-width: 420px; overflow-wrap: anywhere; }
   </style>
@@ -262,6 +325,7 @@ function renderHtml(report: FinalReport): string {
     <div class="metric"><strong>${report.summary.total}</strong>Total</div>
     <div class="metric"><strong>${report.summary.passed}</strong>Passed</div>
     <div class="metric"><strong>${report.summary.failed}</strong>Failed</div>
+    <div class="metric"><strong>${report.summary.blocked}</strong>Blocked</div>
     <div class="metric"><strong>${report.summary.unknown}</strong>Unknown</div>
   </section>
   <table>
@@ -271,6 +335,7 @@ function renderHtml(report: FinalReport): string {
         <th>Module</th>
         <th>Action</th>
         <th>Status</th>
+        <th>Generation</th>
         <th>Generated</th>
         <th>Healed</th>
         <th>Healing</th>
