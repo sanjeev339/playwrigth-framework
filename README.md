@@ -1,13 +1,19 @@
-# Playwright AI Framework
+# Playwright AI Automation Framework
 
-Production-style AI-powered Playwright automation framework that converts manual Excel flows and JSON payloads into normalized scenario JSON, then executes each scenario through a Webwright-style hybrid step runner. The runner scans the live UI at every step, sends the current step and locator candidates to the configured LLM, validates the LLM-selected locator, executes the action, verifies the UI effect, captures artifacts, attempts one repair on failure, and writes JSON/HTML reports with estimated LLM token usage.
+This project converts manual test cases and JSON test data into executable Playwright automation. It supports two flows:
+
+- Dynamic pipeline: runs each scenario directly against the live application by scanning the current DOM at every step and choosing a safe action/locator.
+- Static pipeline: creates TypeScript Playwright specs in `tests/generated/`, validates them, runs only successfully generated specs, heals failures, and writes a final report.
+
+The dynamic pipeline is the main working flow for day-to-day automation. The static pipeline is useful when you need generated `.spec.ts` files that can be reviewed, committed, or reused.
 
 ## Requirements
 
 - Node.js 20 or newer
 - A reachable application URL
-- OpenAI API key
 - Playwright browser dependencies
+- OpenAI API key or Gemini API key
+- Login credentials for the target application
 
 ## Setup
 
@@ -17,46 +23,55 @@ npx playwright install
 cp .env.example .env
 ```
 
-Fill `.env`:
+Fill `.env` with the values needed for your environment:
 
 ```bash
-OPENAI_API_KEY=your-key
-OPENAI_MODEL=gpt-4.1-mini
 LLM_PROVIDER=openai
+OPENAI_API_KEY=your-openai-key
+OPENAI_MODEL=gpt-4.1-mini
+
+# Or use Gemini
+# LLM_PROVIDER=gemini
+# GEMINI_API_KEY=your-gemini-key
+# GEMINI_MODEL=gemini-2.5-flash
+
 ACTION_DECISION_MODE=llm_first
-LOG_LLM_IO=true
-LLM_IO_MAX_CHARS=20000
-WEBSITE_URL=https://your-app.example.com
-LOGIN_EMAIL=your-login
-LOGIN_PASSWORD=your-password
+WEBSITE_URL=https://your-app-url.example.com
+LOGIN_EMAIL=your-login-email
+LOGIN_PASSWORD=your-login-password
 HEADLESS=false
 SLOW_MO=100
 
-# Optional path overrides
+LOG_LLM_IO=true
+LLM_IO_MAX_CHARS=20000
+
 INPUT_FLOW_PATH=input/test_flow.xlsx
 INPUT_DATA_PATH=input/test_data.json
 SCENARIO_OUTPUT_DIR=scenarios
+SPEC_OUTPUT_DIR=specs
+SCENARIO_ACTION_OUTPUT_DIR=scenario-actions
+RECON_OUTPUT_DIR=recon
+RECON_SUMMARY_OUTPUT_DIR=recon-summary
 DYNAMIC_RECON_OUTPUT_DIR=dynamic-recon
 GENERATED_TEST_OUTPUT_DIR=tests/generated
 GENERATED_TEST_QUARANTINE_DIR=generated-quarantine
+HEALED_TEST_OUTPUT_DIR=tests/healed
 REPORT_OUTPUT_DIR=reports
-GENERATION_REPORT_PATH=reports/generation-result.json
 
-# Optional stable login locators, preferably frontend data-testid selectors
-LOGIN_EMAIL_SELECTOR=[data-testid="login-email"]
-LOGIN_PASSWORD_SELECTOR=[data-testid="login-password"]
-LOGIN_SUBMIT_SELECTOR=[data-testid="login-submit"]
-
-# Disabled by default. Enable only when no stable locator exists.
 ALLOW_XPATH_LOCATORS=false
 ALLOW_POSITIONAL_LOCATORS=false
 ```
 
-Never commit `.env`.
+Do not commit `.env`.
 
-## Inputs
+## Input Files
 
-Place the manual flow in `input/test_flow.xlsx`. Flexible Excel headers are supported:
+The framework reads these default files:
+
+- `input/test_flow.xlsx`: manual test cases and steps
+- `input/test_data.json`: payload data matched by `scenario_id`
+
+Supported Excel headers include:
 
 - `scenario_id` or `Scenario ID`
 - `module` or `Module`
@@ -65,27 +80,75 @@ Place the manual flow in `input/test_flow.xlsx`. Flexible Excel headers are supp
 - `instruction`, `Instruction`, or `Step`
 - `expected_result` or `Expected Result`
 
-Place payloads in `input/test_data.json`:
+Example JSON:
 
 ```json
 [
   {
     "scenario_id": "TC-UM-001",
+    "record_id": "1e60cde8-f3ba-4b51-8f5d-e6c03aba5c7d",
+    "data_strategy": "positive_valid_create",
+    "edge_case_type": null,
     "payload": {
-      "First Name": "Riya",
-      "Last Name": "Sharma",
-      "Email Address": "riya.sharma@example.test",
-      "Role": "Executive",
-      "Status": "Pending",
-      "Password": "{{TEST_USER_PASSWORD}}"
+      "First Name": "Auto",
+      "Last Name": "UserOne",
+      "Email Address": "auto.user.one@example.com",
+      "Role": "QA TEST MAGT",
+      "Status": "Active"
     }
   }
 ]
 ```
 
-Payload values may use env placeholders like `{{TEST_USER_PASSWORD}}` or `${TEST_USER_PASSWORD}`. Password-like payload keys are redacted before normalized scenario files are written.
+Password-like payload fields are redacted before scenario JSON files are written.
 
-## Commands
+## Recommended Step Writing
+
+Write steps as user intent, not raw UI internals.
+
+Use:
+
+```text
+Select the user
+Click Reactivate
+Click Deactivate
+Enter Add comments
+```
+
+Avoid generic steps such as:
+
+```text
+Click Actions For User
+```
+
+The normalizer can convert `Select the user` into a row-specific action using payload identity such as email address. This is safer because the runner can target the correct row before opening the row action menu.
+
+For state-changing cases, test data must match the expected current UI state:
+
+- `Click Reactivate` needs a user that is currently suspended or inactive enough for the Reactivate option to be enabled.
+- `Click Deactivate` needs a currently active user.
+- Avoid reusing the same user record across multiple tests when one test changes that user's status.
+- Role values in JSON must exactly match the values available in the UI dropdown.
+
+## Common Commands
+
+Build normalized scenario JSON:
+
+```bash
+npm run build:scenarios
+```
+
+Run the main dynamic pipeline:
+
+```bash
+npm run pipeline
+```
+
+Run dynamic execution after scenarios are already built:
+
+```bash
+npm run run:webwright
+```
 
 Run the seed login test:
 
@@ -93,92 +156,336 @@ Run the seed login test:
 npm run test:seed
 ```
 
-Run the dynamic step-runner pipeline:
+Typecheck the project:
+
+```bash
+npm run typecheck
+```
+
+Run generator and normalizer tests:
+
+```bash
+npm run test:generator
+npm run test:normalizer
+```
+
+## Generate TypeScript Test Files
+
+To create generated Playwright `.spec.ts` files:
 
 ```bash
 npm run build:scenarios
-npm run run:webwright
+npm run plan
+npm run extract:actions
+npm run recon
+npm run generate
 ```
 
-Run the full pipeline:
+Then validate and run only the generated files that succeeded:
 
 ```bash
-npm run pipeline
+npm run validate
+npm run run:generated
 ```
 
-The older static generation flow is still available for comparison:
+Then heal and write the final static report:
+
+```bash
+npm run heal
+npm run report
+```
+
+Or run the full static pipeline in one command:
 
 ```bash
 npm run pipeline:static
 ```
 
-Static generation attempts every scenario independently. If one scenario cannot produce a safe generated test, its failure is written to `reports/generation-result.json`, any older generated script for that scenario is moved to `generated-quarantine/`, and generation continues for the remaining scenarios. Validation, generated-test execution, and healing use only the successful files listed in the latest generation report.
+## Dynamic Pipeline
 
-## How The Pipeline Works
-
-1. `build:scenarios` reads the configured Excel/JSON input paths, matches rows by `scenario_id`, normalizes manual steps, and writes clean scenario JSON files to the configured scenario output folder.
-2. `run:webwright` opens one live Playwright browser session per scenario and logs in with `.env` credentials.
-3. For every normalized step, the runner captures the current page state, runs fresh DOM/accessibility recon, asks the LLM to decide the action/locator, validates the selected locator, executes it, waits for UI stability, verifies the effect, and captures the next page state.
-4. Recon runs inside the step loop, not only once at the beginning, so modals, dropdowns, and newly rendered controls are discovered only after the earlier steps create them.
-5. If a step fails, the runner records the error, screenshot, DOM/accessibility snapshot, locator decision, and failure reason. It then attempts one repair using a fresh snapshot.
-6. If repair succeeds, the scenario continues and marks the step as `repaired`. If repair fails, the scenario stops with a step-wise failure report.
-7. Reports, snapshots, and screenshots are written to the configured report and recon output folders.
-8. The report includes LLM call count and estimated token usage.
-
-## Webwright-Style Hybrid Runner Behavior
-
-The runner is state-based, not a single page scan. It follows the actual user journey:
-
-- Open login page, scan it.
-- Log in, scan dashboard.
-- For each step, capture `before` state.
-- Run fresh DOM and accessibility recon for the current page state.
-- Resolve deterministic locator candidates and validate safety.
-- In the current default mode, `ACTION_DECISION_MODE=llm_first`, send every executable step to the LLM.
-- The LLM decides which locator/action to use from the current screen.
-- Deterministic candidates are still built, but they are used as safe options for the LLM instead of being auto-executed first.
-- To switch back to older deterministic-first behavior, set `ACTION_DECISION_MODE=deterministic_first`.
-- Execute the selected Playwright action.
-- Wait until the UI is stable.
-- Capture `after` state.
-- Verify the effect.
-- On failure, capture screenshot and attempt one repair from a fresh page snapshot.
-- Record estimated LLM tokens in the JSON/HTML report.
-
-## OpenAI Usage
-
-In the current dynamic flow, LLM usage is first-class: every executable step goes to the LLM by default so the LLM decides which locator/action to use from the current screen. Safety validation still runs before execution.
-
-To see exactly what the framework sends to the LLM and what the LLM returns in the terminal, keep:
+`npm run pipeline` executes:
 
 ```bash
-LOG_LLM_IO=true
-LLM_IO_MAX_CHARS=20000
+npm run build:scenarios && npm run run:webwright
 ```
 
-The terminal output is redacted before printing. API keys, login email, login password, bearer tokens, JWTs, and password/token-like payload fields are masked. Increase `LLM_IO_MAX_CHARS` only when you need a larger prompt/response preview.
+What happens:
 
-The older static generation flow uses OpenAI in three places:
+1. Excel and JSON input files are read.
+2. Steps are normalized and scenario files are written to `scenarios/`.
+3. The runner opens the application and logs in for each scenario.
+4. For every step, the runner captures the current page state.
+5. DOM and accessibility candidates are collected from the live UI.
+6. The LLM chooses an action and locator from the current screen.
+7. Locator safety checks run before execution.
+8. Playwright executes the step.
+9. The runner captures after-state evidence.
+10. If a step fails, screenshot, DOM snapshot, decision details, and error details are saved.
+11. One repair attempt is made from a fresh page snapshot.
+12. The next scenario still runs even if the current scenario fails.
 
-- Planner: scenario JSON to Markdown test plan.
-- Generator: scenario, plan, and recon snapshots to Playwright TypeScript tests.
-- Healer: failed run output plus recon snapshots to repaired tests.
+Dynamic reports are written to:
 
-The framework does not send login passwords to OpenAI. Generated tests must use `process.env.LOGIN_PASSWORD`.
+- `reports/dynamic-run-result.json`
+- `reports/dynamic-run-result.html`
+- `dynamic-recon/`
+
+## Static Pipeline
+
+`npm run pipeline:static` executes:
+
+```bash
+npm run build:scenarios &&
+npm run plan &&
+npm run extract:actions &&
+npm run recon &&
+npm run generate &&
+npm run validate &&
+npm run run:generated &&
+npm run heal &&
+npm run report
+```
+
+Static generation is independent per test case. One failed scenario does not stop the remaining scenarios.
+
+Generation behavior:
+
+- Each scenario runs inside its own `try/catch`.
+- Generated code is validated before it is written.
+- Successfully generated specs are written to `tests/generated/`.
+- Failed scenarios are recorded in `reports/generation-result.json`.
+- Older generated specs for failed scenarios are moved to `generated-quarantine/<scenario-id>/`.
+- The pipeline continues if at least one scenario generated successfully.
+- The pipeline fails only for fatal setup errors or when zero scenarios generate.
+
+Example generation report:
+
+```json
+{
+  "summary": {
+    "total": 5,
+    "generated": 4,
+    "failed": 1
+  },
+  "scenarios": [
+    {
+      "scenario_id": "TC-UM-001",
+      "status": "generated",
+      "generated_file": "tests/generated/TC-UM-001.spec.ts"
+    },
+    {
+      "scenario_id": "TC-UM-002",
+      "status": "failed",
+      "failed_stage": "deterministic-generation",
+      "error": "Missing recon locator for select step: Select Role"
+    }
+  ]
+}
+```
+
+Validation and `run:generated` use only successful files from the latest generation report. Final static reporting marks generation failures as `blocked` instead of incorrectly marking all existing generated files as passed.
+
+Static reports are written to:
+
+- `reports/generation-result.json`
+- `reports/locator-validation.json`
+- `reports/run-result.json`
+- `reports/healing-result.json`
+- `reports/result.json`
+- `reports/result.html`
+
+## Folder Structure
+
+```text
+input/
+  test_flow.xlsx              Manual scenario steps
+  test_data.json              Scenario payloads
+
+scenarios/
+  TC-*.json                   Normalized scenario files
+
+specs/
+  TC-*.md                     LLM-written static test plans
+
+scenario-actions/
+  *.json                      Actions extracted from generated plans
+
+recon/
+  TC-*/                       Static recon snapshots
+
+dynamic-recon/
+  TC-*/                       Dynamic run snapshots, screenshots, and decisions
+
+tests/
+  generated/                  Generated Playwright specs
+  healed/                     Healed Playwright specs
+  seed/                       Login seed test
+
+generated-quarantine/
+  TC-*/                       Older generated specs moved away after regeneration failure
+
+reports/
+  generation-result.json      Static generation success/failure report
+  locator-validation.json     Locator validation warnings
+  run-result.json             Generated Playwright run result
+  result.json                 Final static report
+  result.html                 Final static HTML report
+  dynamic-run-result.json     Dynamic execution report
+  dynamic-run-result.html     Dynamic execution HTML report
+```
+
+## Source File Purpose
+
+Root files:
+
+- `README.md`: Project guide, setup, pipeline commands, troubleshooting, and folder explanation.
+- `package.json`: NPM scripts and dependency list.
+- `package-lock.json`: Locked dependency versions for repeatable installs.
+- `tsconfig.json`: TypeScript compiler settings.
+- `playwright.config.ts`: Playwright test runner configuration.
+- `.env.example`: Example environment variables. Copy it to `.env` and fill real values.
+- `.env`: Local secrets and runtime configuration. Do not commit this file.
+- `.gitignore`: Files and folders Git should ignore.
+
+Input and documentation files:
+
+- `input/test_flow.xlsx`: Manual test cases, steps, modules, actions, and expected results.
+- `input/test_data.json`: Test payloads matched to scenarios by `scenario_id`.
+- `input.zip`: Archived or shared input package.
+- `generated.zip`: Archived generated output package.
+- `docs/frontend-automation-readiness.md`: Frontend guidance for making the application easier to automate.
+
+Core TypeScript files:
+
+- `src/types.ts`: Shared TypeScript interfaces used across scenarios, recon, generation, running, and reports.
+- `src/config/env.ts`: Reads `.env`, validates required values, and resolves framework paths.
+
+Input parsing:
+
+- `src/input/excelReader.ts`: Reads Excel test flow data.
+- `src/input/jsonReader.ts`: Reads JSON payload data.
+
+Scenario building:
+
+- `src/scenario/scenarioBuilder.ts`: Combines Excel rows and JSON payloads into normalized scenario files.
+- `src/scenario/stepNormalizer.ts`: Cleans manual steps, splits compound steps, and converts generic row actions into safer row-specific steps.
+- `src/scenario/payloadIdentityResolver.ts`: Finds useful identity values from payloads, such as email or user name, for row targeting.
+- `src/scenario/stepNormalizer.test.ts`: Tests the step normalizer rules.
+
+Dynamic recon and action execution:
+
+- `src/recon/actionParser.ts`: Parses natural-language steps into executable action intent.
+- `src/recon/actionDecisionEngine.ts`: Chooses and executes the best action for each live UI step.
+- `src/recon/accessibilityScanner.ts`: Reads accessibility information from the page.
+- `src/recon/domScanner.ts`: Scans DOM elements and collects locator candidates.
+- `src/recon/locatorCandidateBuilder.ts`: Builds possible Playwright locators from DOM/accessibility data.
+- `src/recon/deterministicLocatorResolver.ts`: Finds safe deterministic locator matches before or alongside LLM decisions.
+- `src/recon/llmActionAdvisor.ts`: Sends current step and candidates to the LLM for action selection.
+- `src/recon/locatorSafetyValidator.ts`: Blocks unsafe locators such as broad, duplicate, positional, or disallowed XPath locators.
+- `src/recon/pageStabilizer.ts`: Waits for UI stability after actions.
+- `src/recon/stateSnapshotWriter.ts`: Writes screenshots, DOM snapshots, and action decision artifacts.
+- `src/recon/reconDecisionTypes.ts`: Types for recon decisions and validation details.
+- `src/recon/reconActionExtractor.ts`: Extracts successful action decisions from recon snapshots for static generation.
+- `src/recon/interactiveRecon.ts`: Static recon command used before generating TypeScript specs.
+- `src/recon/locatorValidator.ts`: Validates generated spec locators and writes locator warnings.
+
+LLM planning, generation, and healing:
+
+- `src/llm/llmClient.ts`: Selects the configured LLM provider.
+- `src/llm/openaiClient.ts`: OpenAI client wrapper.
+- `src/llm/geminiClient.ts`: Gemini client wrapper.
+- `src/llm/planner.ts`: Converts scenario JSON into Markdown test plans.
+- `src/llm/generatorPromptBuilder.ts`: Builds prompts and deterministic fallback code for generated Playwright specs.
+- `src/llm/generator.ts`: Generates `.spec.ts` files independently per scenario and writes `reports/generation-result.json`.
+- `src/llm/healer.ts`: Attempts to repair failed generated tests.
+- `src/llm/generator.test.ts`: Tests generation behavior, including independent per-case generation.
+
+Static generation support:
+
+- `src/specs/mdActionExtractor.ts`: Extracts executable actions from Markdown plans.
+- `src/generation/generationSelection.ts`: Selects only successfully generated files from the latest generation report.
+- `src/utils/specImportPaths.ts`: Normalizes imports inside generated specs.
+
+Runners and reports:
+
+- `src/runner/dynamicScenarioRunner.ts`: Main dynamic/Webwright-style runner.
+- `src/runner/playwrightRunner.ts`: Runs generated Playwright specs selected from the latest generation report.
+- `src/reports/reportWriter.ts`: Writes final static JSON and HTML reports, including `blocked` generation failures.
+
+Utilities:
+
+- `src/utils/fileUtils.ts`: Shared file read/write, JSON, path, escaping, and safe filename helpers.
+- `src/utils/logger.ts`: Simple framework logging helper.
+
+## Reports And Status
+
+Dynamic report status:
+
+- `passed`: all scenario steps completed
+- `failed`: a step failed and repair did not recover it
+- `repaired`: a failed step recovered and scenario continued
+
+Static final report status:
+
+- `passed`: generated Playwright spec passed
+- `failed`: generated Playwright spec ran and failed
+- `blocked`: spec could not be generated safely
+- `unknown`: report data was incomplete or the scenario was not included in the latest run
+
+## Troubleshooting
+
+If only some tests generate:
+
+- Check `reports/generation-result.json`.
+- Failed scenarios are expected to be `blocked`.
+- Successful generated files can still validate and run.
+
+If Reactivate or Deactivate fails:
+
+- Check whether the menu option is disabled in the screenshot.
+- Use test data where the user's current status allows the requested action.
+- Do not use one user for multiple state-changing scenarios unless the test order intentionally prepares that state.
+
+If Role selection fails:
+
+- Confirm the JSON `Role` value exists exactly in the UI dropdown.
+- Prefer stable frontend attributes on dropdown options.
+
+If the wrong user row is selected:
+
+- Use `Select the user` in the input step.
+- Make sure payload includes a unique `Email Address` or another unique row identity.
+
+If generated code is stale:
+
+- Check `generated-quarantine/`.
+- A stale file is moved there when regeneration for that scenario fails.
+
+## Frontend Automation Standards
+
+The application becomes much easier to automate when the frontend exposes stable, meaningful selectors:
+
+- Add `data-testid` to important controls, forms, dialogs, row action buttons, menu items, and status badges.
+- Use unique row identifiers such as email, user id, or record id in row markup.
+- Keep accessible names clear and consistent.
+- Do not rely only on visual position or duplicate button labels.
+- Avoid disabled menu actions without visible state text explaining why the action is disabled.
+- Keep toast, modal, validation, and error messages accessible to Playwright locators.
+
+Good frontend structure reduces LLM uncertainty, locator flakiness, repair attempts, and false failures.
 
 ## Security Rules
 
 - Never commit `.env`.
-- Never print `OPENAI_API_KEY`.
-- Never print `LOGIN_PASSWORD`.
-- Never send `LOGIN_PASSWORD` to OpenAI.
+- Never print `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `LOGIN_PASSWORD`.
+- Never send login passwords to the LLM.
 - Scenario files redact password-like payload keys.
-- DOM recon never collects password input values.
-- Recon does not collect cookies, localStorage tokens, JWTs, auth headers, or session data.
+- DOM recon does not collect password input values.
+- Recon must not collect cookies, localStorage tokens, JWTs, auth headers, or session data.
 
-## Limitations
+## Current Limitations
 
-- The first version uses heuristic recon instead of a full autonomous browser agent.
-- Complex drag/drop, canvas, multi-window, or highly custom widgets may need manual improvement.
-- Generated tests should be reviewed before production use.
-- `data-test`, `data-cy`, and `data-qa` are treated as strong CSS locator candidates; Playwright `getByTestId` is used for `data-testid`.
+- Highly custom widgets may need frontend selector improvements.
+- Drag and drop, canvas, multi-window flows, and complex virtualized tables may need extra implementation.
+- Generated TypeScript tests should be reviewed before production use.
+- The best results come from current dynamic recon. If UI state changes often, run dynamic first, then generate static specs from the latest recon.

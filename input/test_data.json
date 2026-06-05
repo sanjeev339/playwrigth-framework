@@ -1,6 +1,7 @@
 [
   {
     "scenario_id": "TC-UM-001",
+    "execution_order": 1,
     "record_id": "1e60cde8-f3ba-4b51-8f5d-e6c03aba5c7d",
     "data_strategy": "positive_valid_create",
     "edge_case_type": null,
@@ -14,6 +15,7 @@
   },
   {
     "scenario_id": "TC-UM-002",
+    "execution_order": 2,
     "record_id": "b445cfd9-4f0a-45f8-9b81-b14b4bb0f88a",
     "data_strategy": "negative_invalid_email",
     "edge_case_type": "duplicate_value",
@@ -26,6 +28,7 @@
   },
   {
     "scenario_id": "TC-UM-003",
+    "execution_order": 4,
     "record_id": "e26c4e84-d5f2-4f53-b0c1-e1f15145b4c5",
     "data_strategy": "positive_valid_activation",
     "edge_case_type": null,
@@ -37,6 +40,7 @@
   },
   {
     "scenario_id": "TC-UM-004",
+    "execution_order": 3,
     "record_id": "4c5533ec-6653-4b06-876e-03b60198f0ce",
     "data_strategy": "positive_valid_deactivation",
     "edge_case_type": null,
@@ -48,6 +52,7 @@
   },
   {
     "scenario_id": "TC-UM-005",
+    "execution_order": 5,
     "record_id": "e0e02d6b-f73f-47bf-aeb2-4934b85b2444",
     "data_strategy": "negative_unauthorized_access",
     "edge_case_type": null,
@@ -60,6 +65,7 @@
   },
   {
     "scenario_id": "TC-UM-006",
+    "execution_order": 7,
     "record_id": "f0b47317-4e44-48f5-87b6-2144c7b9a6a1",
     "data_strategy": "negative_unauthorized_activation",
     "edge_case_type": null,
@@ -70,6 +76,7 @@
   },
   {
     "scenario_id": "TC-UM-007",
+    "execution_order": 6,
     "record_id": "106032ba-e79e-4dc4-8927-f62fa5e4940f",
     "data_strategy": "negative_unauthorized_deactivation",
     "edge_case_type": null,
@@ -80,6 +87,7 @@
   },
   {
     "scenario_id": "TC-UM-008",
+    "execution_order": 8,
     "record_id": "e63c3411-e0b0-4a7c-b6ed-130257016892",
     "data_strategy": "negative_simultaneous_activation",
     "edge_case_type": null,
@@ -90,6 +98,7 @@
   },
   {
     "scenario_id": "TC-UM-009",
+    "execution_order": 9,
     "record_id": "e9f2b0cf-c4c5-4b54-b44c-370b60c03fee",
     "data_strategy": "negative_database_lock",
     "edge_case_type": null,
@@ -102,6 +111,7 @@
   },
   {
     "scenario_id": "TC-UM-010",
+    "execution_order": 10,
     "record_id": "f69d39ec-e8f1-44f5-90db-3cc94c02ae7b",
     "data_strategy": "negative_network_timeout",
     "edge_case_type": null,
@@ -111,3 +121,4 @@
     }
   }
 ]
+ 
