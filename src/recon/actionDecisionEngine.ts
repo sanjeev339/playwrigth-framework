@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { getActionDecisionMode } from '../config/env';
-import type { DomElementSnapshot, ScenarioStep } from '../types';
+import type { DomElementSnapshot, ScenarioStep, AccessibilityNode } from '../types';
 import { scanVisibleDom } from './domScanner';
 import { isSecretPayloadKey, parseAction } from './actionParser';
 import { resolveDeterministicCandidates } from './deterministicLocatorResolver';
@@ -25,6 +25,7 @@ interface DecisionEngineInput {
   step: ScenarioStep;
   payload: Record<string, unknown>;
   snapshotElements: DomElementSnapshot[];
+  accessibilityTree?: AccessibilityNode | Record<string, never>;
   previousActionErrors?: string[];
   onIntermediateSnapshot?: (state: string, actionBeforeSnapshot: string, decision: ReconDecision) => Promise<void>;
 }
@@ -206,7 +207,8 @@ async function executeLlmSelectedAction(
     visibleElements: input.snapshotElements,
     locatorCandidates: safeCandidates,
     validationResults: safeValidationResults(safeCandidates, validatedCandidates),
-    previousActionErrors: input.previousActionErrors
+    previousActionErrors: input.previousActionErrors,
+    accessibilityTree: input.accessibilityTree
   });
   applyLLMMetadata(decision, advisorDecision);
   logLLMParseStatus(advisorDecision);
@@ -224,7 +226,8 @@ async function executeLlmSelectedAction(
       previousActionErrors: [
         ...(input.previousActionErrors ?? []),
         `Rejected locator "${rejectedLocator}". selectedLocator must exactly copy one locator from the safe Locator Candidates list.`
-      ]
+      ],
+      accessibilityTree: input.accessibilityTree
     });
     applyLLMMetadata(decision, advisorDecision);
     logLLMParseStatus(advisorDecision);
@@ -281,11 +284,12 @@ async function executeLlmSelectedAction(
     };
   }
 
+  const resolvedActionType = parsedAction.actionType !== 'unknown' ? parsedAction.actionType : advisorDecision.actionType;
   return executeSelectedLocator(input, {
     decision,
     parsedAction: {
       ...parsedAction,
-      actionType: advisorDecision.actionType,
+      actionType: resolvedActionType,
       target: advisorDecision.target || parsedAction.target,
       value: parsedAction.isSensitiveValue ? parsedAction.value : advisorDecision.value ?? parsedAction.value
     },
@@ -355,7 +359,8 @@ async function executeFormFill(
         visibleElements,
         locatorCandidates: candidates,
         validationResults: validations,
-        previousActionErrors: [...(input.previousActionErrors ?? []), ...errors]
+        previousActionErrors: [...(input.previousActionErrors ?? []), ...errors],
+        accessibilityTree: input.accessibilityTree
       });
       applyLLMMetadata(decision, advisorDecision);
       logLLMParseStatus(advisorDecision);
@@ -583,7 +588,8 @@ async function executeSelectAction(
       visibleElements: optionElements,
       locatorCandidates: optionCandidates,
       validationResults: optionValidations,
-      previousActionErrors: input.previousActionErrors
+      previousActionErrors: input.previousActionErrors,
+      accessibilityTree: input.accessibilityTree
     });
     applyLLMMetadata(decision, advisorDecision);
     logLLMParseStatus(advisorDecision);
@@ -608,7 +614,8 @@ async function executeSelectAction(
         visibleElements: optionElements,
         locatorCandidates: optionCandidates,
         validationResults: optionValidations,
-        previousActionErrors: input.previousActionErrors
+        previousActionErrors: input.previousActionErrors,
+        accessibilityTree: input.accessibilityTree
       });
       applyLLMMetadata(decision, advisorDecision);
       logLLMParseStatus(advisorDecision);

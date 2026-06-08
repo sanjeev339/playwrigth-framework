@@ -94,7 +94,8 @@ const frameworkPathSchema = z.object({
   FINAL_REPORT_HTML_PATH: optionalPath,
   DYNAMIC_REPORT_JSON_PATH: optionalPath,
   DYNAMIC_REPORT_HTML_PATH: optionalPath,
-  HEALING_REPORT_PATH: optionalPath
+  HEALING_REPORT_PATH: optionalPath,
+  HEALED_RUN_RESULT_PATH: optionalPath
 });
 
 const locatorPolicySchema = z.object({
@@ -154,6 +155,7 @@ export interface FrameworkPaths {
   dynamicReportJsonPath: string;
   dynamicReportHtmlPath: string;
   healingReportPath: string;
+  healedRunResultPath: string;
 }
 
 export function getLLMProvider(): LLMProvider {
@@ -229,6 +231,10 @@ export function getFrameworkPaths(): FrameworkPaths {
     healingReportPath: resolveProjectPath(
       env.HEALING_REPORT_PATH,
       path.relative(process.cwd(), path.join(reportDir, 'healing-result.json'))
+    ),
+    healedRunResultPath: resolveProjectPath(
+      env.HEALED_RUN_RESULT_PATH,
+      path.relative(process.cwd(), path.join(reportDir, 'healed-run-result.json'))
     )
   };
 }

@@ -195,12 +195,16 @@ function findPayloadKeyMention(rawStep: string, payloadKeys: string[]): string |
 }
 
 function cleanTarget(value: string): string | null {
-  const cleaned = value
+  let cleaned = value
     .replace(/\.$/, '')
     .replace(/\b(page|screen|menu|section|button|link|field|dropdown|option)\b/gi, '')
     .replace(/\b(and select|and choose).+$/i, '')
     .replace(/\s+/g, ' ')
     .trim();
+
+  if (cleaned.toLowerCase().startsWith('to ')) {
+    cleaned = cleaned.substring(3).trim();
+  }
 
   return cleaned || null;
 }

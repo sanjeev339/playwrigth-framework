@@ -13,5 +13,7 @@ test-results/
 /specs/
 /tests/generated/
 /tests/healed/
+/tests/seed/
 /generated-quarantine/
 .DS_Store
+playwright/

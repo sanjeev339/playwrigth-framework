@@ -25,7 +25,7 @@ export async function generatePlans(options: {
     const scenario = await readJsonFile<Scenario>(scenarioFile);
     logger.info(`Generating plan for ${scenario.scenario_id} (${path.basename(scenarioFile)})...`);
     const prompt = buildPlannerPrompt(scenario);
-    const plan = await callLLM(prompt);
+    const plan = await callLLM(prompt, { caller: 'planner' });
     const outputPath = path.join(outputDir, `${toSafeFileName(scenario.scenario_id)}.md`);
     await writeTextFile(outputPath, normalizeMarkdown(plan));
     writtenFiles.push(outputPath);

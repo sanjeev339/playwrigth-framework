@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { chromium, type Locator, type Page } from '@playwright/test';
+import { chromium, type Page } from '@playwright/test';
 import fs from 'fs-extra';
 import { getFrameworkPaths, getWebEnv } from '../config/env';
 import type { ReconSnapshot, Scenario, ScenarioStep } from '../types';
@@ -13,6 +13,7 @@ import { waitForRafCycles, waitForSnapshotStability } from './pageStabilizer';
 import { extractReconActions } from './reconActionExtractor';
 import type { ReconDecision } from './reconDecisionTypes';
 import { writeStateSnapshot } from './stateSnapshotWriter';
+import { gotoWithRetry, performLogin } from '../utils/playwrightUtils';
 
 interface CapturedSnapshot {
   filePath: string;
@@ -83,7 +84,7 @@ export async function runInteractiveRecon(options: {
       const previousActionErrors: string[] = [];
 
       try {
-        await page.goto(env.WEBSITE_URL, { waitUntil: 'domcontentloaded' });
+        await gotoWithRetry(page, env.WEBSITE_URL);
         const loginSnapshot = await captureSnapshot({
           page,
           scenarioId: scenario.scenario_id,
@@ -135,6 +136,7 @@ export async function runInteractiveRecon(options: {
             step,
             payload: scenario.payload,
             snapshotElements: before.snapshot.elements,
+            accessibilityTree: before.snapshot.accessibility,
             previousActionErrors,
             onIntermediateSnapshot: async (state, actionBeforeSnapshot, intermediateDecision) => {
               const dropdownSnapshot = await captureSnapshot({
@@ -287,78 +289,6 @@ async function captureSnapshot(input: {
   return { filePath, snapshot };
 }
 
-async function performLogin(page: Page, email: string, password: string): Promise<void> {
-  await fillFirst(page, email, [
-    () => configuredLocator(page, process.env.LOGIN_EMAIL_SELECTOR),
-    () => page.getByLabel(/email|username|user name/i),
-    () => page.getByPlaceholder(/email|username|user name/i),
-    () => page.locator('input[type="email"]').first(),
-    () => page.locator('input[name*="email" i], input[name*="user" i]').first()
-  ]);
-
-  await fillFirst(page, password, [
-    () => configuredLocator(page, process.env.LOGIN_PASSWORD_SELECTOR),
-    () => page.getByLabel(/password/i),
-    () => page.getByPlaceholder(/password/i),
-    () => page.locator('input[type="password"]').first(),
-    () => page.locator('input[name*="password" i]').first()
-  ]);
-
-  await clickFirst(page, [
-    () => configuredLocator(page, process.env.LOGIN_SUBMIT_SELECTOR),
-    () => page.getByRole('button', { name: /login|sign in|submit/i }),
-    () => page.locator('button[type="submit"]').first(),
-  ]);
-
-  await waitForSettledPage(page);
-}
-
-function configuredLocator(page: Page, selector: string | undefined): Locator {
-  if (!selector?.trim()) {
-    return page.locator('__configured_locator_not_set__');
-  }
-
-  const trimmed = selector.trim();
-  if (trimmed.startsWith('testid=')) {
-    return page.getByTestId(trimmed.replace(/^testid=/, ''));
-  }
-
-  return page.locator(trimmed);
-}
-
-async function fillFirst(page: Page, value: string, locatorFactories: Array<() => Locator>): Promise<void> {
-  for (const createLocator of locatorFactories) {
-    const locator = createLocator();
-    if (await isUsable(locator)) {
-      await locator.fill(value);
-      return;
-    }
-  }
-
-  throw new Error('No usable input locator found.');
-}
-
-async function clickFirst(page: Page, locatorFactories: Array<() => Locator>): Promise<void> {
-  for (const createLocator of locatorFactories) {
-    const locator = createLocator();
-    if (await isUsable(locator)) {
-      await locator.click();
-      return;
-    }
-  }
-
-  throw new Error('No usable click locator found.');
-}
-
-async function isUsable(locator: Locator): Promise<boolean> {
-  try {
-    const first = locator.first();
-    return (await first.count()) > 0 && (await first.isVisible({ timeout: 750 })) && (await first.isEnabled({ timeout: 750 }));
-  } catch {
-    return false;
-  }
-}
-
 async function safeAction(action: () => Promise<void>): Promise<string | null> {
   try {
     await action();
@@ -366,12 +296,6 @@ async function safeAction(action: () => Promise<void>): Promise<string | null> {
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
   }
-}
-
-async function waitForSettledPage(page: Page): Promise<void> {
-  await page.waitForLoadState('domcontentloaded').catch(() => undefined);
-  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
-  await page.waitForTimeout(250);
 }
 
 if (require.main === module) {
@@ -384,3 +308,4 @@ if (require.main === module) {
       process.exitCode = 1;
     });
 }
+

@@ -81,12 +81,14 @@ export async function writeFinalReport(options: {
   const validationPath = options.validationPath ?? paths.locatorValidationReportPath;
   const outputJsonPath = options.outputJsonPath ?? paths.finalReportJsonPath;
   const outputHtmlPath = options.outputHtmlPath ?? paths.finalReportHtmlPath;
+  const healedRunResultPath = paths.healedRunResultPath;
 
   const scenarios = await Promise.all((await listFiles(scenarioDir, '.json')).map((file) => readJsonFile<Scenario>(file)));
   const generationReport = (await fs.pathExists(generationReportPath))
     ? await readJsonFile<GenerationReport>(generationReportPath)
     : undefined;
   const runResult = (await fs.pathExists(runResultPath)) ? await readJsonFile<PlaywrightRunResult>(runResultPath) : undefined;
+  const healedRunResult = (await fs.pathExists(healedRunResultPath)) ? await readJsonFile<PlaywrightRunResult>(healedRunResultPath) : undefined;
   const validation = (await fs.pathExists(validationPath)) ? await readJsonFile<LocatorValidationReport>(validationPath) : undefined;
 
   const scenarioReports: FinalScenarioReport[] = [];
@@ -112,10 +114,12 @@ export async function writeFinalReport(options: {
         .map((warning) => `[${warning.severity}] ${warning.rule}: ${warning.message}`) ?? [];
     const status = scenarioStatus(
       runResult,
+      healedRunResult,
       safeScenarioId,
       generationResult,
       Boolean(generationReport),
-      Boolean(generatedRelative)
+      Boolean(generatedRelative),
+      Boolean(healedRelative)
     );
 
     scenarioReports.push({
@@ -155,10 +159,12 @@ export async function writeFinalReport(options: {
 
 function scenarioStatus(
   runResult: PlaywrightRunResult | undefined,
+  healedRunResult: PlaywrightRunResult | undefined,
   safeScenarioId: string,
   generationResult: GenerationScenarioResult | undefined,
   hasGenerationReport: boolean,
-  hasGeneratedFile: boolean
+  hasGeneratedFile: boolean,
+  hasHealedFile: boolean
 ): 'passed' | 'failed' | 'blocked' | 'unknown' {
   if (generationResult?.status === 'failed') {
     return 'blocked';
@@ -170,6 +176,11 @@ function scenarioStatus(
 
   if (hasGenerationReport && generationResult?.status === 'generated' && !hasGeneratedFile) {
     return 'unknown';
+  }
+
+  if (hasHealedFile && healedRunResult) {
+    const failedHealed = healedRunResult.failedTestFiles.some((file) => file.includes(`${safeScenarioId}.spec.ts`));
+    return failedHealed ? 'failed' : 'passed';
   }
 
   if (!runResult) {

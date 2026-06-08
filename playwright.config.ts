@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -26,6 +27,8 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    baseURL: process.env.WEBSITE_URL,
+    storageState: fs.existsSync('playwright/.auth/user.json') ? 'playwright/.auth/user.json' : undefined,
     launchOptions: {
       slowMo
     }

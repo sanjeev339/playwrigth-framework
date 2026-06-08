@@ -327,7 +327,7 @@ function locatorForAction(action: ReconAction): string {
   }
 
   if (!action.selectedLocator) {
-    throw new Error(`Missing recon locator for ${action.actionType} step: ${action.rawStep}`);
+    return `page.locator('__RECON_LOCATOR_MISSING_STEP_${action.stepNo ?? 'unknown'}__')`;
   }
 
   return action.selectedLocator;
@@ -336,7 +336,7 @@ function locatorForAction(action: ReconAction): string {
 function dropdownLocatorForAction(action: ReconAction): string {
   const locator = action.dropdownLocator ?? action.selectedLocator;
   if (!locator) {
-    throw new Error(`Missing recon dropdown locator for step: ${action.rawStep}`);
+    return `page.locator('__RECON_DROPDOWN_LOCATOR_MISSING_STEP_${action.stepNo ?? 'unknown'}__')`;
   }
 
   return locator;

@@ -80,7 +80,7 @@ export async function healFailedTests(options: {
     const generatedCode = await readTextFile(generatedFile);
     logger.info(`Healing ${scenarioId} (${path.basename(generatedFile)}, ${snapshots.length} recon snapshot(s))...`);
     const prompt = buildHealerPrompt(generatedCode, runResult, snapshots, scenario);
-    const healedCode = normalizeNestedTestImports(stripCodeFence(await callLLM(prompt)));
+    const healedCode = normalizeNestedTestImports(stripCodeFence(await callLLM(prompt, { caller: 'healer' })));
     const healedPath = path.join(outputDir, `${toSafeFileName(scenarioId)}.spec.ts`);
     await writeTextFile(healedPath, healedCode);
     healedFiles.push(healedPath);

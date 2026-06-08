@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { getLLMLoggingConfig } from '../config/env';
-import type { DomElementSnapshot } from '../types';
+import type { DomElementSnapshot, AccessibilityNode } from '../types';
 import { callLLM } from '../llm/llmClient';
 import { truncate } from '../utils/fileUtils';
 import { logger, redactSecrets } from '../utils/logger';
@@ -20,6 +20,7 @@ interface LLMAdvisorInput {
   locatorCandidates: LocatorCandidate[];
   validationResults: LocatorValidationResult[];
   previousActionErrors?: string[];
+  accessibilityTree?: AccessibilityNode | Record<string, never>;
 }
 
 const allowedActionTypes = ['click', 'navigate', 'fill', 'select', 'verify', 'wait', 'row_action', 'skip', 'error'] as const;
@@ -234,6 +235,10 @@ function buildPrompt(input: LLMAdvisorInput): string {
     elementSummary: candidate.elementSummary
   }));
 
+  const serializedAccTree = input.accessibilityTree && Object.keys(input.accessibilityTree).length > 0
+    ? truncate(JSON.stringify(input.accessibilityTree, null, 2), 4000)
+    : 'Not available';
+
   return truncate(
     [
       'You are an expert Playwright UI automation advisor.',
@@ -267,6 +272,9 @@ function buildPrompt(input: LLMAdvisorInput): string {
       'Visible UI Elements:',
       JSON.stringify(visibleElements, null, 2),
       '',
+      'Accessibility Tree (pruned, role/name only):',
+      serializedAccTree,
+      '',
       'Locator Candidates:',
       JSON.stringify(locatorCandidates, null, 2),
       '',
@@ -278,7 +286,7 @@ function buildPrompt(input: LLMAdvisorInput): string {
       '',
       'Decision Rules:',
       '1. Choose selectedLocator only by exact string copy from Locator Candidates.',
-      '2. Locator Candidates are already safe candidates; never choose a locator from Visible UI Elements unless the exact same string appears in Locator Candidates.',
+      '2. Locator Candidates are already safe candidates; never choose a locator from Visible UI Elements or Accessibility Tree unless the exact same string appears in Locator Candidates.',
       '3. Prefer getByRole, getByLabel, getByPlaceholder, getByTestId.',
       '4. Avoid XPath unless no safer candidate represents the intended target.',
       '5. If multiple candidates are safe, choose the one most semantically related to the current step.',

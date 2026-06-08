@@ -237,7 +237,7 @@ async function generateReconDrivenCode(input: {
   callLLMForGeneration: typeof callLLM;
 }): Promise<GeneratedCode> {
   try {
-    const generated = await input.callLLMForGeneration(input.prompt);
+    const generated = await input.callLLMForGeneration(input.prompt, { caller: 'generator' });
     const llmCode = stripCodeFence(generated);
     validateGeneratedReconTest(llmCode, input.scenario, input.reconActions);
     return { code: llmCode, source: 'llm' };
@@ -288,7 +288,8 @@ function validateGeneratedReconTest(code: string, scenario: Scenario, reconActio
     }
 
     const stepMarker = `Step ${action.stepNo}: ${action.rawStep}`;
-    if (!code.includes(stepMarker)) {
+    const escapedStepMarker = stepMarker.replace(/"/g, '\\"');
+    if (!code.includes(stepMarker) && !code.includes(escapedStepMarker)) {
       throw new Error(`Generated test missing required recon action: Step ${action.stepNo} - ${action.rawStep}`);
     }
 
