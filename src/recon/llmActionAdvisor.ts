@@ -40,7 +40,7 @@ export async function askLLMForActionDecision(input: LLMAdvisorInput): Promise<L
   const promptTokenEstimate = estimateTokens(prompt);
 
   if (llmDisabledReason) {
-    logLLMInfo('SKIPPED', input, llmDisabledReason);
+    logAdvisorMetadata('SKIPPED', input, 0, llmDisabledReason);
     return {
       actionType: 'error',
       target: input.parsedAction.target ?? '',
@@ -59,10 +59,10 @@ export async function askLLMForActionDecision(input: LLMAdvisorInput): Promise<L
   }
 
   try {
-    logLLMExchange('REQUEST', input, prompt, promptTokenEstimate);
-    const response = await callLLM(prompt);
+    logAdvisorMetadata('REQUEST', input, promptTokenEstimate);
+    const response = await callLLM(prompt, 'advisor');
     const responseTokenEstimate = estimateTokens(response);
-    logLLMExchange('RESPONSE', input, response, responseTokenEstimate);
+    logAdvisorMetadata('RESPONSE', input, responseTokenEstimate);
     const firstParse = parseLLMDecision(response);
 
     if (!firstParse.parseError) {
@@ -81,10 +81,10 @@ export async function askLLMForActionDecision(input: LLMAdvisorInput): Promise<L
 
     const correctionPrompt = buildCorrectionPrompt(response);
     const correctionPromptTokenEstimate = estimateTokens(correctionPrompt);
-    logLLMExchange('CORRECTION_REQUEST', input, correctionPrompt, correctionPromptTokenEstimate);
-    const correctionResponse = await callLLM(correctionPrompt);
+    logAdvisorMetadata('CORRECTION_REQUEST', input, correctionPromptTokenEstimate);
+    const correctionResponse = await callLLM(correctionPrompt, 'advisor');
     const correctionResponseTokenEstimate = estimateTokens(correctionResponse);
-    logLLMExchange('CORRECTION_RESPONSE', input, correctionResponse, correctionResponseTokenEstimate);
+    logAdvisorMetadata('CORRECTION_RESPONSE', input, correctionResponseTokenEstimate);
     const secondParse = parseLLMDecision(correctionResponse);
     const totalPromptTokenEstimate = promptTokenEstimate + correctionPromptTokenEstimate;
     const totalResponseTokenEstimate = responseTokenEstimate + correctionResponseTokenEstimate;
@@ -339,18 +339,17 @@ function preview(value: string): string {
   return redactSecrets(value).slice(0, 500);
 }
 
-function logLLMExchange(
-  direction: 'REQUEST' | 'RESPONSE' | 'CORRECTION_REQUEST' | 'CORRECTION_RESPONSE',
+function logAdvisorMetadata(
+  direction: 'REQUEST' | 'RESPONSE' | 'CORRECTION_REQUEST' | 'CORRECTION_RESPONSE' | 'SKIPPED',
   input: LLMAdvisorInput,
-  content: string,
-  tokenEstimate: number
+  tokenEstimate: number,
+  skippedReason?: string
 ): void {
   const config = getLLMLoggingConfig();
   if (!config.LOG_LLM_IO) {
     return;
   }
 
-  const safeContent = truncate(redactSecrets(content), config.LLM_IO_MAX_CHARS);
   const metadata = [
     `scenario=${input.scenarioId}`,
     `step=${input.parsedAction.stepNo}`,
@@ -361,25 +360,8 @@ function logLLMExchange(
     `estimatedTokens=${tokenEstimate}`
   ].join(' ');
 
-  logger.info(
-    [
-      `[LLM][${direction}] ${metadata}`,
-      `----- ${direction} START -----`,
-      safeContent,
-      `----- ${direction} END -----`
-    ].join('\n')
-  );
-}
-
-function logLLMInfo(kind: 'SKIPPED', input: LLMAdvisorInput, message: string): void {
-  const config = getLLMLoggingConfig();
-  if (!config.LOG_LLM_IO) {
-    return;
-  }
-
-  logger.info(
-    `[LLM][${kind}] scenario=${input.scenarioId} step=${input.parsedAction.stepNo} action=${input.parsedAction.actionType} reason=${redactSecrets(message)}`
-  );
+  const reasonStr = skippedReason ? ` reason=${redactSecrets(skippedReason)}` : '';
+  logger.info(`[LLM][${direction}] ${metadata}${reasonStr}`);
 }
 
 function estimateTokens(value: string): number {

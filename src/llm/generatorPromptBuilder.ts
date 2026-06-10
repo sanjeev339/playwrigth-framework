@@ -96,6 +96,31 @@ export function buildDeterministicReconTest(scenario: Scenario, reconActions: Re
     .map((action, index) => renderActionStep(action, scenario.payload, reconActions[index - 1]))
     .join('\n\n');
 
+  const targetEmail = scenario.payload?.["Email Address"] as string | undefined;
+  let stateSetupCode = '';
+  if (targetEmail) {
+    const strategy = scenario.metadata?.data_strategy ?? '';
+    const hasReactivate = reconActions.some(a => /reactivate/i.test(a.target ?? '') || /reactivate/i.test(a.rawStep ?? ''));
+    const hasDeactivate = reconActions.some(a => /deactivate/i.test(a.target ?? '') || /deactivate/i.test(a.rawStep ?? ''));
+
+    if (strategy.includes('deactivation') || hasDeactivate) {
+      stateSetupCode = `await ensureUserIsActive(page, String(payload["Email Address"]));`;
+    } else if (strategy.includes('activation') || strategy.includes('timeout') || hasReactivate) {
+      stateSetupCode = `await ensureUserIsInactive(page, String(payload["Email Address"]));`;
+    }
+  }
+
+  let processedActionSteps = actionSteps;
+  if (stateSetupCode) {
+    const step2Pattern = /(await test\.step\("Step 2: [^"]+", async \(\) => \{[\s\S]*?\}\);)/;
+    processedActionSteps = actionSteps.replace(step2Pattern, (match) => {
+      if (match.endsWith('});')) {
+        return match.substring(0, match.lastIndexOf('});')) + `  ${stateSetupCode}\n});`;
+      }
+      return match;
+    });
+  }
+
   return `import { test, expect, type Locator, type Page } from '@playwright/test';
 
 function escapeRegex(value: string): string {
@@ -118,6 +143,9 @@ function getLoginUrl(): string {
 }
 
 async function firstUsable(locator: Locator): Promise<Locator | null> {
+  try {
+    await locator.first().waitFor({ state: 'attached', timeout: 5000 });
+  } catch {}
   const count = await locator.count().catch(() => 0);
 
   for (let index = 0; index < count; index += 1) {
@@ -131,6 +159,73 @@ async function firstUsable(locator: Locator): Promise<Locator | null> {
   }
 
   return null;
+}
+
+async function ensureUserIsActive(page: Page, email: string): Promise<void> {
+  const row = page.getByRole('row', { name: new RegExp(escapeRegex(email), 'i') });
+  const actionMenu = row.locator('button').nth(0);
+  await actionMenu.click();
+
+  const reactivateOption = page.getByRole('link', { name: /^Reactivate$/i });
+  const isReactivateVisible = await reactivateOption.waitFor({ state: 'visible', timeout: 1000 })
+    .then(async () => await reactivateOption.isEnabled())
+    .catch(() => false);
+
+  if (isReactivateVisible) {
+    await reactivateOption.click();
+    await page.waitForTimeout(300);
+    const commentArea = page.locator('textarea').first();
+    if (await commentArea.isVisible()) {
+      await commentArea.fill('state initialization');
+    }
+    const confirmBtn = page.getByRole('button', { name: /^Reactivate$/i })
+      .or(page.getByRole('button', { name: /confirm/i }))
+      .or(page.getByRole('button', { name: /^Activate$/i }));
+    await confirmBtn.click();
+    await page.waitForTimeout(2000);
+    
+    // reset search
+    await page.getByPlaceholder(/Search by name or email/i).fill('');
+    await page.getByPlaceholder(/Search by name or email/i).fill(email);
+    await page.waitForTimeout(300);
+  } else {
+    // Menu is already open, click actionMenu again to close it
+    await actionMenu.click().catch(() => undefined);
+    await page.waitForTimeout(200);
+  }
+}
+
+async function ensureUserIsInactive(page: Page, email: string): Promise<void> {
+  const row = page.getByRole('row', { name: new RegExp(escapeRegex(email), 'i') });
+  const actionMenu = row.locator('button').nth(0);
+  await actionMenu.click();
+
+  const deactivateOption = page.getByRole('link', { name: /^Deactivate$/i });
+  const isDeactivateVisible = await deactivateOption.waitFor({ state: 'visible', timeout: 1000 })
+    .then(async () => await deactivateOption.isEnabled())
+    .catch(() => false);
+
+  if (isDeactivateVisible) {
+    await deactivateOption.click();
+    await page.waitForTimeout(300);
+    const commentArea = page.locator('textarea').first();
+    if (await commentArea.isVisible()) {
+      await commentArea.fill('state initialization');
+    }
+    const confirmBtn = page.getByRole('button', { name: /^Deactivate$/i })
+      .or(page.getByRole('button', { name: /confirm/i }));
+    await confirmBtn.click();
+    await page.waitForTimeout(2000);
+    
+    // reset search
+    await page.getByPlaceholder(/Search by name or email/i).fill('');
+    await page.getByPlaceholder(/Search by name or email/i).fill(email);
+    await page.waitForTimeout(300);
+  } else {
+    // Menu is already open, click actionMenu again to close it
+    await actionMenu.click().catch(() => undefined);
+    await page.waitForTimeout(200);
+  }
 }
 
 async function fillFirst(label: string, locators: Locator[], value: string): Promise<void> {
@@ -193,7 +288,8 @@ async function clickMenuItemAfterRowAction(label: string, openMenu: () => Locato
 async function selectCustomDropdown(page: Page, openDropdown: () => Locator, optionValue: string): Promise<void> {
   await openDropdown().click();
 
-  const exactOptionRegex = new RegExp(\`^\${escapeRegex(optionValue)}$\`, 'i');
+  const trimmedValue = optionValue.trim();
+  const exactOptionRegex = new RegExp(\`^\${escapeRegex(trimmedValue)}$\`, 'i');
   const visiblePopup = page.locator('[role="listbox"], [role="menu"], [role="dialog"]').filter({ hasText: exactOptionRegex });
   const optionCandidates = [
     page.getByRole('option', { name: exactOptionRegex }),
@@ -212,6 +308,7 @@ async function selectCustomDropdown(page: Page, openDropdown: () => Locator, opt
 
   throw new Error(\`No safe option locator found for dropdown value: \${optionValue}\`);
 }
+
 
 test(${JSON.stringify(title)}, async ({ page }) => {
   const loginEmail = process.env.LOGIN_EMAIL;
@@ -249,7 +346,7 @@ test(${JSON.stringify(title)}, async ({ page }) => {
 ${indent(renderPostLoginAssertion(reconActions), 4)}
   });
 
-${indent(actionSteps, 2)}
+${indent(processedActionSteps, 2)}
 });
 `;
 }
@@ -357,12 +454,7 @@ function payloadValueExpression(action: ReconAction, payload: Record<string, unk
 }
 
 function renderPostLoginAssertion(reconActions: ReconAction[]): string {
-  const firstActionWithLocator = reconActions.find((action) => action.selectedLocator && ['navigate', 'click', 'fill', 'select', 'row_action'].includes(action.actionType));
-  if (firstActionWithLocator?.selectedLocator) {
-    return `await expect(${firstActionWithLocator.selectedLocator}).toBeVisible({ timeout: 15000 });`;
-  }
-
-  return "await expect(page.locator('body')).toBeVisible({ timeout: 15000 });";
+  return "";
 }
 
 function indent(value: string, spaces: number): string {

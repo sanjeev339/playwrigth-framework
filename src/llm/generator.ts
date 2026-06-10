@@ -237,7 +237,7 @@ async function generateReconDrivenCode(input: {
   callLLMForGeneration: typeof callLLM;
 }): Promise<GeneratedCode> {
   try {
-    const generated = await input.callLLMForGeneration(input.prompt);
+    const generated = await input.callLLMForGeneration(input.prompt, 'generator');
     const llmCode = stripCodeFence(generated);
     validateGeneratedReconTest(llmCode, input.scenario, input.reconActions);
     return { code: llmCode, source: 'llm' };

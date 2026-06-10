@@ -1,13 +1,10 @@
-import { execFile } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
-import { promisify } from 'node:util';
 import type { PlaywrightRunResult } from '../types';
 import { getBaseEnv, getFrameworkPaths } from '../config/env';
 import { getLatestGenerationSelection } from '../generation/generationSelection';
 import { writeJsonFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
-
-const execFileAsync = promisify(execFile);
 
 export async function runGeneratedTests(options: {
   outputPath?: string;
@@ -38,22 +35,36 @@ export async function runGeneratedTests(options: {
   let exitCode: number | null = 0;
 
   try {
-    const result = await execFileAsync('npx', args, {
+    const child = spawn('npx', args, {
       cwd: process.cwd(),
       env: process.env,
-      maxBuffer: 20 * 1024 * 1024
+      stdio: ['inherit', 'pipe', 'pipe']
     });
-    stdout = result.stdout;
-    stderr = result.stderr;
+
+    child.stdout.on('data', (data) => {
+      const chunk = data.toString();
+      stdout += chunk;
+      process.stdout.write(chunk);
+    });
+
+    child.stderr.on('data', (data) => {
+      const chunk = data.toString();
+      stderr += chunk;
+      process.stderr.write(chunk);
+    });
+
+    exitCode = await new Promise<number | null>((resolve) => {
+      child.on('close', (code) => {
+        resolve(code);
+      });
+      child.on('error', (err) => {
+        logger.error('Failed to start test execution process.', err);
+        resolve(1);
+      });
+    });
   } catch (error) {
-    const execError = error as NodeJS.ErrnoException & {
-      stdout?: string;
-      stderr?: string;
-      code?: number;
-    };
-    stdout = execError.stdout ?? '';
-    stderr = execError.stderr ?? execError.message;
-    exitCode = typeof execError.code === 'number' ? execError.code : 1;
+    stderr = error instanceof Error ? error.message : String(error);
+    exitCode = 1;
   }
 
   const endedAt = new Date();

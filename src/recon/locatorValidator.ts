@@ -5,9 +5,40 @@ import type { LocatorValidationReport, LocatorValidationWarning } from '../types
 import { listFiles, readTextFile, writeJsonFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 
-const locatorRegex =
-  /page\.(getBy(?:Role|Label|Placeholder|Text|TestId)\([^;\n]+?\)|locator\([^;\n]+?\))/g;
+import ts from 'typescript';
+
 const genericText = /^(add|edit|delete|save|submit|cancel|ok|yes|no|next|back|close|login|search)$/i;
+
+const locatorMethods = new Set([
+  'locator',
+  'getByRole',
+  'getByLabel',
+  'getByPlaceholder',
+  'getByText',
+  'getByTestId',
+  'getByTitle',
+  'getByAltText',
+  'frameLocator'
+]);
+
+function isLocatorCall(node: ts.Node): boolean {
+  if (!ts.isCallExpression(node)) {
+    return false;
+  }
+  const expr = node.expression;
+  if (!ts.isPropertyAccessExpression(expr)) {
+    return false;
+  }
+  const methodName = expr.name.text;
+  if (!locatorMethods.has(methodName)) {
+    return false;
+  }
+  const base = expr.expression;
+  if (ts.isIdentifier(base) && (base.text === 'page' || base.text === 'frame')) {
+    return true;
+  }
+  return isLocatorCall(base);
+}
 
 export async function validateGeneratedLocators(options: {
   generatedDir?: string;
@@ -51,8 +82,19 @@ export async function validateGeneratedLocators(options: {
 }
 
 function extractLocators(code: string): string[] {
-  const matches = code.match(locatorRegex) ?? [];
-  return [...new Set(matches)];
+  const sourceFile = ts.createSourceFile('test.spec.ts', code, ts.ScriptTarget.Latest, true);
+  const locators: string[] = [];
+
+  function visit(node: ts.Node) {
+    if (isLocatorCall(node)) {
+      locators.push(node.getText(sourceFile));
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return [...new Set(locators)];
 }
 
 function validateFile(file: string, code: string, locators: string[]): LocatorValidationWarning[] {

@@ -62,7 +62,7 @@ const actionDecisionModeSchema = z.preprocess((value) => {
     return value.toLowerCase();
   }
   return value;
-}, z.enum(['llm_first', 'deterministic_first']).default('llm_first'));
+}, z.enum(['llm_first', 'deterministic_first']).default('deterministic_first'));
 
 const sharedSchema = z.object({
   LLM_PROVIDER: llmProviderSchema,
@@ -103,7 +103,7 @@ const locatorPolicySchema = z.object({
 });
 
 const llmLoggingSchema = z.object({
-  LOG_LLM_IO: booleanFromStringDefaultTrue,
+  LOG_LLM_IO: booleanFromString,
   LLM_IO_MAX_CHARS: positiveNumberFromString(20_000)
 });
 

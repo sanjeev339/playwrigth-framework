@@ -26,6 +26,7 @@ interface DecisionEngineInput {
   payload: Record<string, unknown>;
   snapshotElements: DomElementSnapshot[];
   previousActionErrors?: string[];
+  isLastStep?: boolean;
   onIntermediateSnapshot?: (state: string, actionBeforeSnapshot: string, decision: ReconDecision) => Promise<void>;
 }
 
@@ -126,7 +127,8 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
         selectorRisk: strongDeterministicSelection.selectorRisk,
         selectorConfidenceSignals: strongDeterministicSelection.selectorConfidenceSignals,
         reason: 'Selected one strong deterministic safe locator before LLM fallback.',
-        knownCandidates: deterministicCandidates
+        knownCandidates: deterministicCandidates,
+        isLastStep: input.isLastStep
       });
     }
 
@@ -151,7 +153,8 @@ export async function decideAndExecuteAction(input: DecisionEngineInput): Promis
           safeCandidates.length === 1
             ? 'Exactly one deterministic safe locator matched.'
             : 'Multiple safe locator strings matched the same UI element; selected the highest-priority locator.',
-          knownCandidates: deterministicCandidates
+        knownCandidates: deterministicCandidates,
+        isLastStep: input.isLastStep
       });
     }
 
@@ -297,7 +300,8 @@ async function executeLlmSelectedAction(
     selectorRisk: selectedCandidate?.selectorRisk,
     selectorConfidenceSignals: selectedCandidate?.selectorConfidenceSignals,
     reason: advisorDecision.reason,
-    knownCandidates: deterministicCandidates
+    knownCandidates: deterministicCandidates,
+    isLastStep: input.isLastStep
   });
 }
 
@@ -422,6 +426,7 @@ async function executeSelectedLocator(
     selectorConfidenceSignals?: string[];
     reason: string;
     knownCandidates: LocatorCandidate[];
+    isLastStep?: boolean;
   }
 ): Promise<ReconDecision> {
   const locator = locatorFromExpression(input.page, options.selectedLocator, options.knownCandidates);
@@ -438,6 +443,26 @@ async function executeSelectedLocator(
       selectorConfidenceSignals: options.selectorConfidenceSignals,
       actionStatus: 'failed',
       actionError: `Unsupported locator: ${options.selectedLocator}`
+    };
+  }
+
+  // Recon dry-run: locator discovered and validated, but the final action is skipped
+  // to prevent database mutations (e.g. user creation) during the discovery phase.
+  if (process.env['IS_RECON'] === 'true' && options.isLastStep) {
+    console.log(`[Recon] Last step dry-run: skipping execution of "${options.parsedAction.actionType}" on "${options.selectedLocator}" to avoid mutation.`);
+    return {
+      ...options.decision,
+      decisionSource: options.decisionSource,
+      selectedLocator: options.selectedLocator,
+      selectedValue: options.selectedValue,
+      llmReason: `${options.reason} (Skipped execution in recon mode — final step dry-run)`,
+      confidence: options.confidence,
+      selectorConfidenceScore: options.selectorConfidenceScore,
+      selectorRisk: options.selectorRisk,
+      selectorConfidenceSignals: options.selectorConfidenceSignals,
+      executed: false,
+      actionStatus: 'success',
+      actionError: null
     };
   }
 

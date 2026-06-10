@@ -608,7 +608,11 @@ function semanticSimilarityScore(target: string, value: string): number {
 
 function targetVariants(value: string): string[] {
   const variants = new Set<string>();
-  const cleanValue = value.replace(/\bclick\s+on\b/gi, '').replace(/\s+/g, ' ').trim();
+  const cleanValue = value
+    .replace(/\bclick\s+on\b/gi, '')
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (cleanValue) {
     variants.add(cleanValue);
   }
@@ -628,6 +632,14 @@ function targetVariants(value: string): string[] {
 
   if (/\badd\b/i.test(cleanValue)) {
     variants.add(cleanValue.replace(/\badd\b/gi, 'New'));
+  }
+
+  if (/email|address|name|user|id/i.test(cleanValue)) {
+    variants.add('Search');
+    variants.add('Search by name or email');
+    variants.add('Search by name');
+    variants.add('Search by email');
+    variants.add('Search...');
   }
 
   return [...variants];

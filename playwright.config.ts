@@ -16,6 +16,7 @@ export default defineConfig({
   testDir,
   timeout,
   retries,
+  workers: 1,
   reporter: [
     ['html', { outputFolder: process.env.PLAYWRIGHT_HTML_REPORT_DIR ?? `${reportDir}/playwright-html`, open: 'never' }],
     ['json', { outputFile: process.env.PLAYWRIGHT_JSON_REPORT_PATH ?? `${reportDir}/playwright-report.json` }]

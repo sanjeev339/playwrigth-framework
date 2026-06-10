@@ -434,8 +434,12 @@ function detectActionType(rawActionText: string, sourceStepTitle: string, payloa
 
 function isRowActionText(text: string, title: string, payload: Record<string, string>): boolean {
   const identity = resolvePayloadIdentity(payload);
-  const hasIdentity = Boolean(identity?.identityValue && normalize(text).includes(normalize(identity.identityValue)));
-  const hasRowCue = /\b(row|record|table|list|associated|customer|user|license|employee|account|entry|profile)\b/i.test(text);
+  const hasIdentity = Boolean(
+    identity?.identityValue &&
+    (normalize(text).includes(normalize(identity.identityValue)) ||
+     normalize(title).includes(normalize(identity.identityValue)))
+  );
+  const hasRowCue = /\b(row|record|table|list|associated|customer|user|license|employee|member|account|entry|profile)\b/i.test(text);
   const hasMenuCue = /\b(menu|actions?|more|associated)\b/i.test(text);
   const hasActionCue = /\b(click|select|choose|edit|delete|remove|view|details|open)\b/i.test(text);
   const refersToIdentifiedRow = Boolean(identity?.identityValue && /\bidentified\b|\bassociated\b/i.test(text));

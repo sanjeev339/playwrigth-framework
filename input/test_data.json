@@ -6,9 +6,9 @@
     "data_strategy": "positive_valid_create",
     "edge_case_type": null,
     "payload": {
-      "First Name": "Auto",
+      "First Name": "Audi",
       "Last Name": "UserOne",
-      "Email Address": "auto.user.one.1780654125370@company.com",
+      "Email Address": "audi.user.one.1780654125370@company.com",
       "Role": "QA TEST MAGT",
       "Status": "Active"
     }
@@ -20,7 +20,7 @@
     "data_strategy": "negative_invalid_email",
     "edge_case_type": "duplicate_value",
     "payload": {
-      "First Name": "Alice",
+      "First Name": "Alice2",
       "Last Name": "Smith",
       "Email Address": "sanjeevkumar.m00@gmail.com",
       "Role": "Adthiya Role "
@@ -103,9 +103,9 @@
     "data_strategy": "negative_database_lock",
     "edge_case_type": null,
     "payload": {
-      "First Name": "Lock",
+      "First Name": "Lock3",
       "Last Name": "User",
-      "Email Address": "lock.user.1780654125370@company.com",
+      "Email Address": "lock3.user.1780654125370@company.com",
       "Role": "QA TEST MAGT"
     }
   },

@@ -1,8 +1,9 @@
 import path from 'node:path';
 import { getFrameworkPaths } from '../config/env';
 import type { ReconSnapshot } from '../types';
-import type { LocatorCandidate, ReconDecision } from './reconDecisionTypes';
+import type { LocatorCandidate, ReconDecision, ParsedAction, ActionType } from './reconDecisionTypes';
 import { listFiles, readJsonFile, toSafeFileName, writeJsonFile } from '../utils/fileUtils';
+import { parseAction } from './actionParser';
 
 export interface ReconAction {
   scenarioId: string;
@@ -60,6 +61,13 @@ export async function extractReconActions(scenarioId: string, reconRootDir = get
     }
   }
 
+  let payload: Record<string, unknown> = {};
+  try {
+    const scenarioPath = path.join(getFrameworkPaths().scenarioDir, `${safeScenarioId}.json`);
+    const scenario = await readJsonFile<any>(scenarioPath);
+    payload = scenario.payload ?? {};
+  } catch {}
+
   const actionsByStep = new Map<string, ReconAction>();
 
   for (const entry of sortedSnapshots) {
@@ -72,7 +80,7 @@ export async function extractReconActions(scenarioId: string, reconRootDir = get
       continue;
     }
 
-    const action = toReconAction(decision, entry, dropdownSnapshotsByStep.get(decision.stepNo ?? -1));
+    const action = toReconAction(decision, entry, payload, dropdownSnapshotsByStep.get(decision.stepNo ?? -1));
     const key = `${action.stepNo ?? 'na'}:${action.rawStep}`;
     actionsByStep.set(key, action);
   }
@@ -89,28 +97,30 @@ export async function extractReconActions(scenarioId: string, reconRootDir = get
 function toReconAction(
   decision: ReconDecision,
   entry: SnapshotWithFile,
+  payload: Record<string, unknown>,
   dropdownSnapshot?: SnapshotWithFile
 ): ReconAction {
+  const parsedAction = parseAction(decision.rawStep, payload);
   const selectedLocatorParts = splitSelectLocator(decision.selectedLocator);
-  const optionValue = decision.parsedAction.actionType === 'select' ? decision.selectedValue ?? decision.parsedAction.value : null;
+  const optionValue = parsedAction.actionType === 'select' ? decision.selectedValue ?? parsedAction.value : null;
   const inferredOptionLocator =
-    decision.parsedAction.actionType === 'select'
+    parsedAction.actionType === 'select'
       ? decision.optionLocator ?? selectedLocatorParts.optionLocator ?? findOptionLocator(decision.deterministicCandidates, optionValue)
       : null;
   const dropdownLocator =
-    decision.parsedAction.actionType === 'select'
+    parsedAction.actionType === 'select'
       ? decision.dropdownLocator ?? selectedLocatorParts.dropdownLocator ?? dropdownSnapshot?.snapshot.decision?.selectedLocator ?? decision.selectedLocator
       : null;
-  const rowLocator = rowLocatorForDecision(decision);
-  const rowActionLocator = decision.parsedAction.actionType === 'row_action' ? decision.selectedLocator : null;
+  const rowLocator = rowLocatorForDecision(decision, parsedAction);
+  const rowActionLocator = parsedAction.actionType === 'row_action' ? decision.selectedLocator : null;
 
   return {
     scenarioId: decision.scenarioId,
     stepNo: decision.stepNo,
     rawStep: decision.rawStep,
-    actionType: decision.parsedAction.actionType,
-    target: decision.parsedAction.target,
-    value: decision.parsedAction.value,
+    actionType: parsedAction.actionType,
+    target: parsedAction.target,
+    value: parsedAction.value,
     selectedLocator: decision.selectedLocator,
     selectedValue: decision.selectedValue,
     actionStatus: decision.actionStatus,
@@ -119,9 +129,9 @@ function toReconAction(
     dropdownLocator,
     optionLocator: inferredOptionLocator,
     optionValue: decision.optionValue ?? optionValue,
-    optionSelectStatus: decision.optionSelectStatus ?? optionStatus(decision, inferredOptionLocator),
-    selectionVerified: decision.selectionVerified ?? (decision.parsedAction.actionType === 'select' && decision.actionStatus === 'success'),
-    payloadIdentity: decision.parsedAction.payloadIdentity,
+    optionSelectStatus: decision.optionSelectStatus ?? optionStatus(decision, inferredOptionLocator, parsedAction.actionType),
+    selectionVerified: decision.selectionVerified ?? (parsedAction.actionType === 'select' && decision.actionStatus === 'success'),
+    payloadIdentity: parsedAction.payloadIdentity,
     rowLocator,
     rowActionLocator,
     snapshotFile: path.relative(process.cwd(), entry.file),
@@ -158,8 +168,8 @@ function findOptionLocator(candidates: LocatorCandidate[], optionValue: string |
   return (roleOption ?? textOption ?? matches.sort((left, right) => left.priority - right.priority)[0])?.locator ?? null;
 }
 
-function optionStatus(decision: ReconDecision, optionLocator: string | null): 'success' | 'failed' | 'skipped' | 'not_applicable' {
-  if (decision.parsedAction.actionType !== 'select') {
+function optionStatus(decision: ReconDecision, optionLocator: string | null, parsedActionType: ActionType): 'success' | 'failed' | 'skipped' | 'not_applicable' {
+  if (parsedActionType !== 'select') {
     return 'not_applicable';
   }
   if (decision.actionStatus === 'success' && optionLocator) {
@@ -171,9 +181,9 @@ function optionStatus(decision: ReconDecision, optionLocator: string | null): 's
   return 'skipped';
 }
 
-function rowLocatorForDecision(decision: ReconDecision): string | null {
-  const identityValue = decision.parsedAction.payloadIdentity?.identityValue;
-  if (!identityValue || decision.parsedAction.actionType !== 'row_action') {
+function rowLocatorForDecision(decision: ReconDecision, parsedAction: ParsedAction): string | null {
+  const identityValue = parsedAction.payloadIdentity?.identityValue;
+  if (!identityValue || parsedAction.actionType !== 'row_action') {
     return null;
   }
 

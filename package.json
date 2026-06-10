@@ -17,10 +17,11 @@
     "run:dynamic": "ts-node src/runner/dynamicScenarioRunner.ts",
     "run:webwright": "ts-node src/runner/dynamicScenarioRunner.ts",
     "run:generated": "ts-node src/runner/playwrightRunner.ts",
+    "run:healed": "ts-node src/runner/playwrightHealedRunner.ts",
     "heal": "ts-node src/llm/healer.ts",
     "report": "ts-node src/reports/reportWriter.ts",
     "pipeline": "npm run build:scenarios && npm run run:webwright",
-    "pipeline:static": "npm run build:scenarios && npm run plan && npm run extract:actions && npm run recon && npm run generate && npm run validate && npm run run:generated && npm run heal && npm run report",
+    "pipeline:static": "npm run build:scenarios && npm run plan && npm run extract:actions && npm run recon && npm run generate && npm run validate && npm run run:generated && npm run heal && npm run run:healed && npm run validate && npm run report",
     "typecheck": "tsc --noEmit",
     "test:generator": "ts-node src/llm/generator.test.ts",
     "test:normalizer": "ts-node src/scenario/stepNormalizer.test.ts"
