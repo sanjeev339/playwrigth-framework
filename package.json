@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "license": "MIT",
   "scripts": {
+    "mcp:server": "ts-node mcp-server/index.ts",
     "build:scenarios": "ts-node src/scenario/scenarioBuilder.ts",
     "plan": "ts-node src/llm/planner.ts",
     "extract:actions": "ts-node src/specs/mdActionExtractor.ts",
@@ -27,6 +28,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.7.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^16.4.7",
     "fs-extra": "^11.2.0",
     "openai": "^4.77.0",

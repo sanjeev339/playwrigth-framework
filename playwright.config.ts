@@ -21,6 +21,7 @@ export default defineConfig({
     ['json', { outputFile: process.env.PLAYWRIGHT_JSON_REPORT_PATH ?? `${reportDir}/playwright-report.json` }]
   ],
   use: {
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'https://adminportal.dev.eigen-dyne.com',
     ...devices['Desktop Chrome'],
     headless,
     trace: 'on-first-retry',
