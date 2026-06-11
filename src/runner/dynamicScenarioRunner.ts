@@ -7,6 +7,7 @@ import { decideAndExecuteAction } from '../recon/actionDecisionEngine';
 import { locatorFromExpression } from '../recon/locatorSafetyValidator';
 import { scanVisibleDom } from '../recon/domScanner';
 import { waitForRafCycles, waitForSnapshotStability } from '../recon/pageStabilizer';
+import { extractReconActions } from '../recon/reconActionExtractor';
 import { performLogin, safeAction, gotoWithRetry } from '../utils/playwrightUtils';
 import type { ReconDecision } from '../recon/reconDecisionTypes';
 import { writeStateSnapshot } from '../recon/stateSnapshotWriter';
@@ -280,6 +281,20 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
   await writeJsonFile(reportJsonPath, report);
   await writeTextFile(reportHtmlPath, renderDynamicReport(report));
   logger.info(`Wrote dynamic step-runner reports -> ${reportJsonPath}, ${reportHtmlPath}`);
+
+  // Extract recon action summaries from dynamic-recon snapshots so the
+  // .spec.ts generator can find them under recon-summary/ and use them
+  // as 'dynamic' source (preferred over static recon).
+  logger.info('Extracting recon action summaries for generator...');
+  for (const scenario of scenarios) {
+    try {
+      const actions = await extractReconActions(scenario.scenario_id, outputDir);
+      logger.info(`  [recon-summary] ${scenario.scenario_id}: ${actions.length} action(s) ready for generator.`);
+    } catch (error) {
+      logger.warn(`  [recon-summary] Could not extract actions for ${scenario.scenario_id}.`, error);
+    }
+  }
+
   return report;
 }
 

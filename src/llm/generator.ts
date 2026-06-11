@@ -133,11 +133,9 @@ async function generateScenarioIndependently(input: {
     scenarioId = scenario.scenario_id;
     safeScenarioId = toSafeFileName(scenarioId);
     outputPath = path.join(input.outputDir, `${safeScenarioId}.spec.ts`);
-    const specPath = path.join(input.specDir, `${safeScenarioId}.md`);
+    logger.info(`Generating test for ${scenarioId} using recon-only mode...`);
 
-    logger.info(`Generating test for ${scenarioId} (spec: ${path.basename(specPath)})...`);
-    stage = 'plan-read';
-    const plan = await readTextFile(specPath);
+    stage = 'recon-extraction';
 
     stage = 'recon-extraction';
     const reconSelection = await readPreferredReconActions({
@@ -158,7 +156,6 @@ async function generateScenarioIndependently(input: {
     stage = 'prompt-build';
     const prompt = buildGeneratorPrompt({
       scenario,
-      plan,
       reconActions,
       dropdownSnapshots
     });

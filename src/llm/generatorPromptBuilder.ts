@@ -4,7 +4,6 @@ import { truncate } from '../utils/fileUtils';
 
 export function buildGeneratorPrompt(input: {
   scenario: Scenario;
-  plan: string;
   reconActions: ReconAction[];
   dropdownSnapshots: CompactDropdownSnapshot[];
 }): string {
@@ -38,9 +37,6 @@ export function buildGeneratorPrompt(input: {
       '',
       'Scenario JSON:',
       JSON.stringify(input.scenario, null, 2),
-      '',
-      'Markdown test plan:',
-      input.plan,
       '',
       'Recon actions:',
       JSON.stringify(input.reconActions, null, 2),
