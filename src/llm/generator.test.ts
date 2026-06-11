@@ -12,8 +12,6 @@ import { generateTests } from './generator';
 async function main(): Promise<void> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-independent-generation-'));
   const scenarioDir = path.join(root, 'scenarios');
-  const specDir = path.join(root, 'specs');
-  const reconDir = path.join(root, 'recon');
   const dynamicReconDir = path.join(root, 'dynamic-recon');
   const generatedDir = path.join(root, 'tests', 'generated');
   const healedDir = path.join(root, 'tests', 'healed');
@@ -25,10 +23,7 @@ async function main(): Promise<void> {
     await Promise.all([
       writeScenario(scenarioDir, 'TC-001', 'Dashboard'),
       writeScenario(scenarioDir, 'TC-002', 'Role'),
-      writeScenario(scenarioDir, 'TC-003', 'Settings'),
-      writePlan(specDir, 'TC-001'),
-      writePlan(specDir, 'TC-002'),
-      writePlan(specDir, 'TC-003')
+      writeScenario(scenarioDir, 'TC-003', 'Settings')
     ]);
 
     const staleFile = path.join(generatedDir, 'TC-002.spec.ts');
@@ -36,8 +31,6 @@ async function main(): Promise<void> {
 
     const report = await generateTests({
       scenarioDir,
-      specDir,
-      reconDir,
       dynamicReconDir,
       outputDir: generatedDir,
       quarantineDir,
@@ -110,7 +103,7 @@ async function main(): Promise<void> {
       scenarioDir,
       generatedDir,
       healedDir,
-      reconDir,
+      dynamicReconDir,
       generationReportPath,
       runResultPath,
       validationPath,
@@ -143,9 +136,7 @@ async function writeScenario(dir: string, scenarioId: string, target: string): P
   await fs.outputJson(path.join(dir, `${scenarioId}.json`), scenario);
 }
 
-async function writePlan(dir: string, scenarioId: string): Promise<void> {
-  await fs.outputFile(path.join(dir, `${scenarioId}.md`), `# ${scenarioId}\n`);
-}
+
 
 function successfulClickAction(scenarioId: string): ReconAction {
   const target = scenarioId === 'TC-001' ? 'Dashboard' : 'Settings';

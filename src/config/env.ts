@@ -77,16 +77,12 @@ const frameworkPathSchema = z.object({
   INPUT_FLOW_PATH: optionalPath,
   INPUT_DATA_PATH: optionalPath,
   SCENARIO_OUTPUT_DIR: optionalPath,
-  SPEC_OUTPUT_DIR: optionalPath,
-  SCENARIO_ACTION_OUTPUT_DIR: optionalPath,
-  RECON_OUTPUT_DIR: optionalPath,
   RECON_SUMMARY_OUTPUT_DIR: optionalPath,
   DYNAMIC_RECON_OUTPUT_DIR: optionalPath,
   GENERATED_TEST_OUTPUT_DIR: optionalPath,
   GENERATED_TEST_QUARANTINE_DIR: optionalPath,
   HEALED_TEST_OUTPUT_DIR: optionalPath,
   REPORT_OUTPUT_DIR: optionalPath,
-  ACTION_EXTRACTION_REPORT_PATH: optionalPath,
   GENERATION_REPORT_PATH: optionalPath,
   RUN_RESULT_PATH: optionalPath,
   LOCATOR_VALIDATION_REPORT_PATH: optionalPath,
@@ -136,16 +132,12 @@ export interface FrameworkPaths {
   inputFlowPath: string;
   inputDataPath: string;
   scenarioDir: string;
-  specDir: string;
-  scenarioActionDir: string;
-  reconDir: string;
   reconSummaryDir: string;
   dynamicReconDir: string;
   generatedTestsDir: string;
   generatedTestsQuarantineDir: string;
   healedTestsDir: string;
   reportDir: string;
-  actionExtractionReportPath: string;
   generationReportPath: string;
   runResultPath: string;
   locatorValidationReportPath: string;
@@ -188,19 +180,12 @@ export function getFrameworkPaths(): FrameworkPaths {
     inputFlowPath: resolveProjectPath(env.INPUT_FLOW_PATH, 'input', 'test_flow.xlsx'),
     inputDataPath: resolveProjectPath(env.INPUT_DATA_PATH, 'input', 'test_data.json'),
     scenarioDir: resolveProjectPath(env.SCENARIO_OUTPUT_DIR, 'scenarios'),
-    specDir: resolveProjectPath(env.SPEC_OUTPUT_DIR, 'specs'),
-    scenarioActionDir: resolveProjectPath(env.SCENARIO_ACTION_OUTPUT_DIR, 'scenario-actions'),
-    reconDir: resolveProjectPath(env.RECON_OUTPUT_DIR, 'recon'),
     reconSummaryDir: resolveProjectPath(env.RECON_SUMMARY_OUTPUT_DIR, 'recon-summary'),
     dynamicReconDir: resolveProjectPath(env.DYNAMIC_RECON_OUTPUT_DIR, 'dynamic-recon'),
     generatedTestsDir: resolveProjectPath(env.GENERATED_TEST_OUTPUT_DIR, 'tests', 'generated'),
     generatedTestsQuarantineDir: resolveProjectPath(env.GENERATED_TEST_QUARANTINE_DIR, 'generated-quarantine'),
     healedTestsDir: resolveProjectPath(env.HEALED_TEST_OUTPUT_DIR, 'tests', 'healed'),
     reportDir,
-    actionExtractionReportPath: resolveProjectPath(
-      env.ACTION_EXTRACTION_REPORT_PATH,
-      path.relative(process.cwd(), path.join(reportDir, 'action-extraction-validation.json'))
-    ),
     generationReportPath: resolveProjectPath(
       env.GENERATION_REPORT_PATH,
       path.relative(process.cwd(), path.join(reportDir, 'generation-result.json'))

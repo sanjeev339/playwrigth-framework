@@ -64,7 +64,7 @@ export async function writeFinalReport(options: {
   scenarioDir?: string;
   generatedDir?: string;
   healedDir?: string;
-  reconDir?: string;
+  dynamicReconDir?: string;
   generationReportPath?: string;
   runResultPath?: string;
   validationPath?: string;
@@ -75,7 +75,7 @@ export async function writeFinalReport(options: {
   const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
   const generatedDir = options.generatedDir ?? paths.generatedTestsDir;
   const healedDir = options.healedDir ?? paths.healedTestsDir;
-  const reconDir = options.reconDir ?? paths.reconDir;
+  const dynamicReconDir = options.dynamicReconDir ?? paths.dynamicReconDir;
   const generationReportPath = options.generationReportPath ?? paths.generationReportPath;
   const runResultPath = options.runResultPath ?? paths.runResultPath;
   const validationPath = options.validationPath ?? paths.locatorValidationReportPath;
@@ -96,7 +96,7 @@ export async function writeFinalReport(options: {
     const generatedFile = path.join(generatedDir, `${safeScenarioId}.spec.ts`);
     const healedFile = path.join(healedDir, `${safeScenarioId}.spec.ts`);
     const generationResult = generationReport?.scenarios.find((result) => result.scenario_id === scenario.scenario_id);
-    const reconSnapshots = await listFiles(path.join(reconDir, safeScenarioId), '.json');
+    const reconSnapshots = await listFiles(path.join(dynamicReconDir, safeScenarioId), '.json');
     const smartRecon = await readSmartReconSummary(reconSnapshots);
     const generatedRelative =
       generationResult?.status !== 'failed' && (await fs.pathExists(generatedFile))

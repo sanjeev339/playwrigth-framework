@@ -29,7 +29,7 @@ export async function healFailedTests(options: {
   scenarioDir?: string;
   generatedDir?: string;
   generationReportPath?: string;
-  reconDir?: string;
+  dynamicReconDir?: string;
   outputDir?: string;
   healingReportPath?: string;
 } = {}): Promise<HealingResult> {
@@ -38,7 +38,7 @@ export async function healFailedTests(options: {
   const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
   const generatedDir = options.generatedDir ?? paths.generatedTestsDir;
   const generationReportPath = options.generationReportPath ?? paths.generationReportPath;
-  const reconDir = options.reconDir ?? paths.reconDir;
+  const dynamicReconDir = options.dynamicReconDir ?? paths.dynamicReconDir;
   const outputDir = options.outputDir ?? paths.healedTestsDir;
   const healingReportPath = options.healingReportPath ?? paths.healingReportPath;
 
@@ -76,7 +76,7 @@ export async function healFailedTests(options: {
     const scenarioId = path.basename(generatedFile).replace(/\.spec\.ts$/, '');
     const scenarioPath = path.join(scenarioDir, `${scenarioId}.json`);
     const scenario = (await fs.pathExists(scenarioPath)) ? await readJsonFile<Scenario>(scenarioPath) : undefined;
-    const snapshots = await readReconSnapshots(path.join(reconDir, scenarioId));
+    const snapshots = await readReconSnapshots(path.join(dynamicReconDir, scenarioId));
     const generatedCode = await readTextFile(generatedFile);
     logger.info(`Healing ${scenarioId} (${path.basename(generatedFile)}, ${snapshots.length} recon snapshot(s))...`);
     const prompt = buildHealerPrompt(generatedCode, runResult, snapshots, scenario);

@@ -34,8 +34,6 @@ interface GeneratedCode {
 
 export interface GenerateTestsOptions {
   scenarioDir?: string;
-  specDir?: string;
-  reconDir?: string;
   dynamicReconDir?: string;
   outputDir?: string;
   quarantineDir?: string;
@@ -60,8 +58,6 @@ class ScenarioGenerationError extends Error {
 export async function generateTests(options: GenerateTestsOptions = {}): Promise<GenerationReport> {
   const paths = getFrameworkPaths();
   const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
-  const specDir = options.specDir ?? paths.specDir;
-  const reconDir = options.reconDir ?? paths.reconDir;
   const dynamicReconDir = options.dynamicReconDir ?? paths.dynamicReconDir;
   const outputDir = options.outputDir ?? paths.generatedTestsDir;
   const quarantineDir = options.quarantineDir ?? paths.generatedTestsQuarantineDir;
@@ -82,8 +78,6 @@ export async function generateTests(options: GenerateTestsOptions = {}): Promise
     scenarioResults.push(
       await generateScenarioIndependently({
         scenarioFile,
-        specDir,
-        reconDir,
         dynamicReconDir,
         outputDir,
         quarantineDir,
@@ -113,8 +107,6 @@ export async function generateTests(options: GenerateTestsOptions = {}): Promise
 
 async function generateScenarioIndependently(input: {
   scenarioFile: string;
-  specDir: string;
-  reconDir: string;
   dynamicReconDir: string;
   outputDir: string;
   quarantineDir: string;
@@ -136,22 +128,14 @@ async function generateScenarioIndependently(input: {
     logger.info(`Generating test for ${scenarioId} using recon-only mode...`);
 
     stage = 'recon-extraction';
-
-    stage = 'recon-extraction';
-    const reconSelection = await readPreferredReconActions({
-      scenarioId,
-      dynamicReconDir: input.dynamicReconDir,
-      staticReconDir: input.reconDir,
-      extractActions: input.extractActions
-    });
-    reconSource = reconSelection.source;
-    const reconActions = reconSelection.actions;
-    logger.info(`Loaded ${reconActions.length} ${reconSelection.source} recon action(s) for ${scenarioId}.`);
+    const reconActions = await input.extractActions(scenarioId, input.dynamicReconDir);
+    reconSource = 'dynamic';
+    logger.info(`Loaded ${reconActions.length} dynamic recon action(s) for ${scenarioId}.`);
     if (reconActions.length === 0) {
-      throw new Error(`No recon decisions found for ${scenarioId}. Run npm run pipeline or npm run recon first.`);
+      throw new Error(`No recon decisions found for ${scenarioId}. Run npm run pipeline first.`);
     }
 
-    const reconPath = path.join(reconSelection.rootDir, safeScenarioId);
+    const reconPath = path.join(input.dynamicReconDir, safeScenarioId);
     const dropdownSnapshots = await readRelevantDropdownSnapshots(reconPath, reconActions);
     stage = 'prompt-build';
     const prompt = buildGeneratorPrompt({
@@ -179,7 +163,7 @@ async function generateScenarioIndependently(input: {
       status: 'generated',
       generated_file: path.relative(process.cwd(), outputPath),
       generator_source: generated.source,
-      recon_source: reconSelection.source
+      recon_source: reconSource
     };
   } catch (error) {
     let failureStage = error instanceof ScenarioGenerationError ? error.stage : stage;
@@ -203,28 +187,6 @@ async function generateScenarioIndependently(input: {
       quarantined_file: quarantinedFile
     };
   }
-}
-
-async function readPreferredReconActions(input: {
-  scenarioId: string;
-  dynamicReconDir: string;
-  staticReconDir: string;
-  extractActions: typeof extractReconActions;
-}): Promise<{ source: 'dynamic' | 'static'; rootDir: string; actions: ReconAction[] }> {
-  const dynamicActions = await input.extractActions(input.scenarioId, input.dynamicReconDir);
-  if (dynamicActions.length > 0) {
-    return {
-      source: 'dynamic',
-      rootDir: input.dynamicReconDir,
-      actions: dynamicActions
-    };
-  }
-
-  return {
-    source: 'static',
-    rootDir: input.staticReconDir,
-    actions: await input.extractActions(input.scenarioId, input.staticReconDir)
-  };
 }
 
 async function generateReconDrivenCode(input: {

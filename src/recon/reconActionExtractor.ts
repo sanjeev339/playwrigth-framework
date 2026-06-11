@@ -35,7 +35,7 @@ interface SnapshotWithFile {
   snapshot: ReconSnapshot;
 }
 
-export async function extractReconActions(scenarioId: string, reconRootDir = getFrameworkPaths().reconDir): Promise<ReconAction[]> {
+export async function extractReconActions(scenarioId: string, reconRootDir = getFrameworkPaths().dynamicReconDir): Promise<ReconAction[]> {
   const safeScenarioId = toSafeFileName(scenarioId);
   const scenarioReconDir = path.join(reconRootDir, safeScenarioId);
   const snapshotFiles = await listFiles(scenarioReconDir, '.json');
