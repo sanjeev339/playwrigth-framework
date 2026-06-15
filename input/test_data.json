@@ -1,0 +1,29 @@
+[
+  {
+    "scenario_id": "TC-UM-001",
+    "execution_order": 1,
+    "record_id": "1e60cde8-f3ba-4b51-8f5d-e6c03aba5c7d",
+    "data_strategy": "positive_valid_create",
+    "edge_case_type": null,
+    "payload": {
+      "First Name": "Nevi",
+      "Last Name": "S",
+      "Email Address": "nevi.s.001@piraiinfotech.com",
+      "Role": "QA TEST MAGT",
+      "Status": "Active"
+    }
+  },
+  {
+    "scenario_id": "TC-UM-002",
+    "execution_order": 2,
+    "record_id": "b445cfd9-4f0a-45f8-9b81-b14b4bb0f88a",
+    "data_strategy": "negative_invalid_email",
+    "edge_case_type": "duplicate_value",
+    "payload": {
+      "First Name": "Lica2",
+      "Last Name": "Smith",
+      "Email Address": "sanjeevkumar.m00@gmail.com",
+      "Role": "Adthiya Role "
+    }
+  }
+]

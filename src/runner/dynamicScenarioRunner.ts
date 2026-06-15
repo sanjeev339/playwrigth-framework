@@ -123,6 +123,7 @@ interface DynamicRunnerOptions {
 }
 
 export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): Promise<DynamicRunReport> {
+  process.env['IS_RECON'] = 'true';
   const env = getWebEnv();
   const paths = getFrameworkPaths();
   const scenarioDir = options.scenarioDir ?? paths.scenarioDir;
@@ -229,7 +230,9 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
         failureReason = `Login failed: ${loginError}`;
         await captureFailureScreenshot(page, screenshotDir, 'login-failed');
       } else {
-        for (const step of scenario.steps) {
+        for (let i = 0; i < scenario.steps.length; i++) {
+          const step = scenario.steps[i];
+          const isLastStep = i === scenario.steps.length - 1;
           const stepReport = await executeStep({
             page,
             scenario,
@@ -238,6 +241,7 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
             screenshotDir,
             snapshotSessionId,
             previousActionErrors,
+            isLastStep,
             nextSequence: () => sequence++
           });
           steps.push(stepReport);
@@ -308,6 +312,7 @@ async function executeStep(input: {
   screenshotDir: string;
   snapshotSessionId: string;
   previousActionErrors: string[];
+  isLastStep: boolean;
   nextSequence: () => number;
 }): Promise<StepExecutionReport> {
   const startedAt = new Date();
@@ -331,6 +336,7 @@ async function executeStep(input: {
     payload: input.scenario.payload,
     snapshotElements: before.snapshot.elements,
     previousActionErrors: input.previousActionErrors,
+    isLastStep: input.isLastStep,
     onIntermediateSnapshot: async (state: string, actionBeforeSnapshot: string, intermediateDecision: ReconDecision) => {
       await captureSnapshot({
         page: input.page,
@@ -400,7 +406,8 @@ async function executeStep(input: {
     step: input.step,
     payload: input.scenario.payload,
     snapshotElements: repairBefore.snapshot.elements,
-    previousActionErrors: input.previousActionErrors
+    previousActionErrors: input.previousActionErrors,
+    isLastStep: input.isLastStep
   });
   const repairAfter = await captureSnapshot({
     page: input.page,
