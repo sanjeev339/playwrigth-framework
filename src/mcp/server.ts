@@ -87,7 +87,7 @@ async function savePipelineLog(paths: ReturnType<typeof getFrameworkPaths>, log:
   }
 }
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
   const paths = getFrameworkPaths();
 
   switch (request.params.name) {
@@ -102,32 +102,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Playwright reads and writes to that same folder automatically.
         if (args.inputFlowPath) {
           const outDir = path.dirname(args.inputFlowPath);
-          env.INPUT_FLOW_PATH  = args.inputFlowPath;
-          env.INPUT_DATA_PATH  = args.inputDataPath || path.join(outDir, 'test_data.json');
-          env.SCENARIO_OUTPUT_DIR              = path.join(outDir, 'scenarios');
-          env.RECON_SUMMARY_OUTPUT_DIR         = path.join(outDir, 'recon-summary');
-          env.DYNAMIC_RECON_OUTPUT_DIR         = path.join(outDir, 'dynamic-recon');
-          env.GENERATED_TEST_OUTPUT_DIR        = path.join(outDir, 'tests', 'generated');
-          env.GENERATED_TEST_QUARANTINE_DIR    = path.join(outDir, 'generated-quarantine');
-          env.HEALED_TEST_OUTPUT_DIR           = path.join(outDir, 'tests', 'healed');
-          env.REPORT_OUTPUT_DIR                = path.join(outDir, 'reports');
-          env.GENERATION_REPORT_PATH           = path.join(outDir, 'reports', 'generation-result.json');
-          env.RUN_RESULT_PATH                  = path.join(outDir, 'reports', 'run-result.json');
-          env.LOCATOR_VALIDATION_REPORT_PATH   = path.join(outDir, 'reports', 'locator-validation.json');
-          env.FINAL_REPORT_JSON_PATH           = path.join(outDir, 'reports', 'final-report.json');
-          env.FINAL_REPORT_HTML_PATH           = path.join(outDir, 'reports', 'final-report.html');
-          env.DYNAMIC_REPORT_JSON_PATH         = path.join(outDir, 'reports', 'dynamic-run-result.json');
-          env.DYNAMIC_REPORT_HTML_PATH         = path.join(outDir, 'reports', 'dynamic-run-result.html');
-          env.HEALING_REPORT_PATH              = path.join(outDir, 'reports', 'healing-result.json');
+          env.INPUT_FLOW_PATH = args.inputFlowPath;
+          env.INPUT_DATA_PATH = args.inputDataPath || path.join(outDir, 'test_data.json');
+          env.SCENARIO_OUTPUT_DIR = path.join(outDir, 'scenarios');
+          env.RECON_SUMMARY_OUTPUT_DIR = path.join(outDir, 'recon-summary');
+          env.DYNAMIC_RECON_OUTPUT_DIR = path.join(outDir, 'dynamic-recon');
+          env.GENERATED_TEST_OUTPUT_DIR = path.join(outDir, 'tests', 'generated');
+          env.GENERATED_TEST_QUARANTINE_DIR = path.join(outDir, 'generated-quarantine');
+          env.HEALED_TEST_OUTPUT_DIR = path.join(outDir, 'tests', 'healed');
+          env.REPORT_OUTPUT_DIR = path.join(outDir, 'reports');
+          env.GENERATION_REPORT_PATH = path.join(outDir, 'reports', 'generation-result.json');
+          env.RUN_RESULT_PATH = path.join(outDir, 'reports', 'run-result.json');
+          env.LOCATOR_VALIDATION_REPORT_PATH = path.join(outDir, 'reports', 'locator-validation.json');
+          env.FINAL_REPORT_JSON_PATH = path.join(outDir, 'reports', 'final-report.json');
+          env.FINAL_REPORT_HTML_PATH = path.join(outDir, 'reports', 'final-report.html');
+          env.DYNAMIC_REPORT_JSON_PATH = path.join(outDir, 'reports', 'dynamic-run-result.json');
+          env.DYNAMIC_REPORT_HTML_PATH = path.join(outDir, 'reports', 'dynamic-run-result.html');
+          env.HEALING_REPORT_PATH = path.join(outDir, 'reports', 'healing-result.json');
         } else if (args.inputDataPath) {
           env.INPUT_DATA_PATH = args.inputDataPath;
         }
 
         // Still forward any remaining .env keys not already set above
         const envKeys = [
-          'WEBSITE_URL','LOGIN_EMAIL','LOGIN_PASSWORD',
-          'LLM_PROVIDER','GEMINI_API_KEY','OPENAI_API_KEY','OPENAI_MODEL','GEMINI_MODEL',
-          'HEADLESS','SLOW_MO','ACTION_DECISION_MODE'
+          'WEBSITE_URL', 'LOGIN_EMAIL', 'LOGIN_PASSWORD',
+          'LLM_PROVIDER', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'OPENAI_MODEL', 'GEMINI_MODEL',
+          'HEADLESS', 'SLOW_MO', 'ACTION_DECISION_MODE',
+          'INPUT_FLOW_PATH', 'INPUT_DATA_PATH'
         ];
         for (const key of envKeys) {
           if (process.env[key] && !env[key]) env[key] = process.env[key];

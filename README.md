@@ -45,8 +45,8 @@ SLOW_MO=100
 LOG_LLM_IO=true
 LLM_IO_MAX_CHARS=20000
 
-INPUT_FLOW_PATH=input/test_flow.xlsx
-INPUT_DATA_PATH=input/test_data.json
+INPUT_FLOW_PATH=input/UC_trail_pw.xlsx
+INPUT_DATA_PATH=input/test_data_enriched.json
 SCENARIO_OUTPUT_DIR=scenarios
 SPEC_OUTPUT_DIR=specs
 SCENARIO_ACTION_OUTPUT_DIR=scenario-actions
@@ -66,10 +66,10 @@ Do not commit `.env`.
 
 ## Input Files
 
-The framework reads these default files:
+The framework reads the paths configured in your `.env` file:
 
-- `input/test_flow.xlsx`: manual test cases and steps
-- `input/test_data.json`: payload data matched by `scenario_id`
+- `INPUT_FLOW_PATH` (e.g. `input/UC_trail_pw.xlsx`): manual test cases and steps
+- `INPUT_DATA_PATH` (e.g. `input/test_data_enriched.json`): payload data matched by `scenario_id`
 
 Supported Excel headers include:
 
@@ -138,19 +138,49 @@ Build normalized scenario JSON:
 npm run build:scenarios
 ```
 
-Run the main dynamic pipeline:
-
-```bash
-npm run pipeline
-```
-
-Run dynamic execution after scenarios are already built:
+Run the dynamic execution runner (after scenarios are built):
 
 ```bash
 npm run run:webwright
 ```
 
-Run the seed login test:
+Generate TypeScript Playwright spec files from the dynamic execution logs:
+
+```bash
+npm run generate
+```
+
+Validate locators in generated specs:
+
+```bash
+npm run validate
+```
+
+Run successfully generated specs:
+
+```bash
+npm run run:generated
+```
+
+Heal failed steps in generated specs using LLM repair:
+
+```bash
+npm run heal
+```
+
+Run the healed specs:
+
+```bash
+npm run run:healed
+```
+
+Write the final combined reports (HTML and JSON):
+
+```bash
+npm run report
+```
+
+Run the seed login test (headed):
 
 ```bash
 npm run test:seed
@@ -162,137 +192,39 @@ Typecheck the project:
 npm run typecheck
 ```
 
-Run generator and normalizer tests:
+Run tests for the generator and normalizer:
 
 ```bash
 npm run test:generator
 npm run test:normalizer
 ```
 
-## Generate TypeScript Test Files
+## Running the Pipeline
 
-To create generated Playwright `.spec.ts` files:
-
-```bash
-npm run build:scenarios
-npm run plan
-npm run extract:actions
-npm run recon
-npm run generate
-```
-
-Then validate and run only the generated files that succeeded:
+You can run the entire pipeline end-to-end (scenario building, dynamic execution, static generation, validation, execution of generated specs, healing, healed execution, and reporting) with a single command:
 
 ```bash
-npm run validate
-npm run run:generated
+npm run pipeline
 ```
 
-Then heal and write the final static report:
+### What Happens in the Pipeline:
 
-```bash
-npm run heal
-npm run report
-```
+1. **Excel & JSON Inputs Parsing**: Reads the Excel manual test cases and JSON payloads specified by `INPUT_FLOW_PATH` and `INPUT_DATA_PATH` in `.env`.
+2. **Scenario Normalization**: Normalizes Excel steps and outputs normalized JSON scenarios to `scenarios/`.
+3. **Dynamic Runner Execution**: Launches the application and uses LLM/deterministic decision engines to execute actions dynamically, writing screenshots and DOM snapshots.
+4. **Code Generation**: Translates dynamic action sequences into TypeScript Playwright specs in `tests/generated/`.
+5. **Locator Validation**: Scans generated specs to warn about duplicate or accessibility-deficient locators.
+6. **Execution of Generated Specs**: Runs the new specs with Playwright.
+7. **Healing Failures**: Automatically attempts to repair failed steps inside generated specs.
+8. **Healed Spec Execution**: Runs the repaired test files.
+9. **Final Reports Generation**: Writes HTML/JSON execution status and healing outcomes to `reports/`.
 
-Or run the full static pipeline in one command:
+### Report & Directory Outputs:
+- Dynamic execution details are saved under `dynamic-recon/`.
+- Generated specifications are saved to `tests/generated/`.
+- Healed specifications are saved to `tests/healed/`.
+- Reports (HTML/JSON) are saved under `reports/`.
 
-```bash
-npm run pipeline:static
-```
-
-## Dynamic Pipeline
-
-`npm run pipeline` executes:
-
-```bash
-npm run build:scenarios && npm run run:webwright
-```
-
-What happens:
-
-1. Excel and JSON input files are read.
-2. Steps are normalized and scenario files are written to `scenarios/`.
-3. The runner opens the application and logs in for each scenario.
-4. For every step, the runner captures the current page state.
-5. DOM and accessibility candidates are collected from the live UI.
-6. The LLM chooses an action and locator from the current screen.
-7. Locator safety checks run before execution.
-8. Playwright executes the step.
-9. The runner captures after-state evidence.
-10. If a step fails, screenshot, DOM snapshot, decision details, and error details are saved.
-11. One repair attempt is made from a fresh page snapshot.
-12. The next scenario still runs even if the current scenario fails.
-
-Dynamic reports are written to:
-
-- `reports/dynamic-run-result.json`
-- `reports/dynamic-run-result.html`
-- `dynamic-recon/`
-
-## Static Pipeline
-
-`npm run pipeline:static` executes:
-
-```bash
-npm run build:scenarios &&
-npm run plan &&
-npm run extract:actions &&
-npm run recon &&
-npm run generate &&
-npm run validate &&
-npm run run:generated &&
-npm run heal &&
-npm run report
-```
-
-Static generation is independent per test case. One failed scenario does not stop the remaining scenarios.
-
-Generation behavior:
-
-- Each scenario runs inside its own `try/catch`.
-- Generated code is validated before it is written.
-- Successfully generated specs are written to `tests/generated/`.
-- Failed scenarios are recorded in `reports/generation-result.json`.
-- Older generated specs for failed scenarios are moved to `generated-quarantine/<scenario-id>/`.
-- The pipeline continues if at least one scenario generated successfully.
-- The pipeline fails only for fatal setup errors or when zero scenarios generate.
-
-Example generation report:
-
-```json
-{
-  "summary": {
-    "total": 5,
-    "generated": 4,
-    "failed": 1
-  },
-  "scenarios": [
-    {
-      "scenario_id": "TC-UM-001",
-      "status": "generated",
-      "generated_file": "tests/generated/TC-UM-001.spec.ts"
-    },
-    {
-      "scenario_id": "TC-UM-002",
-      "status": "failed",
-      "failed_stage": "deterministic-generation",
-      "error": "Missing recon locator for select step: Select Role"
-    }
-  ]
-}
-```
-
-Validation and `run:generated` use only successful files from the latest generation report. Final static reporting marks generation failures as `blocked` instead of incorrectly marking all existing generated files as passed.
-
-Static reports are written to:
-
-- `reports/generation-result.json`
-- `reports/locator-validation.json`
-- `reports/run-result.json`
-- `reports/healing-result.json`
-- `reports/result.json`
-- `reports/result.html`
 
 ## Folder Structure
 
