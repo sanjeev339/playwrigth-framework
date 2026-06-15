@@ -111,6 +111,11 @@ function splitRowMenuActionInstruction(
   payload: Record<string, unknown>,
   payloadLabels: string[]
 ): string[] {
+  // Guard: must explicitly mention a menu/actions trigger — NOT a plain "Select X" form step
+  if (!/\b(menu|actions?)\b/i.test(instruction)) {
+    return [];
+  }
+
   if (!/^(click|select|choose|open)\b/i.test(instruction) || !hasGenericRowSubject(instruction)) {
     return [];
   }
@@ -139,6 +144,7 @@ function splitRowMenuActionInstruction(
     `Click ${canonicalizeGeneralTarget(actionTarget, payloadLabels)}`
   ];
 }
+
 
 function normalizeGenericRowSelectionInstruction(
   instruction: string,
@@ -262,6 +268,16 @@ function normalizeActionInstruction(
   if (selectMatch?.[2]) {
     if (/\bedit\b/i.test(selectMatch[2])) {
       return 'Click Edit';
+    }
+
+    // Handle "Select X: Value" pattern (e.g. "Select account type: Company")
+    // The value after the colon is the actual button/option to click
+    const colonValueMatch = selectMatch[2].match(/^(.+?)\s*:\s*(.+)$/);
+    if (colonValueMatch?.[2]) {
+      const value = colonValueMatch[2].trim();
+      // Check payload for this value to canonicalize
+      const payloadMatch = payloadLabels.find(l => l.toLowerCase() === value.toLowerCase());
+      return `Click ${payloadMatch ?? value}`;
     }
 
     const verb = titleCaseAction(selectMatch[1]);

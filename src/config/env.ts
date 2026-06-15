@@ -177,8 +177,8 @@ export function getFrameworkPaths(): FrameworkPaths {
   const reportDir = resolveProjectPath(env.REPORT_OUTPUT_DIR, 'reports');
 
   return {
-    inputFlowPath: resolveProjectPath(env.INPUT_FLOW_PATH, 'input', 'test_flow.xlsx'),
-    inputDataPath: resolveProjectPath(env.INPUT_DATA_PATH, 'input', 'test_data.json'),
+    inputFlowPath: resolveProjectPath(env.INPUT_FLOW_PATH, 'scenarios_combined.csv'),
+    inputDataPath: resolveProjectPath(env.INPUT_DATA_PATH, 'test_data.json'),
     scenarioDir: resolveProjectPath(env.SCENARIO_OUTPUT_DIR, 'scenarios'),
     reconSummaryDir: resolveProjectPath(env.RECON_SUMMARY_OUTPUT_DIR, 'recon-summary'),
     dynamicReconDir: resolveProjectPath(env.DYNAMIC_RECON_OUTPUT_DIR, 'dynamic-recon'),
@@ -186,35 +186,14 @@ export function getFrameworkPaths(): FrameworkPaths {
     generatedTestsQuarantineDir: resolveProjectPath(env.GENERATED_TEST_QUARANTINE_DIR, 'generated-quarantine'),
     healedTestsDir: resolveProjectPath(env.HEALED_TEST_OUTPUT_DIR, 'tests', 'healed'),
     reportDir,
-    generationReportPath: resolveProjectPath(
-      env.GENERATION_REPORT_PATH,
-      path.relative(process.cwd(), path.join(reportDir, 'generation-result.json'))
-    ),
-    runResultPath: resolveProjectPath(env.RUN_RESULT_PATH, path.relative(process.cwd(), path.join(reportDir, 'run-result.json'))),
-    locatorValidationReportPath: resolveProjectPath(
-      env.LOCATOR_VALIDATION_REPORT_PATH,
-      path.relative(process.cwd(), path.join(reportDir, 'locator-validation.json'))
-    ),
-    finalReportJsonPath: resolveProjectPath(
-      env.FINAL_REPORT_JSON_PATH,
-      path.relative(process.cwd(), path.join(reportDir, 'result.json'))
-    ),
-    finalReportHtmlPath: resolveProjectPath(
-      env.FINAL_REPORT_HTML_PATH,
-      path.relative(process.cwd(), path.join(reportDir, 'result.html'))
-    ),
-    dynamicReportJsonPath: resolveProjectPath(
-      env.DYNAMIC_REPORT_JSON_PATH,
-      path.relative(process.cwd(), path.join(reportDir, 'dynamic-run-result.json'))
-    ),
-    dynamicReportHtmlPath: resolveProjectPath(
-      env.DYNAMIC_REPORT_HTML_PATH,
-      path.relative(process.cwd(), path.join(reportDir, 'dynamic-run-result.html'))
-    ),
-    healingReportPath: resolveProjectPath(
-      env.HEALING_REPORT_PATH,
-      path.relative(process.cwd(), path.join(reportDir, 'healing-result.json'))
-    )
+    generationReportPath: resolveProjectPath(env.GENERATION_REPORT_PATH, 'reports', 'generation-result.json'),
+    runResultPath: resolveProjectPath(env.RUN_RESULT_PATH, 'reports', 'run-result.json'),
+    locatorValidationReportPath: resolveProjectPath(env.LOCATOR_VALIDATION_REPORT_PATH, 'reports', 'locator-validation.json'),
+    finalReportJsonPath: resolveProjectPath(env.FINAL_REPORT_JSON_PATH, 'reports', 'result.json'),
+    finalReportHtmlPath: resolveProjectPath(env.FINAL_REPORT_HTML_PATH, 'reports', 'result.html'),
+    dynamicReportJsonPath: resolveProjectPath(env.DYNAMIC_REPORT_JSON_PATH, 'reports', 'dynamic-run-result.json'),
+    dynamicReportHtmlPath: resolveProjectPath(env.DYNAMIC_REPORT_HTML_PATH, 'reports', 'dynamic-run-result.html'),
+    healingReportPath: resolveProjectPath(env.HEALING_REPORT_PATH, 'reports', 'healing-result.json')
   };
 }
 
@@ -237,6 +216,7 @@ export function requireEnvValue(
 }
 
 function resolveProjectPath(value: string | undefined, ...fallbackSegments: string[]): string {
+  const baseDir = process.env.ORCHESTAI_OUTPUT_DIR || process.cwd();
   const target = value ?? path.join(...fallbackSegments);
-  return path.isAbsolute(target) ? target : path.resolve(process.cwd(), target);
+  return path.isAbsolute(target) ? target : path.resolve(baseDir, target);
 }

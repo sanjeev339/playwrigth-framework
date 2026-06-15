@@ -33,6 +33,7 @@ export interface Scenario {
   steps: ScenarioStep[];
   expected_results: string[];
   payload: Record<string, unknown>;
+  skip_login?: boolean;
   metadata: {
     execution_order?: number;
     data_strategy?: string;

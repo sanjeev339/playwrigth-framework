@@ -15,8 +15,14 @@ const testDataSchema = z.array(
 );
 
 export async function readTestData(filePath = getFrameworkPaths().inputDataPath): Promise<TestDataRecord[]> {
+  if (!filePath.toLowerCase().endsWith('.json')) {
+    console.warn(`Warning: Expected a JSON file for test data, but got ${filePath}. Proceeding without test data payloads.`);
+    return [];
+  }
+
   if (!(await fs.pathExists(filePath))) {
-    throw new Error(`JSON test data file not found at ${filePath}`);
+    console.warn(`Warning: JSON test data file not found at ${filePath}. Proceeding without test data payloads.`);
+    return [];
   }
 
   console.log(`Reading JSON: ${filePath}`);

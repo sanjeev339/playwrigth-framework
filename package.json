@@ -20,10 +20,12 @@
     "pipeline": "npm run build:scenarios && npm run run:webwright && npm run generate && npm run validate && npm run run:generated && npm run heal && npm run run:healed && npm run report",
     "typecheck": "tsc --noEmit",
     "test:generator": "ts-node src/llm/generator.test.ts",
-    "test:normalizer": "ts-node src/scenario/stepNormalizer.test.ts"
+    "test:normalizer": "ts-node src/scenario/stepNormalizer.test.ts",
+    "mcp": "ts-node src/mcp/server.ts"
   },
   "dependencies": {
     "@google/genai": "^2.7.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^16.4.7",
     "fs-extra": "^11.2.0",
     "openai": "^4.77.0",

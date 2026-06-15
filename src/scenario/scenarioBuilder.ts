@@ -81,6 +81,10 @@ function createScenario(
   }));
   const steps = normalizeScenarioSteps(rawSteps, payload);
 
+  // Auto-detect public pages that don't need login (Registration, Signup, Login, Forgot Password, etc.)
+  const publicModulePattern = /registration|signup|sign.?up|forgot.?password|reset.?password|onboard/i;
+  const skipLogin = publicModulePattern.test(firstRow?.module ?? '') || publicModulePattern.test(firstRow?.action ?? '');
+
   return {
     scenario_id: scenarioId,
     module: firstRow?.module,
@@ -89,6 +93,7 @@ function createScenario(
     steps,
     expected_results: orderedRows.map((row) => row.expected_result).filter((value): value is string => Boolean(value)),
     payload,
+    skip_login: skipLogin,
     metadata: {
       execution_order: dataRecord?.execution_order,
       data_strategy: dataRecord?.data_strategy,

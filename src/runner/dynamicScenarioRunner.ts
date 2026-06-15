@@ -198,7 +198,7 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
           scenarioDir: scenarioOutputDir,
           sequence: sequence++,
           state: 'login-before',
-          actionBeforeSnapshot: 'Open login page',
+          actionBeforeSnapshot: scenario.skip_login ? 'Open page (no login required)' : 'Open login page',
           decision: null,
           actionError: null,
           snapshotSessionId
@@ -206,22 +206,24 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
         snapshots
       );
 
-      loginError = await safeAction(() => performLogin(page, input.env.LOGIN_EMAIL, input.env.LOGIN_PASSWORD, waitForSnapshotStability)) ?? undefined;
-      loginStatus = loginError ? 'failed' : 'passed';
-      await recordSnapshot(
-        await captureSnapshot({
-          page,
-          scenarioId: scenario.scenario_id,
-          scenarioDir: scenarioOutputDir,
-          sequence: sequence++,
-          state: 'login-after',
-          actionBeforeSnapshot: 'Perform login',
-          decision: null,
-          actionError: loginError ?? null,
-          snapshotSessionId
-        }),
-        snapshots
-      );
+      if (!scenario.skip_login) {
+        loginError = await safeAction(() => performLogin(page, input.env.LOGIN_EMAIL, input.env.LOGIN_PASSWORD, waitForSnapshotStability)) ?? undefined;
+        loginStatus = loginError ? 'failed' : 'passed';
+        await recordSnapshot(
+          await captureSnapshot({
+            page,
+            scenarioId: scenario.scenario_id,
+            scenarioDir: scenarioOutputDir,
+            sequence: sequence++,
+            state: 'login-after',
+            actionBeforeSnapshot: 'Perform login',
+            decision: null,
+            actionError: loginError ?? null,
+            snapshotSessionId
+          }),
+          snapshots
+        );
+      }
 
       if (loginError) {
         failureReason = `Login failed: ${loginError}`;
