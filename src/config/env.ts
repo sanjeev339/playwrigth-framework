@@ -76,6 +76,7 @@ const optionalPath = z.string().trim().min(1).optional();
 const frameworkPathSchema = z.object({
   INPUT_FLOW_PATH: optionalPath,
   INPUT_DATA_PATH: optionalPath,
+  EXTRACTED_REQUIREMENTS_PATH: optionalPath,
   SCENARIO_OUTPUT_DIR: optionalPath,
   RECON_SUMMARY_OUTPUT_DIR: optionalPath,
   DYNAMIC_RECON_OUTPUT_DIR: optionalPath,
@@ -84,6 +85,7 @@ const frameworkPathSchema = z.object({
   HEALED_TEST_OUTPUT_DIR: optionalPath,
   REPORT_OUTPUT_DIR: optionalPath,
   FRONTEND_REVIEW_OUTPUT_DIR: optionalPath,
+  DOCUMENT_REPORT_OUTPUT_DIR: optionalPath,
   GENERATION_REPORT_PATH: optionalPath,
   RUN_RESULT_PATH: optionalPath,
   LOCATOR_VALIDATION_REPORT_PATH: optionalPath,
@@ -132,6 +134,7 @@ export type LLMLoggingConfig = z.infer<typeof llmLoggingSchema>;
 export interface FrameworkPaths {
   inputFlowPath: string;
   inputDataPath: string;
+  extractedRequirementsPath: string;
   scenarioDir: string;
   reconSummaryDir: string;
   dynamicReconDir: string;
@@ -140,6 +143,7 @@ export interface FrameworkPaths {
   healedTestsDir: string;
   reportDir: string;
   frontendReviewDir: string;
+  documentReportDir: string;
   generationReportPath: string;
   runResultPath: string;
   locatorValidationReportPath: string;
@@ -191,6 +195,7 @@ export function getFrameworkPaths(): FrameworkPaths {
   return {
     inputFlowPath: resolveProjectPath(finalExcelPath),
     inputDataPath: resolveProjectPath(finalJsonPath),
+    extractedRequirementsPath: resolveProjectPath(env.EXTRACTED_REQUIREMENTS_PATH, 'input', 'extracted_requirements.md'),
     scenarioDir: resolveProjectPath(env.SCENARIO_OUTPUT_DIR, 'scenarios'),
     reconSummaryDir: resolveProjectPath(env.RECON_SUMMARY_OUTPUT_DIR, 'recon-summary'),
     dynamicReconDir: resolveProjectPath(env.DYNAMIC_RECON_OUTPUT_DIR, 'dynamic-recon'),
@@ -199,6 +204,7 @@ export function getFrameworkPaths(): FrameworkPaths {
     healedTestsDir: resolveProjectPath(env.HEALED_TEST_OUTPUT_DIR, 'tests', 'healed'),
     reportDir,
     frontendReviewDir: resolveProjectPath(env.FRONTEND_REVIEW_OUTPUT_DIR, 'reports', 'frontend-reviews'),
+    documentReportDir: resolveProjectPath(env.DOCUMENT_REPORT_OUTPUT_DIR, 'reports', 'document-report'),
     generationReportPath: resolveProjectPath(env.GENERATION_REPORT_PATH, 'reports', 'generation-result.json'),
     runResultPath: resolveProjectPath(env.RUN_RESULT_PATH, 'reports', 'run-result.json'),
     locatorValidationReportPath: resolveProjectPath(env.LOCATOR_VALIDATION_REPORT_PATH, 'reports', 'locator-validation.json'),

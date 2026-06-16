@@ -23,6 +23,7 @@ import {
 } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
 import { writeCombinedFrontendReport } from '../reports/frontendReviewReporter';
+import { writeReviewerReport } from '../reports/reviewerReportWriter';
 
 type StepExecutionStatus = 'passed' | 'failed' | 'repaired' | 'skipped';
 type ScenarioExecutionStatus = 'passed' | 'failed';
@@ -32,12 +33,12 @@ interface SnapshotReference {
   path: string;
 }
 
-interface EffectVerification {
+export interface EffectVerification {
   status: 'passed' | 'failed' | 'skipped';
   reason: string;
 }
 
-interface StepExecutionReport {
+export interface StepExecutionReport {
   stepNo: number;
   instruction: string;
   expectedResult?: string;
@@ -60,7 +61,7 @@ interface StepExecutionReport {
   repairDecision?: DecisionSummary;
 }
 
-interface DecisionSummary {
+export interface DecisionSummary {
   decisionSource: ReconDecision['decisionSource'];
   actionStatus: ReconDecision['actionStatus'];
   selectedLocator: string | null;
@@ -76,7 +77,7 @@ interface DecisionSummary {
   llmTotalTokenEstimate?: number;
 }
 
-interface ScenarioExecutionReport {
+export interface ScenarioExecutionReport {
   scenarioId: string;
   module?: string;
   action?: string;
@@ -93,7 +94,7 @@ interface ScenarioExecutionReport {
   steps: StepExecutionReport[];
 }
 
-interface DynamicRunReport {
+export interface DynamicRunReport {
   generatedAt: string;
   command: string;
   mode: 'hybrid-webwright-step-runner';
@@ -308,14 +309,23 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
   await writeTextFile(reportHtmlPath, renderDynamicReport(report));
   logger.info(`Wrote dynamic step-runner reports -> ${reportJsonPath}, ${reportHtmlPath}`);
 
+  const runTimestamp = formatTimestamp(new Date());
+
   // Write frontend review report if there are any issues
   const hasIssues = Object.values(frontendIssues).some((issues) => issues.length > 0);
   if (hasIssues) {
-    const runTimestamp = formatTimestamp(new Date());
     const writtenPath = await writeCombinedFrontendReport(frontendIssues, runTimestamp, paths.frontendReviewDir);
     logger.info(`Wrote combined frontend review report to -> ${writtenPath}`);
   } else {
     logger.info('No frontend issues detected; frontend review report was not generated.');
+  }
+
+  // Write reviewer report
+  try {
+    const reviewerReportPath = await writeReviewerReport(reports, frontendIssues, runTimestamp, paths.documentReportDir);
+    logger.info(`Wrote Reviewer Report to -> ${reviewerReportPath}`);
+  } catch (error) {
+    logger.error('Error generating Reviewer Report:', error);
   }
 
   // Extract recon action summaries from dynamic-recon snapshots so the
