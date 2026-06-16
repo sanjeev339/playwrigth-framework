@@ -184,3 +184,38 @@ export interface PlaywrightRunResult {
   stderr: string;
   failedTestFiles: string[];
 }
+
+export type FrontendIssueCode =
+  | 'NO_TESTID'
+  | 'DYNAMIC_CLASS_ONLY'
+  | 'DIV_CLICKABLE_NO_ROLE'
+  | 'NO_CANDIDATES'
+  | 'ALL_UNSAFE'
+  | 'HIGH_RISK_LOCATOR'
+  | 'XPATH_FALLBACK'
+  | 'NO_ARIA_LABEL'
+  | 'CANVAS_OR_SVG_ELEMENT'
+  | 'ELEMENT_NOT_IN_DOM';
+
+export interface FrontendStepIssue {
+  // --- What step it was ---
+  stepNo?: number;
+  rawStep: string;                        // e.g. "Click on the Save button"
+  actionType: string;                     // e.g. 'click' | 'fill' | 'select' | 'unknown'
+
+  // --- What the engine did ---
+  decisionSource: 'deterministic' | 'llm' | 'none';  // how the locator was chosen
+  candidatesFound: number;                // total locator candidates generated
+  safeCandidatesFound: number;            // how many passed safety validation
+  selectedLocator: string | null;         // the locator actually selected (if any)
+  selectorRisk?: 'low' | 'medium' | 'high';
+  selectorConfidenceSignals?: string[];   // e.g. ['nthChildPenalty', 'xpathPenalty']
+  llmReason?: string;                     // the LLM's explanation for its decision
+  actionError?: string | null;            // the raw error from the engine
+
+  // --- What was wrong ---
+  issueCodes: FrontendIssueCode[];        // e.g. ['NO_TESTID', 'HIGH_RISK_LOCATOR']
+  elementSummary?: Record<string, unknown>; // tag, role, text, id of the matched element
+  recommendation: string;                 // human-readable fix for the frontend dev
+}
+

@@ -11,7 +11,7 @@ import { extractReconActions } from '../recon/reconActionExtractor';
 import { performLogin, safeAction, gotoWithRetry } from '../utils/playwrightUtils';
 import type { ReconDecision } from '../recon/reconDecisionTypes';
 import { writeStateSnapshot } from '../recon/stateSnapshotWriter';
-import type { ReconSnapshot, Scenario, ScenarioStep } from '../types';
+import type { ReconSnapshot, Scenario, ScenarioStep, FrontendStepIssue } from '../types';
 import {
   escapeHtml,
   listFiles,
@@ -22,6 +22,7 @@ import {
   writeTextFile
 } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
+import { writeCombinedFrontendReport } from '../reports/frontendReviewReporter';
 
 type StepExecutionStatus = 'passed' | 'failed' | 'repaired' | 'skipped';
 type ScenarioExecutionStatus = 'passed' | 'failed';
@@ -148,6 +149,22 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
     slowMo: env.SLOW_MO
   });
   const reports: ScenarioExecutionReport[] = [];
+  const frontendIssues: Record<string, FrontendStepIssue[]> = {};
+
+  const registerFrontendIssue = (scenarioId: string) => (issues: FrontendStepIssue[]) => {
+    if (!frontendIssues[scenarioId]) {
+      frontendIssues[scenarioId] = [];
+    }
+    for (const newIssue of issues) {
+      const isDup = frontendIssues[scenarioId].some(
+        existing => existing.stepNo === newIssue.stepNo &&
+          JSON.stringify(existing.issueCodes) === JSON.stringify(newIssue.issueCodes)
+      );
+      if (!isDup) {
+        frontendIssues[scenarioId].push(newIssue);
+      }
+    }
+  };
 
   try {
     for (const scenario of scenarios) {
@@ -156,7 +173,8 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
         await runScenario({
           scenario: runtimePayload ? { ...scenario, payload: { ...scenario.payload, ...runtimePayload } } : scenario,
           outputDir,
-          env
+          env,
+          onFrontendIssue: registerFrontendIssue(scenario.scenario_id)
         })
       );
     }
@@ -168,6 +186,7 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
     scenario: Scenario;
     outputDir: string;
     env: ReturnType<typeof getWebEnv>;
+    onFrontendIssue?: (issues: FrontendStepIssue[]) => void;
   }): Promise<ScenarioExecutionReport> {
     const startedAt = new Date();
     const scenario = input.scenario;
@@ -242,7 +261,8 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
             snapshotSessionId,
             previousActionErrors,
             isLastStep,
-            nextSequence: () => sequence++
+            nextSequence: () => sequence++,
+            onFrontendIssue: input.onFrontendIssue
           });
           steps.push(stepReport);
           snapshots.push(...extractStepSnapshots(stepReport));
@@ -288,6 +308,16 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
   await writeTextFile(reportHtmlPath, renderDynamicReport(report));
   logger.info(`Wrote dynamic step-runner reports -> ${reportJsonPath}, ${reportHtmlPath}`);
 
+  // Write frontend review report if there are any issues
+  const hasIssues = Object.values(frontendIssues).some((issues) => issues.length > 0);
+  if (hasIssues) {
+    const runTimestamp = formatTimestamp(new Date());
+    const writtenPath = await writeCombinedFrontendReport(frontendIssues, runTimestamp, paths.frontendReviewDir);
+    logger.info(`Wrote combined frontend review report to -> ${writtenPath}`);
+  } else {
+    logger.info('No frontend issues detected; frontend review report was not generated.');
+  }
+
   // Extract recon action summaries from dynamic-recon snapshots so the
   // .spec.ts generator can find them under recon-summary/ and use them
   // as 'dynamic' source (preferred over static recon).
@@ -314,6 +344,7 @@ async function executeStep(input: {
   previousActionErrors: string[];
   isLastStep: boolean;
   nextSequence: () => number;
+  onFrontendIssue?: (issues: FrontendStepIssue[]) => void;
 }): Promise<StepExecutionReport> {
   const startedAt = new Date();
   const stepNo = input.step.step_no ?? 0;
@@ -349,7 +380,8 @@ async function executeStep(input: {
         actionError: intermediateDecision.actionError ?? null,
         snapshotSessionId: input.snapshotSessionId
       });
-    }
+    },
+    onFrontendIssue: input.onFrontendIssue
   });
 
   const after = await captureSnapshot({
@@ -407,7 +439,8 @@ async function executeStep(input: {
     payload: input.scenario.payload,
     snapshotElements: repairBefore.snapshot.elements,
     previousActionErrors: input.previousActionErrors,
-    isLastStep: input.isLastStep
+    isLastStep: input.isLastStep,
+    onFrontendIssue: input.onFrontendIssue
   });
   const repairAfter = await captureSnapshot({
     page: input.page,
@@ -776,6 +809,17 @@ function renderDynamicReport(report: DynamicRunReport): string {
   ${rows}
 </body>
 </html>`;
+}
+
+function formatTimestamp(date: Date): string {
+  const pad = (num: number) => String(num).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  const MM = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  const ss = date.getSeconds();
+  return `${yyyy}${MM}${dd}-${hh}${mm}${pad(ss)}`;
 }
 
 if (require.main === module) {

@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { getActionDecisionMode } from '../config/env';
-import type { DomElementSnapshot, ScenarioStep } from '../types';
+import type { DomElementSnapshot, ScenarioStep, FrontendStepIssue } from '../types';
 import { scanVisibleDom } from './domScanner';
 import { isSecretPayloadKey, parseAction } from './actionParser';
 import { resolveDeterministicCandidates } from './deterministicLocatorResolver';
@@ -18,6 +18,7 @@ import type {
   ParsedAction,
   ReconDecision
 } from './reconDecisionTypes';
+import { collectStepIssues } from '../reports/frontendReviewReporter';
 
 interface DecisionEngineInput {
   page: Page;
@@ -28,9 +29,28 @@ interface DecisionEngineInput {
   previousActionErrors?: string[];
   isLastStep?: boolean;
   onIntermediateSnapshot?: (state: string, actionBeforeSnapshot: string, decision: ReconDecision) => Promise<void>;
+  onFrontendIssue?: (issues: FrontendStepIssue[]) => void;
 }
 
 export async function decideAndExecuteAction(input: DecisionEngineInput): Promise<ReconDecision> {
+  const decision = await _decideAndExecuteAction(input);
+  if (input.onFrontendIssue) {
+    const parsedAction = parseAction(input.step, input.payload);
+    const issues = collectStepIssues(
+      input.scenarioId,
+      input.step,
+      parsedAction,
+      decision,
+      input.snapshotElements
+    );
+    if (issues.length > 0) {
+      input.onFrontendIssue(issues);
+    }
+  }
+  return decision;
+}
+
+async function _decideAndExecuteAction(input: DecisionEngineInput): Promise<ReconDecision> {
   const parsedAction = parseAction(input.step, input.payload);
   const decision = createBaseDecision(input.scenarioId, parsedAction);
   const decisionMode = getActionDecisionMode();

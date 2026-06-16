@@ -83,6 +83,7 @@ const frameworkPathSchema = z.object({
   GENERATED_TEST_QUARANTINE_DIR: optionalPath,
   HEALED_TEST_OUTPUT_DIR: optionalPath,
   REPORT_OUTPUT_DIR: optionalPath,
+  FRONTEND_REVIEW_OUTPUT_DIR: optionalPath,
   GENERATION_REPORT_PATH: optionalPath,
   RUN_RESULT_PATH: optionalPath,
   LOCATOR_VALIDATION_REPORT_PATH: optionalPath,
@@ -138,6 +139,7 @@ export interface FrameworkPaths {
   generatedTestsQuarantineDir: string;
   healedTestsDir: string;
   reportDir: string;
+  frontendReviewDir: string;
   generationReportPath: string;
   runResultPath: string;
   locatorValidationReportPath: string;
@@ -196,6 +198,7 @@ export function getFrameworkPaths(): FrameworkPaths {
     generatedTestsQuarantineDir: resolveProjectPath(env.GENERATED_TEST_QUARANTINE_DIR, 'generated-quarantine'),
     healedTestsDir: resolveProjectPath(env.HEALED_TEST_OUTPUT_DIR, 'tests', 'healed'),
     reportDir,
+    frontendReviewDir: resolveProjectPath(env.FRONTEND_REVIEW_OUTPUT_DIR, 'reports', 'frontend-reviews'),
     generationReportPath: resolveProjectPath(env.GENERATION_REPORT_PATH, 'reports', 'generation-result.json'),
     runResultPath: resolveProjectPath(env.RUN_RESULT_PATH, 'reports', 'run-result.json'),
     locatorValidationReportPath: resolveProjectPath(env.LOCATOR_VALIDATION_REPORT_PATH, 'reports', 'locator-validation.json'),
