@@ -209,6 +209,19 @@ export function parseLLMDecision(raw: string): LLMActionDecision {
   }
 }
 
+import { getFrameworkConfig } from '../config/configLoader';
+
+function getFirstTestId(element: DomElementSnapshot): string | undefined {
+  const config = getFrameworkConfig();
+  if (!element.testAttributes) return undefined;
+  for (const attr of config.locator.testIdAttributes) {
+    if (element.testAttributes[attr]) {
+      return element.testAttributes[attr];
+    }
+  }
+  return undefined;
+}
+
 function buildPrompt(input: LLMAdvisorInput): string {
   const visibleElements = input.visibleElements.map((element) => ({
     index: element.index,
@@ -222,7 +235,7 @@ function buildPrompt(input: LLMAdvisorInput): string {
     name: element.name,
     id: element.id,
     title: element.title,
-    testId: element.dataTestId || element.dataTest || element.dataCy || element.dataQa,
+    testId: getFirstTestId(element),
     locatorPriority: element.locatorPriority
   }));
 

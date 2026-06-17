@@ -23,7 +23,8 @@ export function inferUiStability(element: DomElementSnapshot): 'transient' | 'st
     return 'transient';
   }
 
-  const haystack = `${element.className ?? ''} ${element.dataTestId ?? ''}`.toLowerCase();
+  const testIdString = element.testAttributes ? Object.values(element.testAttributes).join(' ') : '';
+  const haystack = `${element.className ?? ''} ${testIdString}`.toLowerCase();
   const transientHints = ['toast', 'snackbar', 'sonner', 'notistack', 'react-hot-toast', 'mantine-notification'];
   if (transientHints.some((hint) => haystack.includes(hint))) {
     return 'transient';
@@ -57,17 +58,30 @@ export function buildLocatorPriority(element: DomElementSnapshot): string[] {
   return buildStructuredLocatorPriority(element).map(locatorToString);
 }
 
+import { getFrameworkConfig } from '../config/configLoader';
+
 export function buildStructuredLocatorPriority(element: DomElementSnapshot): StructuredLocator[] {
   const candidates: StructuredLocator[] = [];
   const policy = getLocatorPolicy();
-  const testId = firstNonEmpty(element.dataTestId, element.dataTest, element.dataCy, element.dataQa);
+  const config = getFrameworkConfig();
 
-  if (testId) {
-    if (element.dataTestId) {
+  let testId: string | undefined;
+  let matchedAttr: string | undefined;
+  if (element.testAttributes) {
+    for (const attr of config.locator.testIdAttributes) {
+      if (element.testAttributes[attr]) {
+        testId = element.testAttributes[attr];
+        matchedAttr = attr;
+        break;
+      }
+    }
+  }
+
+  if (testId && matchedAttr) {
+    if (matchedAttr === 'data-testid') {
       candidates.push({ method: 'getByTestId', text: testId, exact: true });
     } else {
-      const attr = element.dataTest ? 'data-test' : element.dataCy ? 'data-cy' : 'data-qa';
-      candidates.push({ method: 'css', selector: `[${attr}="${cssEscape(testId)}"]` });
+      candidates.push({ method: 'css', selector: `[${matchedAttr}="${cssEscape(testId)}"]` });
     }
   }
 
@@ -239,7 +253,7 @@ function scoreLocatorStructuralConfidence(
   let score = 0.45;
   const signals: string[] = [];
 
-  if (element.dataTestId || element.dataTest || element.dataCy || element.dataQa) {
+  if (element.testAttributes && Object.keys(element.testAttributes).length > 0) {
     score += 0.35;
     signals.push('hasTestAttribute');
   }

@@ -1,11 +1,13 @@
 import type { Page } from '@playwright/test';
 import { getLocatorPolicy } from '../config/env';
+import { getFrameworkConfig } from '../config/configLoader';
 import type { DomElementSnapshot } from '../types';
 import { addLocatorCandidates, isStableIdentifier } from './locatorCandidateBuilder';
 
 export async function scanVisibleDom(page: Page): Promise<DomElementSnapshot[]> {
   const locatorPolicy = getLocatorPolicy();
-  const elements = await page.evaluate((policy) => {
+  const config = getFrameworkConfig();
+  const elements = await page.evaluate(({ policy, testIdAttributes, autoDetectDataAttributes }) => {
     const selector = [
       'input',
       'textarea',
@@ -56,6 +58,23 @@ export async function scanVisibleDom(page: Page): Promise<DomElementSnapshot[]> 
             ? undefined
             : truncate(normalizeText(element.value), 120);
 
+        // Capture test attributes dynamically based on config
+        const testAttributes: Record<string, string> = {};
+        for (const attr of testIdAttributes) {
+          const val = element.getAttribute(attr);
+          if (val) {
+            testAttributes[attr] = val;
+          }
+        }
+        if (autoDetectDataAttributes) {
+          for (let i = 0; i < element.attributes.length; i++) {
+            const attrName = element.attributes[i].name;
+            if (attrName.startsWith('data-') && !testAttributes[attrName]) {
+              testAttributes[attrName] = element.attributes[i].value;
+            }
+          }
+        }
+
         return {
           index,
           tag,
@@ -71,10 +90,7 @@ export async function scanVisibleDom(page: Page): Promise<DomElementSnapshot[]> 
           placeholder: element.getAttribute('placeholder') || undefined,
           title: element.getAttribute('title') || undefined,
           value,
-          dataTestId: element.getAttribute('data-testid') || undefined,
-          dataTest: element.getAttribute('data-test') || undefined,
-          dataCy: element.getAttribute('data-cy') || undefined,
-          dataQa: element.getAttribute('data-qa') || undefined,
+          testAttributes: Object.keys(testAttributes).length > 0 ? testAttributes : undefined,
           href: element instanceof HTMLAnchorElement ? element.href || undefined : undefined,
           isVisible:
             (rect.width > 0 &&
@@ -121,17 +137,20 @@ export async function scanVisibleDom(page: Page): Promise<DomElementSnapshot[]> 
     }
 
     function buildCssCandidate(element: HTMLElement): string | undefined {
-      const testId = element.getAttribute('data-testid');
-      if (testId) return `[data-testid="${cssEscape(testId)}"]`;
+      for (const attr of testIdAttributes) {
+        const val = element.getAttribute(attr);
+        if (val) return `[${attr}="${cssEscape(val)}"]`;
+      }
 
-      const dataTest = element.getAttribute('data-test');
-      if (dataTest) return `[data-test="${cssEscape(dataTest)}"]`;
-
-      const dataCy = element.getAttribute('data-cy');
-      if (dataCy) return `[data-cy="${cssEscape(dataCy)}"]`;
-
-      const dataQa = element.getAttribute('data-qa');
-      if (dataQa) return `[data-qa="${cssEscape(dataQa)}"]`;
+      if (autoDetectDataAttributes) {
+        for (let i = 0; i < element.attributes.length; i++) {
+          const attrName = element.attributes[i].name;
+          if (attrName.startsWith('data-')) {
+            const val = element.attributes[i].value;
+            return `[${attrName}="${cssEscape(val)}"]`;
+          }
+        }
+      }
 
       const name = element.getAttribute('name');
       if (name) return `${element.tagName.toLowerCase()}[name="${cssEscape(name)}"]`;
@@ -186,7 +205,7 @@ export async function scanVisibleDom(page: Page): Promise<DomElementSnapshot[]> 
     function cssEscape(value: string): string {
       return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     }
-  }, locatorPolicy);
+  }, { policy: locatorPolicy, testIdAttributes: config.locator.testIdAttributes, autoDetectDataAttributes: config.locator.autoDetectDataAttributes });
 
   const sanitized = elements.map((element) => {
     const shouldUseId = element.id ? isStableIdentifier(element.id) : false;

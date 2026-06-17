@@ -1,0 +1,26 @@
+locator:
+  # All known test ID attribute conventions — checked in priority order.
+  # First matching attribute wins as the CSS candidate locator.
+  # Add any custom attribute your application uses to this list.
+  testIdAttributes:
+    - data-testid          # Playwright / React Testing Library (default)
+    - data-test            # Common React alternative
+    - data-cy              # Cypress standard
+    - data-qa              # QA-specific convention
+    - data-automation-id   # Selenium / enterprise standard (e.g. Salesforce)
+    - data-automation      # Short enterprise automation key
+    - data-test-id         # Kebab-case alternative
+    - data-id              # Generic short form
+    - qa-id                # Alternative QA id
+    - data-component       # Component-level tracking
+    - data-e2e             # End-to-end test marker
+
+  # ADVANCED — When true, also treats ANY 'data-*' attribute as a test ID candidate.
+  # WARNING: Can produce false positives on apps with many data-* attributes.
+  autoDetectDataAttributes: false
+
+execution:
+  # Max simultaneous LLM generation calls.
+  # Tune based on your OpenAI/Gemini rate limits and tier.
+  generationConcurrency: 5
+

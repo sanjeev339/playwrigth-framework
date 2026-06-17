@@ -308,9 +308,22 @@ function matchElement(
   };
 }
 
+import { getFrameworkConfig } from '../config/configLoader';
+
+function getFirstTestId(element: DomElementSnapshot): string | undefined {
+  const config = getFrameworkConfig();
+  if (!element.testAttributes) return undefined;
+  for (const attr of config.locator.testIdAttributes) {
+    if (element.testAttributes[attr]) {
+      return element.testAttributes[attr];
+    }
+  }
+  return undefined;
+}
+
 function searchableFields(element: DomElementSnapshot): Record<string, string | undefined> {
   return {
-    testId: element.dataTestId || element.dataTest || element.dataCy || element.dataQa,
+    testId: getFirstTestId(element),
     label: element.label,
     placeholder: element.placeholder,
     ariaLabel: element.ariaLabel,
@@ -509,7 +522,7 @@ function summarizeElement(element: DomElementSnapshot): Record<string, unknown> 
     placeholder: element.placeholder,
     name: element.name,
     id: element.id,
-    testId: element.dataTestId || element.dataTest || element.dataCy || element.dataQa,
+    testId: getFirstTestId(element),
     isLikelyClickable: element.isLikelyClickable
   };
 }

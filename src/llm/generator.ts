@@ -23,6 +23,8 @@ import {
   writeJsonFile,
   writeTextFileAtomic
 } from '../utils/fileUtils';
+import { getFrameworkConfig } from '../config/configLoader';
+import { runWithConcurrency } from '../utils/concurrencyUtils';
 import { logger } from '../utils/logger';
 import { normalizeNestedTestImports } from '../utils/specImportPaths';
 import { callLLM } from './llmClient';
@@ -74,9 +76,11 @@ export async function generateTests(options: GenerateTestsOptions = {}): Promise
   logger.info(`Generating tests for ${scenarioFiles.length} scenario(s) using LLM provider from env.`);
   const scenarioResults: GenerationScenarioResult[] = [];
 
-  for (const scenarioFile of scenarioFiles) {
-    scenarioResults.push(
-      await generateScenarioIndependently({
+  const config = getFrameworkConfig();
+  const results = await runWithConcurrency(
+    scenarioFiles,
+    (scenarioFile) =>
+      generateScenarioIndependently({
         scenarioFile,
         dynamicReconDir,
         outputDir,
@@ -84,9 +88,10 @@ export async function generateTests(options: GenerateTestsOptions = {}): Promise
         extractActions,
         callLLMForGeneration,
         now
-      })
-    );
-  }
+      }),
+    config.execution.generationConcurrency
+  );
+  scenarioResults.push(...results);
 
   const report: GenerationReport = {
     generated_at: now().toISOString(),

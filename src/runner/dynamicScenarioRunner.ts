@@ -24,6 +24,8 @@ import {
 import { logger } from '../utils/logger';
 import { writeCombinedFrontendReport } from '../reports/frontendReviewReporter';
 import { writeReviewerReport } from '../reports/reviewerReportWriter';
+import { getFrameworkConfig } from '../config/configLoader';
+import { runWithConcurrency } from '../utils/concurrencyUtils';
 
 type StepExecutionStatus = 'passed' | 'failed' | 'repaired' | 'skipped';
 type ScenarioExecutionStatus = 'passed' | 'failed';
@@ -152,32 +154,33 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
   const reports: ScenarioExecutionReport[] = [];
   const frontendIssues: Record<string, FrontendStepIssue[]> = {};
 
-  const registerFrontendIssue = (scenarioId: string) => (issues: FrontendStepIssue[]) => {
-    if (!frontendIssues[scenarioId]) {
-      frontendIssues[scenarioId] = [];
-    }
-    for (const newIssue of issues) {
-      const isDup = frontendIssues[scenarioId].some(
-        existing => existing.stepNo === newIssue.stepNo &&
-          JSON.stringify(existing.issueCodes) === JSON.stringify(newIssue.issueCodes)
-      );
-      if (!isDup) {
-        frontendIssues[scenarioId].push(newIssue);
-      }
-    }
-  };
+  const config = getFrameworkConfig();
 
   try {
     for (const scenario of scenarios) {
       const runtimePayload = runtimePayloads.get(scenario.scenario_id);
-      reports.push(
-        await runScenario({
-          scenario: runtimePayload ? { ...scenario, payload: { ...scenario.payload, ...runtimePayload } } : scenario,
-          outputDir,
-          env,
-          onFrontendIssue: registerFrontendIssue(scenario.scenario_id)
-        })
-      );
+      const scenarioIssues: FrontendStepIssue[] = [];
+      const localRegister = (issues: FrontendStepIssue[]) => {
+        for (const newIssue of issues) {
+          const isDup = scenarioIssues.some(
+            existing => existing.stepNo === newIssue.stepNo &&
+              JSON.stringify(existing.issueCodes) === JSON.stringify(newIssue.issueCodes)
+          );
+          if (!isDup) {
+            scenarioIssues.push(newIssue);
+          }
+        }
+      };
+
+      const scenarioReport = await runScenario({
+        scenario: runtimePayload ? { ...scenario, payload: { ...scenario.payload, ...runtimePayload } } : scenario,
+        outputDir,
+        env,
+        onFrontendIssue: localRegister
+      });
+
+      reports.push(scenarioReport);
+      frontendIssues[scenario.scenario_id] = scenarioIssues;
     }
   } finally {
     await browser.close().catch(() => undefined);

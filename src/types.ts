@@ -68,10 +68,7 @@ export interface DomElementSnapshot {
   placeholder?: string;
   title?: string;
   value?: string;
-  dataTestId?: string;
-  dataTest?: string;
-  dataCy?: string;
-  dataQa?: string;
+  testAttributes?: Record<string, string>;
   href?: string;
   isVisible: boolean;
   isEnabled?: boolean;

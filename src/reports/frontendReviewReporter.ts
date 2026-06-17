@@ -3,6 +3,7 @@ import type { ReconDecision, ParsedAction } from '../recon/reconDecisionTypes';
 import path from 'node:path';
 import { writeTextFile } from '../utils/fileUtils';
 import { logger } from '../utils/logger';
+import { getFrameworkConfig } from '../config/configLoader';
 
 /**
  * Called once per step inside the actionDecisionEngine.
@@ -16,6 +17,7 @@ export function collectStepIssues(
   snapshotElements: DomElementSnapshot[]
 ): FrontendStepIssue[] {
   const issueCodes: FrontendIssueCode[] = [];
+  const config = getFrameworkConfig();
 
   // Count visible elements in DOM
   const visibleElements = snapshotElements.filter(e => e.isVisible);
@@ -48,12 +50,9 @@ export function collectStepIssues(
 
   if (targetElement) {
     // 4. NO_TESTID
-    // Element matched but has no data-testid, data-cy, data-qa, or data-test
-    const hasTestId = !!(
-      targetElement.dataTestId ||
-      targetElement.dataTest ||
-      targetElement.dataCy ||
-      targetElement.dataQa
+    // Element matched but has no configured test ID attributes
+    const hasTestId = config.locator.testIdAttributes.some(
+      attr => targetElement.testAttributes?.[attr]
     );
     if (isInteractiveAction && !hasTestId) {
       issueCodes.push('NO_TESTID');
@@ -98,8 +97,13 @@ export function collectStepIssues(
     // Fallback locator string checks if target element is not found directly
     const sel = decision.selectedLocator;
     if (sel) {
-      if (isInteractiveAction && !sel.includes('getByTestId') && !sel.includes('[data-testid') && !sel.includes('[data-cy') && !sel.includes('[data-qa') && !sel.includes('[data-test')) {
-        issueCodes.push('NO_TESTID');
+      if (isInteractiveAction) {
+        const hasTestIdInSel = sel.includes('getByTestId') || config.locator.testIdAttributes.some(
+          attr => sel.includes(`[${attr}`)
+        );
+        if (!hasTestIdInSel) {
+          issueCodes.push('NO_TESTID');
+        }
       }
       if (sel.includes('canvas') || sel.includes('svg')) {
         issueCodes.push('CANVAS_OR_SVG_ELEMENT');
@@ -157,7 +161,7 @@ export function collectStepIssues(
       placeholder: targetElement.placeholder,
       name: targetElement.name,
       id: targetElement.id,
-      testId: targetElement.dataTestId || targetElement.dataTest || targetElement.dataCy || targetElement.dataQa,
+      testId: config.locator.testIdAttributes.map(attr => targetElement.testAttributes?.[attr]).find(Boolean),
       isLikelyClickable: targetElement.isLikelyClickable
     };
   } else if (decision.deterministicCandidates.length > 0) {
@@ -218,7 +222,7 @@ function findTargetElement(
     if (match) {
       const testId = match[1];
       const el = snapshotElements.find(e => 
-        e.dataTestId === testId || e.dataTest === testId || e.dataCy === testId || e.dataQa === testId
+        e.testAttributes && Object.values(e.testAttributes).includes(testId)
       );
       if (el) return el;
     }
