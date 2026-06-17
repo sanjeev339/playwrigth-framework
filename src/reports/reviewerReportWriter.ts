@@ -83,34 +83,33 @@ Below is the structured data of the execution run (including all scenarios, step
 ${JSON.stringify(scenariosWithIssues, null, 2)}
 
 ### Task Details:
-Please audit the above execution data against any provided FSD/BRD context, and output a professional, clear, and comprehensive Markdown report detailing the mismatches, missing details, locator issues, and other alignment problems.
+Please audit the above execution data against any provided FSD/BRD context, and output a professional, clear, and comprehensive Markdown report detailing the mismatches, missing details, and alignment problems. 
+IMPORTANT: DO NOT include test case creation mistakes, locator extraction failures, or automation limitations. Focus ONLY on mistakes or gaps in the documentation (BRD/FSD) compared to the actual application.
 
 ### Report Categories:
-Every issue you identify MUST be classified into one of the following 7 categories:
+Every issue you identify MUST be classified into one of the following 5 categories:
 1. **Requirement and Application Mismatch**: The BRD specifies elements, actions, or flows that do not exist or behave differently in the application (e.g. BRD says "select option" but there is no select dropdown, or page layout/steps are different).
 2. **Missing or Incorrect Functional Details**: Business rules, field names, navigation paths, or required steps are ambiguous or missing from the BRD.
-3. **Locator Extraction Failures**: UI elements in the BRD are not present, application structure differs from requirements, or elements are dynamically generated/inaccessible.
-4. **Data and Validation Issues**: Application requires specific data formats, dependencies, or values not specified in the BRD, or validation errors prevent flow progression.
-5. **Incomplete User Flows or Unimplemented Features**: BRD steps describe features that are not active or not yet implemented in the app.
-6. **Automation Constraints and Tooling Limitations**: Dynamic behaviors, canvas/svg, iframe elements, or framework limitations.
-7. **Outdated or Misaligned Steps**: The UI has updated/changed and the BRD steps no longer correspond to the current flow.
+3. **Data and Validation Issues**: Application requires specific data formats, dependencies, or values not specified in the BRD, or validation errors prevent flow progression.
+4. **Incomplete User Flows or Unimplemented Features**: BRD steps describe features that are not active or not yet implemented in the app.
+5. **Outdated or Misaligned Steps**: The UI has updated/changed and the BRD steps no longer correspond to the current flow.
 
 ### Report Structure:
-1. **Title**: A premium-looking title (e.g., "# BRD/FSD & Application Alignment Reviewer Report").
-2. **Metadata**: Date generated, total scenarios audited, total failures/blockers.
-3. **Executive Summary**: A summary evaluating the quality and alignment of the requirements versus the actual application, pointing out critical blockers.
+1. **Title**: A premium-looking title (e.g., "# BRD/FSD Document Review Report").
+2. **Metadata**: Date generated, total scenarios audited, total discrepancies found.
+3. **Executive Summary**: A summary evaluating the quality and alignment of the requirements versus the actual application.
 4. **Discrepancy Summary Table**:
    | Scenario ID | Step No | Expected Behavior (BRD) | Issue Category | Severity (Critical/Major/Minor) |
 5. **Detailed Findings by Category**:
-   Group the findings by the 7 categories above. For each mismatch or failure found, provide:
+   Group the findings by the 5 categories above. For each mismatch or failure found, provide:
    - **Scenario ID & Step Number**
    - **Expected Behavior (BRD/FSD)**
-   - **Actual Observation**: (Describe precisely what was observed/failed in the app, referencing errors/locators where relevant)
+   - **Actual Observation**: (Describe precisely what was observed in the app that contradicts or is missing from the BRD)
    - **Severity**:
-     - *Critical*: Blocks test generation or test execution (e.g. login failed, element missing, invalid path).
-     - *Major*: Dynamic element / fragile selector / missing test ID causing locator risk.
-     - *Minor*: Simple testability warning.
-   - **Recommended Action**: Clear recommendation to either the Business Analyst (to update the BRD/FSD) or the Developer (to fix/update the UI).
+     - *Critical*: Major missing requirement or complete mismatch between doc and app.
+     - *Major*: Significant ambiguity or missing functional detail.
+     - *Minor*: Minor typo, outdated field name, or small discrepancy.
+   - **Recommended Action**: Clear recommendation to the Business Analyst to update the BRD/FSD.
 6. **If no issues were found**: If everything passed with zero warnings or errors, generate a clean report stating that the BRD and the application are perfectly aligned and no issues were found.
 
 ### Guidelines:
