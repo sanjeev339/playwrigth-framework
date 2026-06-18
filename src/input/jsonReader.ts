@@ -26,7 +26,36 @@ export async function readTestData(filePath = getFrameworkPaths().inputDataPath)
   }
 
   console.log(`Reading JSON: ${filePath}`);
-  const raw = await fs.readJson(filePath);
+  let raw = await fs.readJson(filePath);
+
+  if (Array.isArray(raw)) {
+    raw = raw.map((item: any) => {
+      if (item && typeof item === 'object') {
+        const normalized: any = { ...item };
+        if (!normalized.scenario_id && normalized.id) {
+          normalized.scenario_id = String(normalized.id);
+        }
+        if (!normalized.payload && normalized.test_data) {
+          normalized.payload = normalized.test_data;
+        }
+        if (normalized.payload && typeof normalized.payload === 'object') {
+          if (normalized.payload._data_strategy && !normalized.data_strategy) {
+            normalized.data_strategy = String(normalized.payload._data_strategy);
+          }
+          if (normalized.payload._edge_case_type !== undefined && normalized.edge_case_type === undefined) {
+            normalized.edge_case_type = normalized.payload._edge_case_type;
+          }
+          if (normalized.payload._execution_order !== undefined && normalized.execution_order === undefined) {
+            const val = Number(normalized.payload._execution_order);
+            if (!isNaN(val)) normalized.execution_order = val;
+          }
+        }
+        return normalized;
+      }
+      return item;
+    });
+  }
+
   const parsed = testDataSchema.safeParse(raw);
 
   if (!parsed.success) {

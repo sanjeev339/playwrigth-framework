@@ -24,7 +24,7 @@
     "mcp": "ts-node src/mcp/server.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.7.0",
+    "@google/generative-ai": "^0.24.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^16.4.7",
     "fs-extra": "^11.2.0",

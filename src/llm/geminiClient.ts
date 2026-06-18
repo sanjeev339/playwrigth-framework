@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getGeminiEnv } from '../config/env';
 import { formatForLog, logger, redactSecrets } from '../utils/logger';
 
@@ -10,23 +10,23 @@ const SYSTEM_PROMPT =
 export async function callGemini(prompt: string): Promise<string> {
   const env = getGeminiEnv();
   logger.info(`Calling Gemini model "${env.GEMINI_MODEL}" (prompt length: ${prompt.length} chars).`);
-  const client = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+  const client = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+  const model = client.getGenerativeModel({
+    model: env.GEMINI_MODEL,
+    systemInstruction: SYSTEM_PROMPT,
+    generationConfig: {
+      temperature: 0.2,
+    },
+  });
   const safePrompt = redactSecrets(prompt);
 
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= MAX_RETRY_ATTEMPT_INDEX; attempt += 1) {
     try {
-      const response = await client.models.generateContent({
-        model: env.GEMINI_MODEL,
-        contents: safePrompt,
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-          temperature: 0.2
-        }
-      });
+      const result = await model.generateContent(safePrompt);
+      const content = result.response.text()?.trim();
 
-      const content = response.text?.trim();
       if (!content) {
         throw new Error('Gemini returned an empty response.');
       }
@@ -90,3 +90,4 @@ function getErrorStatus(error: unknown): number | undefined {
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
