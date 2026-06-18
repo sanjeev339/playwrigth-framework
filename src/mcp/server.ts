@@ -41,7 +41,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: 'object',
           properties: {
             inputFlowPath: { type: 'string', description: 'Path to scenarios Excel/CSV' },
-            inputDataPath: { type: 'string', description: 'Path to test data JSON' }
+            inputDataPath: { type: 'string', description: 'Path to test data JSON' },
+            extractedRequirementsPath: { type: 'string', description: 'Path to extracted requirements markdown file' }
           },
           required: []
         }
@@ -119,18 +120,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
           env.DYNAMIC_REPORT_JSON_PATH = path.join(outDir, 'reports', 'dynamic-run-result.json');
           env.DYNAMIC_REPORT_HTML_PATH = path.join(outDir, 'reports', 'dynamic-run-result.html');
           env.HEALING_REPORT_PATH = path.join(outDir, 'reports', 'healing-result.json');
+          env.FRONTEND_REVIEW_OUTPUT_DIR = path.join(outDir, 'reports', 'frontend-reviews');
+          env.DOCUMENT_REPORT_OUTPUT_DIR = path.join(outDir, 'reports', 'document-report');
         } else if (args.inputDataPath) {
           env.INPUT_DATA_PATH = args.inputDataPath;
+        }
+
+        if (args.extractedRequirementsPath) {
+          env.EXTRACTED_REQUIREMENTS_PATH = args.extractedRequirementsPath;
+        } else if (args.inputFlowPath) {
+          const outDir = path.dirname(args.inputFlowPath);
+          env.EXTRACTED_REQUIREMENTS_PATH = path.join(outDir, 'extracted_requirements.md');
         }
 
         // Still forward any remaining .env keys not already set above
         const envKeys = [
           'WEBSITE_URL', 'LOGIN_EMAIL', 'LOGIN_PASSWORD',
           'LLM_PROVIDER', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'OPENAI_MODEL', 'GEMINI_MODEL',
+          'ANTHROPIC_API_KEY',
           'HEADLESS', 'SLOW_MO', 'ACTION_DECISION_MODE',
-          'INPUT_FLOW_PATH', 'INPUT_DATA_PATH'
+          'LOG_LLM_IO', 'LLM_IO_MAX_CHARS',
+          'ALLOW_XPATH_LOCATORS', 'ALLOW_POSITIONAL_LOCATORS',
+          'INPUT_FLOW_PATH', 'INPUT_DATA_PATH', 'EXTRACTED_REQUIREMENTS_PATH',
+          'FRONTEND_REVIEW_OUTPUT_DIR', 'DOCUMENT_REPORT_OUTPUT_DIR'
         ];
         for (const key of envKeys) {
+          // Only fill from process.env if not already set by the args-derived logic above
           if (process.env[key] && !env[key]) env[key] = process.env[key];
         }
 

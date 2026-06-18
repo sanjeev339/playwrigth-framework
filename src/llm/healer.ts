@@ -68,6 +68,7 @@ export async function healFailedTests(options: {
 
   const selection = await getLatestGenerationSelection({ generationReportPath, generatedDir });
   const generatedFiles = filesToHeal(selection.generatedFiles, runResult.failedTestFiles);
+  await fs.emptyDir(outputDir);
   const healedFiles: string[] = [];
 
   logger.info(`Healing ${generatedFiles.length} failed test file(s) using LLM provider from env.`);

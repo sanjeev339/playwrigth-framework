@@ -37,6 +37,7 @@
     "@playwright/test": "^1.49.1",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.10.2",
+    "@types/yaml": "^1.9.6",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
   }

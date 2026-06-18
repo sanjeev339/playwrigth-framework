@@ -314,14 +314,10 @@ export async function runDynamicScenarios(options: DynamicRunnerOptions = {}): P
 
   const runTimestamp = formatTimestamp(new Date());
 
-  // Write frontend review report if there are any issues
-  const hasIssues = Object.values(frontendIssues).some((issues) => issues.length > 0);
-  if (hasIssues) {
-    const writtenPath = await writeCombinedFrontendReport(frontendIssues, runTimestamp, paths.frontendReviewDir);
-    logger.info(`Wrote combined frontend review report to -> ${writtenPath}`);
-  } else {
-    logger.info('No frontend issues detected; frontend review report was not generated.');
-  }
+  // Write frontend review report
+  await fs.ensureDir(paths.frontendReviewDir);
+  const writtenPath = await writeCombinedFrontendReport(frontendIssues, runTimestamp, paths.frontendReviewDir);
+  logger.info(`Wrote combined frontend review report to -> ${writtenPath}`);
 
   // Write reviewer report
   try {

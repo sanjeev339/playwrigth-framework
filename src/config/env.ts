@@ -183,18 +183,11 @@ export function getFrameworkPaths(): FrameworkPaths {
   const reportDir = resolveProjectPath(env.REPORT_OUTPUT_DIR, 'reports');
 
   const finalExcelPath = env.INPUT_FLOW_PATH;
-  if (!finalExcelPath) {
-    throw new Error('INPUT_FLOW_PATH environment variable is required.');
-  }
-
   const finalJsonPath = env.INPUT_DATA_PATH;
-  if (!finalJsonPath) {
-    throw new Error('INPUT_DATA_PATH environment variable is required.');
-  }
 
   return {
-    inputFlowPath: resolveProjectPath(finalExcelPath),
-    inputDataPath: resolveProjectPath(finalJsonPath),
+    inputFlowPath: resolveProjectPath(finalExcelPath, 'scenarios_combined.csv'),
+    inputDataPath: resolveProjectPath(finalJsonPath, 'test_data.json'),
     extractedRequirementsPath: resolveProjectPath(env.EXTRACTED_REQUIREMENTS_PATH, 'input', 'extracted_requirements.md'),
     scenarioDir: resolveProjectPath(env.SCENARIO_OUTPUT_DIR, 'scenarios'),
     reconSummaryDir: resolveProjectPath(env.RECON_SUMMARY_OUTPUT_DIR, 'recon-summary'),

@@ -24,7 +24,7 @@ export async function buildScenarios(options: {
   const payloadByScenarioId = new Map(testData.map((record) => [record.scenario_id, record]));
   const groupedRows = groupRowsByScenario(rows);
 
-  await fs.ensureDir(outputDir);
+  await fs.emptyDir(outputDir);
 
   const scenarios: Scenario[] = [];
   const processedScenarioIds = new Set<string>();

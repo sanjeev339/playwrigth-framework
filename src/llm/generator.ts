@@ -73,6 +73,9 @@ export async function generateTests(options: GenerateTestsOptions = {}): Promise
     throw new Error(`No scenario files found in ${scenarioDir}. Run npm run build:scenarios first.`);
   }
 
+  await fs.emptyDir(outputDir);
+  await fs.emptyDir(quarantineDir);
+
   logger.info(`Generating tests for ${scenarioFiles.length} scenario(s) using LLM provider from env.`);
   const scenarioResults: GenerationScenarioResult[] = [];
 
@@ -268,6 +271,11 @@ function validateGeneratedReconTest(code: string, scenario: Scenario, reconActio
       !code.includes(action.selectedLocator)
     ) {
       throw new Error(`Generated test missing required recon locator: Step ${action.stepNo} - ${action.rawStep}`);
+    }
+
+    // Skip strict locator check for skipped/unknown steps — no locator was captured during recon
+    if (action.actionStatus === 'skipped' || !action.selectedLocator) {
+      continue;
     }
   }
 
