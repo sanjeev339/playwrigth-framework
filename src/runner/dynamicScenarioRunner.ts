@@ -50,6 +50,8 @@ export interface StepExecutionReport {
   durationMs: number;
   beforeSnapshotPath?: string;
   afterSnapshotPath?: string;
+  beforeUrl?: string;
+  afterUrl?: string;
   repairBeforeSnapshotPath?: string;
   repairAfterSnapshotPath?: string;
   screenshotPath?: string;
@@ -77,6 +79,7 @@ export interface DecisionSummary {
   llmPromptTokenEstimate?: number;
   llmResponseTokenEstimate?: number;
   llmTotalTokenEstimate?: number;
+  actionType?: string;
 }
 
 export interface ScenarioExecutionReport {
@@ -418,6 +421,8 @@ async function executeStep(input: {
       durationMs: endedAt.getTime() - startedAt.getTime(),
       beforeSnapshotPath: before.filePath,
       afterSnapshotPath: after.filePath,
+      beforeUrl: before.snapshot.url,
+      afterUrl: after.snapshot.url,
       repairAttempted: false,
       repairSucceeded: false,
       verification,
@@ -480,6 +485,8 @@ async function executeStep(input: {
     durationMs: endedAt.getTime() - startedAt.getTime(),
     beforeSnapshotPath: before.filePath,
     afterSnapshotPath: after.filePath,
+    beforeUrl: before.snapshot.url,
+    afterUrl: after.snapshot.url,
     repairBeforeSnapshotPath: repairBefore.filePath,
     repairAfterSnapshotPath: repairAfter.filePath,
     screenshotPath,
@@ -647,7 +654,8 @@ function summarizeDecision(decision: ReconDecision): DecisionSummary {
     llmUsed: decision.decisionSource === 'llm',
     llmPromptTokenEstimate: decision.llmPromptTokenEstimate,
     llmResponseTokenEstimate: decision.llmResponseTokenEstimate,
-    llmTotalTokenEstimate: decision.llmTotalTokenEstimate
+    llmTotalTokenEstimate: decision.llmTotalTokenEstimate,
+    actionType: decision.parsedAction?.actionType
   };
 }
 

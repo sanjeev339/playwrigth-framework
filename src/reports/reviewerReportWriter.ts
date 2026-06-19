@@ -47,6 +47,9 @@ export async function writeReviewerReport(
         expectedResult: s.expectedResult,
         status: s.status,
         failureReason: s.failureReason,
+        actionType: s.decision?.actionType,
+        beforeUrl: s.beforeUrl,
+        afterUrl: s.afterUrl,
         selectedLocator: s.decision?.selectedLocator,
         actionError: s.decision?.actionError,
         llmReason: s.decision?.llmReason,
@@ -83,12 +86,18 @@ Below is the structured data of the execution run (including all scenarios, step
 ${JSON.stringify(scenariosWithIssues, null, 2)}
 
 ### Task Details:
+Current Date/Time: ${new Date().toISOString().split('T')[0]} (Use this for "Date Generated")
 Please audit the above execution data against any provided FSD/BRD context, and output a professional, clear, and comprehensive Markdown report detailing the mismatches, missing details, and alignment problems. 
 IMPORTANT: DO NOT include test case creation mistakes, locator extraction failures, or automation limitations. Focus ONLY on mistakes or gaps in the documentation (BRD/FSD) compared to the actual application.
 
+In particular, perform the following two automated audits:
+1. **URL Validation**: If a step involves navigation or is expected to land on a specific page, inspect the actual \`beforeUrl\` and \`afterUrl\` in the execution step data. Check if it matches the target URL or path pattern specified/implied by the FSD. If it lands on a different URL or fails to navigate to the correct page, flag this mismatch.
+2. **Action Type Validation**: Identify action type mismatches between requirements and actual UI interactions. For example:
+   - If the FSD/BRD specifies selecting/choosing a value from a dropdown/select element, but the actionType executed in the application is a "click" (due to custom dropdown divs, buttons, listboxes, or custom click triggers), or vice versa, flag it. Explain that the documentation describes a standard HTML input action while the application implements custom elements requiring click triggers.
+
 ### Report Categories:
 Every issue you identify MUST be classified into one of the following 5 categories:
-1. **Requirement and Application Mismatch**: The BRD specifies elements, actions, or flows that do not exist or behave differently in the application (e.g. BRD says "select option" but there is no select dropdown, or page layout/steps are different).
+1. **Requirement and Application Mismatch**: The BRD specifies elements, actions, or flows that do not exist or behave differently in the application (e.g. BRD says "select option" but there is no select dropdown, or page layout/steps are different, or URL/navigation mismatches).
 2. **Missing or Incorrect Functional Details**: Business rules, field names, navigation paths, or required steps are ambiguous or missing from the BRD.
 3. **Data and Validation Issues**: Application requires specific data formats, dependencies, or values not specified in the BRD, or validation errors prevent flow progression.
 4. **Incomplete User Flows or Unimplemented Features**: BRD steps describe features that are not active or not yet implemented in the app.
@@ -104,10 +113,10 @@ Every issue you identify MUST be classified into one of the following 5 categori
    Group the findings by the 5 categories above. For each mismatch or failure found, provide:
    - **Scenario ID & Step Number**
    - **Expected Behavior (BRD/FSD)**
-   - **Actual Observation**: (Describe precisely what was observed in the app that contradicts or is missing from the BRD)
+   - **Actual Observation**: (Describe precisely what was observed in the app that contradicts or is missing from the BRD. Mention the exact mismatch, e.g., the URL discrepancy or target action type mismatch such as select vs click)
    - **Severity**:
-     - *Critical*: Major missing requirement or complete mismatch between doc and app.
-     - *Major*: Significant ambiguity or missing functional detail.
+     - *Critical*: Major missing requirement or complete mismatch between doc and app (such as landing on the wrong page/URL).
+     - *Major*: Significant ambiguity or missing functional detail (such as custom dropdown action mismatch).
      - *Minor*: Minor typo, outdated field name, or small discrepancy.
    - **Recommended Action**: Clear recommendation to the Business Analyst to update the BRD/FSD.
 6. **If no issues were found**: If everything passed with zero warnings or errors, generate a clean report stating that the BRD and the application are perfectly aligned and no issues were found.
