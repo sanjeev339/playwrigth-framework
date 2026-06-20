@@ -46,7 +46,13 @@ export async function runHealedTests(): Promise<void> {
   try {
     const child = spawn('npx', args, {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        PLAYWRIGHT_TEST_DIR: path.resolve(paths.healedTestsDir, '..'),
+        NODE_PATH: process.env.NODE_PATH 
+          ? `${process.env.NODE_PATH}${path.delimiter}${path.join(process.cwd(), 'node_modules')}` 
+          : path.join(process.cwd(), 'node_modules')
+      },
       stdio: ['inherit', 'pipe', 'pipe']
     });
 

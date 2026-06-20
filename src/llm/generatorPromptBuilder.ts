@@ -7,6 +7,9 @@ export function buildGeneratorPrompt(input: {
   reconActions: ReconAction[];
   dropdownSnapshots: CompactDropdownSnapshot[];
 }): string {
+  const moduleName = input.scenario.module ?? 'UnknownModule';
+  const pageClassName = moduleName.replace(/[^a-zA-Z0-9]/g, '') + 'Page';
+
   return truncate(
     [
       'You are an expert TypeScript Playwright test generator.',
@@ -14,26 +17,21 @@ export function buildGeneratorPrompt(input: {
       'You MUST generate the Playwright test from the provided reconAction list.',
       'The reconAction list is the source of truth for locators.',
       'Do not invent generic locators when selectedLocator exists.',
-      'Do not stop after login.',
       'Every action in reconAction must appear in the generated test.',
-      'If actionStatus is failed for a select/dropdown step, generate robust custom dropdown fallback code using parsedAction.value.',
       '',
-      'Hard rules:',
-      '1. Use @playwright/test with TypeScript.',
-      '2. Use test.step for login and for every reconAction.',
-      '3. Use this safe login URL pattern:',
-      '   const loginUrl = process.env.LOGIN_URL ?? process.env.WEBSITE_URL ?? build from APP_BASE_URL + LOGIN_PATH;',
-      '   await page.goto(loginUrl);',
-      '4. Never call page.goto(`${baseURL}/login/`).',
-      '5. Never append /login/ manually when WEBSITE_URL is present.',
-      '6. After login, assert the first reconAction locator is visible when a selectedLocator exists; otherwise assert page body is visible.',
-      '7. For successful recon actions, use reconAction.selectedLocator exactly.',
-      '8. For custom dropdowns, never use selectOption unless recon proves the element is a native select.',
-      '9. For dropdown options, click an option by parsedAction.value/payload value using role/text fallback.',
-      '10. For row_action, use rowActionLocator or selectedLocator from recon-summary; do not guess the row.',
-      '12. Use payload values for business fields.',
-      '13. Never hardcode login credentials; use process.env.LOGIN_EMAIL and process.env.LOGIN_PASSWORD.',
-      '14. Output full code only. No Markdown. No explanation.',
+      'Hard rules for the new 5-layer architecture:',
+      '1. Import test and expect from "../fixtures" (NOT from "@playwright/test").',
+      `2. Import the page object: import { ${pageClassName} } from "../pages";`,
+      '3. Import faker builder: import { buildPayload } from "../data/fakerFactory";',
+      '4. Initialize payload dynamically:',
+      `   const payload = buildPayload("<scenario_id>", { ...originalPayload }, { dataStrategy: "<data_strategy>" });`,
+      '5. Extract test arguments using fixtures: `test("Title", async ({ page }) => {`',
+      `6. Instantiate the page object: const ${pageClassName.charAt(0).toLowerCase() + pageClassName.slice(1)} = new ${pageClassName}(page);`,
+      '7. DO NOT write helper functions inline. They belong in the actions/ layer.',
+      '8. DO NOT write a login test.step. The fixtures handle login via storageState automatically.',
+      '9. After navigation or actions, use page object methods if available, otherwise use recon locators.',
+      '10. Use payload values for business fields (e.g., `payload["First Name"]`).',
+      '11. Output full code only. No Markdown. No explanation.',
       '',
       'Scenario JSON:',
       JSON.stringify(input.scenario, null, 2),
@@ -86,261 +84,37 @@ export function compactDropdownSnapshot(snapshot: ReconSnapshot): CompactDropdow
 }
 
 export function buildDeterministicReconTest(scenario: Scenario, reconActions: ReconAction[]): string {
+  const moduleName = scenario.module ?? 'UnknownModule';
+  const pageClassName = moduleName.replace(/[^a-zA-Z0-9]/g, '') + 'Page';
+  const pageVarName = pageClassName.charAt(0).toLowerCase() + pageClassName.slice(1);
   const title = `${scenario.scenario_id}: ${scenario.action ?? scenario.module ?? 'Generated scenario'}`;
   const payloadLiteral = JSON.stringify(scenario.payload, null, 2).replace(/\n/g, '\n  ');
+  const dataStrategy = scenario.metadata?.data_strategy ?? '';
+
   const actionSteps = reconActions
     .map((action, index) => renderActionStep(action, scenario.payload, reconActions[index - 1]))
     .join('\n\n');
 
-  const targetEmail = scenario.payload?.["Email Address"] as string | undefined;
-  let stateSetupCode = '';
-  if (targetEmail) {
-    const strategy = scenario.metadata?.data_strategy ?? '';
-    const hasReactivate = reconActions.some(a => /reactivate/i.test(a.target ?? '') || /reactivate/i.test(a.rawStep ?? ''));
-    const hasDeactivate = reconActions.some(a => /deactivate/i.test(a.target ?? '') || /deactivate/i.test(a.rawStep ?? ''));
-
-    if (strategy.includes('deactivation') || hasDeactivate) {
-      stateSetupCode = `await ensureUserIsActive(page, String(payload["Email Address"]));`;
-    } else if (strategy.includes('activation') || strategy.includes('timeout') || hasReactivate) {
-      stateSetupCode = `await ensureUserIsInactive(page, String(payload["Email Address"]));`;
-    }
-  }
-
   let processedActionSteps = actionSteps;
-  if (stateSetupCode) {
-    const step2Pattern = /(await test\.step\("Step 2: [^"]+", async \(\) => \{[\s\S]*?\}\);)/;
-    processedActionSteps = actionSteps.replace(step2Pattern, (match) => {
-      if (match.endsWith('});')) {
-        return match.substring(0, match.lastIndexOf('});')) + `  ${stateSetupCode}\n});`;
-      }
-      return match;
-    });
+
+  // Append a placeholder for Expected Results since the deterministic generator cannot write custom assertions
+  if (scenario.expected_results && scenario.expected_results.length > 0) {
+    const expectedResultsText = scenario.expected_results.join(' ').replace(/\n/g, ' ');
+    processedActionSteps += `\n\n  await test.step("Verify Expected Results: ${expectedResultsText}", async () => {\n    // TODO: Implement deterministic or manual assertion for expected results.\n    // Expected: ${expectedResultsText}\n  });`;
   }
 
-  return `import { test, expect, type Locator, type Page } from '@playwright/test';
-
-function escapeRegex(value: string): string {
-  return value.replace(/[|\\\\{}()[\\]^$+*?.]/g, '\\\\$&');
-}
-
-function getLoginUrl(): string {
-  const loginUrl =
-    process.env.LOGIN_URL ??
-    process.env.WEBSITE_URL ??
-    (process.env.APP_BASE_URL
-      ? \`\${process.env.APP_BASE_URL.replace(/\\/+$/, '')}/\${(process.env.LOGIN_PATH ?? 'login').replace(/^\\/+/, '')}\`
-      : undefined);
-
-  if (!loginUrl) {
-    throw new Error('Missing LOGIN_URL, WEBSITE_URL, or APP_BASE_URL.');
-  }
-
-  return loginUrl;
-}
-
-async function firstUsable(locator: Locator): Promise<Locator | null> {
-  try {
-    await locator.first().waitFor({ state: 'attached', timeout: 5000 });
-  } catch {}
-  const count = await locator.count().catch(() => 0);
-
-  for (let index = 0; index < count; index += 1) {
-    const candidate = locator.nth(index);
-    const visible = await candidate.isVisible().catch(() => false);
-    const enabled = await candidate.isEnabled().catch(() => false);
-
-    if (visible && enabled) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
-async function ensureUserIsActive(page: Page, email: string): Promise<void> {
-  const row = page.getByRole('row', { name: new RegExp(escapeRegex(email), 'i') });
-  const actionMenu = row.locator('button').nth(0);
-  await actionMenu.click();
-
-  const reactivateOption = page.getByRole('link', { name: /^Reactivate$/i });
-  const isReactivateVisible = await reactivateOption.waitFor({ state: 'visible', timeout: 1000 })
-    .then(async () => await reactivateOption.isEnabled())
-    .catch(() => false);
-
-  if (isReactivateVisible) {
-    await reactivateOption.click();
-    await page.waitForTimeout(300);
-    const commentArea = page.locator('textarea').first();
-    if (await commentArea.isVisible()) {
-      await commentArea.fill('state initialization');
-    }
-    const confirmBtn = page.getByRole('button', { name: /^Reactivate$/i })
-      .or(page.getByRole('button', { name: /confirm/i }))
-      .or(page.getByRole('button', { name: /^Activate$/i }));
-    await confirmBtn.click();
-    await page.waitForTimeout(2000);
-    
-    // reset search
-    await page.getByPlaceholder(/Search by name or email/i).fill('');
-    await page.getByPlaceholder(/Search by name or email/i).fill(email);
-    await page.waitForTimeout(300);
-  } else {
-    // Menu is already open, click actionMenu again to close it
-    await actionMenu.click().catch(() => undefined);
-    await page.waitForTimeout(200);
-  }
-}
-
-async function ensureUserIsInactive(page: Page, email: string): Promise<void> {
-  const row = page.getByRole('row', { name: new RegExp(escapeRegex(email), 'i') });
-  const actionMenu = row.locator('button').nth(0);
-  await actionMenu.click();
-
-  const deactivateOption = page.getByRole('link', { name: /^Deactivate$/i });
-  const isDeactivateVisible = await deactivateOption.waitFor({ state: 'visible', timeout: 1000 })
-    .then(async () => await deactivateOption.isEnabled())
-    .catch(() => false);
-
-  if (isDeactivateVisible) {
-    await deactivateOption.click();
-    await page.waitForTimeout(300);
-    const commentArea = page.locator('textarea').first();
-    if (await commentArea.isVisible()) {
-      await commentArea.fill('state initialization');
-    }
-    const confirmBtn = page.getByRole('button', { name: /^Deactivate$/i })
-      .or(page.getByRole('button', { name: /confirm/i }));
-    await confirmBtn.click();
-    await page.waitForTimeout(2000);
-    
-    // reset search
-    await page.getByPlaceholder(/Search by name or email/i).fill('');
-    await page.getByPlaceholder(/Search by name or email/i).fill(email);
-    await page.waitForTimeout(300);
-  } else {
-    // Menu is already open, click actionMenu again to close it
-    await actionMenu.click().catch(() => undefined);
-    await page.waitForTimeout(200);
-  }
-}
-
-async function fillFirst(label: string, locators: Locator[], value: string): Promise<void> {
-  for (const locator of locators) {
-    const candidate = await firstUsable(locator);
-    if (candidate) {
-      await candidate.fill(value);
-      return;
-    }
-  }
-
-  throw new Error(\`Unable to find input for \${label}.\`);
-}
-
-async function clickFirst(label: string, locators: Locator[]): Promise<void> {
-  for (const locator of locators) {
-    const candidate = await firstUsable(locator);
-    if (candidate) {
-      await candidate.click();
-      return;
-    }
-  }
-
-  throw new Error(\`Unable to find clickable control for \${label}.\`);
-}
-
-function configuredLocator(page: Page, selector: string | undefined): Locator {
-  if (!selector?.trim()) {
-    return page.locator('__configured_locator_not_set__');
-  }
-
-  const trimmed = selector.trim();
-  if (trimmed.startsWith('testid=')) {
-    return page.getByTestId(trimmed.replace(/^testid=/, ''));
-  }
-
-  return page.locator(trimmed);
-}
-
-async function clickMenuItemAfterRowAction(label: string, openMenu: () => Locator, item: () => Locator): Promise<void> {
-  let candidate = await firstUsable(item());
-
-  if (!candidate) {
-    const opener = await firstUsable(openMenu());
-    if (!opener) {
-      throw new Error(\`Unable to find row action menu opener for \${label}.\`);
-    }
-
-    await opener.click();
-    candidate = await firstUsable(item());
-  }
-
-  if (!candidate) {
-    throw new Error(\`Unable to find row menu item for \${label}.\`);
-  }
-
-  await candidate.click();
-}
-
-async function selectCustomDropdown(page: Page, openDropdown: () => Locator, optionValue: string): Promise<void> {
-  await openDropdown().click();
-
-  const trimmedValue = optionValue.trim();
-  const exactOptionRegex = new RegExp(\`^\${escapeRegex(trimmedValue)}$\`, 'i');
-  const visiblePopup = page.locator('[role="listbox"], [role="menu"], [role="dialog"]').filter({ hasText: exactOptionRegex });
-  const optionCandidates = [
-    page.getByRole('option', { name: exactOptionRegex }),
-    visiblePopup.getByRole('option', { name: exactOptionRegex }),
-    visiblePopup.getByText(exactOptionRegex),
-    page.locator('[aria-selected], [data-option], li[role="option"]').filter({ hasText: exactOptionRegex })
-  ];
-
-  for (const locator of optionCandidates) {
-    const candidate = await firstUsable(locator);
-    if (candidate) {
-      await candidate.click();
-      return;
-    }
-  }
-
-  throw new Error(\`No safe option locator found for dropdown value: \${optionValue}\`);
-}
-
+  return `import { test, expect } from '../fixtures';
+import { ${pageClassName} } from '../pages';
+import { buildPayload } from '../data/fakerFactory';
+import { selectCustomDropdown, clickMenuItemAfterRowAction } from '../actions';
 
 test(${JSON.stringify(title)}, async ({ page }) => {
-  const loginEmail = process.env.LOGIN_EMAIL;
-  const loginPassword = process.env.LOGIN_PASSWORD;
-  const payload = ${payloadLiteral} as const;
-
-  if (!loginEmail || !loginPassword) {
-    throw new Error('Missing LOGIN_EMAIL or LOGIN_PASSWORD.');
-  }
-
-  await test.step('Login to the application', async () => {
-    const loginUrl = getLoginUrl();
-    await page.goto(loginUrl);
-
-    await fillFirst('login email', [
-      configuredLocator(page, process.env.LOGIN_EMAIL_SELECTOR),
-      page.getByLabel(/email|username/i),
-      page.getByRole('textbox', { name: /email|username/i }),
-      page.getByPlaceholder(/email|username/i)
-    ], loginEmail);
-
-    await fillFirst('login password', [
-      configuredLocator(page, process.env.LOGIN_PASSWORD_SELECTOR),
-      page.getByLabel(/password/i),
-      page.getByRole('textbox', { name: /password/i }),
-      page.getByPlaceholder(/password/i)
-    ], loginPassword);
-
-    await clickFirst('login submit', [
-      configuredLocator(page, process.env.LOGIN_SUBMIT_SELECTOR),
-      page.getByRole('button', { name: /login|sign in|submit/i }),
-      page.locator('button[type="submit"]').first()
-    ]);
-
-${indent(renderPostLoginAssertion(reconActions), 4)}
-  });
+  const ${pageVarName} = new ${pageClassName}(page);
+  const payload = buildPayload(
+    ${JSON.stringify(scenario.scenario_id)},
+    ${payloadLiteral},
+    { dataStrategy: ${JSON.stringify(dataStrategy)} }
+  );
 
 ${indent(processedActionSteps, 2)}
 });
@@ -349,6 +123,14 @@ ${indent(processedActionSteps, 2)}
 
 function renderActionStep(action: ReconAction, payload: Record<string, unknown>, previousAction?: ReconAction): string {
   const stepTitle = `Step ${action.stepNo ?? '?'}: ${action.rawStep}`;
+
+  const hasLocator = action.selectedLocator || action.rowActionLocator || action.dropdownLocator;
+  if (action.actionStatus === 'skipped' || (!hasLocator && !['verify', 'wait', 'unknown'].includes(action.actionType))) {
+    return `await test.step(${JSON.stringify(stepTitle)}, async () => {
+  test.info().annotations.push({ type: 'recon', description: ${JSON.stringify(action.actionError ?? 'Action skipped or missing locator from recon.')} });
+});`;
+  }
+
   const locator = locatorForAction(action);
   const valueExpression = payloadValueExpression(action, payload);
 
