@@ -21,14 +21,14 @@ The User Management module allows platform administrators and organization owner
 Provide an interface to add internal users and assign them specific roles within the tenant organization.
 
 #### Workflow Steps
-1. **Navigate to User Management**: Admin clicks on the "User Management" navigation link. The system displays the Internal Users list with columns for Name, Email, Role, Status, and Created At.
+1. **Navigate to User Management**: Admin clicks on the "User Management" navigation button. The system displays the Internal Users list (navigating to `/users/internal-user`) with columns for Name, Email, Role, Status, and Created At.
 2. **Click Add User**: Admin clicks the "Add User" button. The system opens a modal dialog showing options: "Add Internal User" or "Invite Users".
 3. **Click Add Internal User**: Admin clicks "Add Internal User". The system renders the user details form.
 4. **Enter Details**: Admin enters the required details:
    - **First Name**: Required text field.
    - **Last Name**: Required text field.
    - **Email Address**: Required email text field.
-   - **Role**: Dropdown selection displaying pre-seeded tenant roles (e.g. `QA TEST MAGT`, `Adthiya Role`).
+   - **Role**: Custom dropdown selection (requiring click triggers to open popup options) displaying pre-seeded tenant roles (e.g. `QA TEST MAGT`, `Adthiya Role`).
 5. **Save User**: Admin clicks "Save". The system triggers validations.
 
 #### Validation & Business Rules
