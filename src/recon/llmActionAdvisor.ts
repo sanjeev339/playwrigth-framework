@@ -247,6 +247,22 @@ function buildPrompt(input: LLMAdvisorInput): string {
     elementSummary: candidate.elementSummary
   }));
 
+  const optionsDetected = input.visibleElements
+    .filter(el => /option/i.test(el.role ?? '') || /option/i.test(el.tag ?? ''))
+    .map(el => el.text || el.value || el.label)
+    .filter((text): text is string => Boolean(text));
+
+  const introspectionInstruction = optionsDetected.length > 0
+    ? [
+        '',
+        'UI INTROSPECTION (DROPDOWN OPTIONS DETECTED):',
+        'The following exact options are currently visible on the screen:',
+        JSON.stringify([...new Set(optionsDetected)], null, 2),
+        'You MUST pick one of these exact options for your value if you are selecting a dropdown. Do not invent a fake value.',
+        ''
+      ].join('\n')
+    : '';
+
   return truncate(
     [
       'You are an expert Playwright UI automation advisor.',
@@ -279,6 +295,7 @@ function buildPrompt(input: LLMAdvisorInput): string {
       '',
       'Visible UI Elements:',
       JSON.stringify(visibleElements, null, 2),
+      introspectionInstruction,
       '',
       'Locator Candidates:',
       JSON.stringify(locatorCandidates, null, 2),

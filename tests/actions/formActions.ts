@@ -59,13 +59,18 @@ export async function selectCustomDropdown(
   const escaped = optionValue.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
   const regex = new RegExp(`^${escaped}$`, 'i');
   const popup = page
-    .locator('[role="listbox"],[role="menu"],[role="dialog"]')
+    .locator('[role="listbox"],[role="menu"],[role="dialog"],.dropdown-menu,.select-menu')
     .filter({ hasText: regex });
   const candidates = [
     page.getByRole('option', { name: regex }),
+    page.getByRole('menuitem', { name: regex }),
+    page.getByRole('checkbox', { name: regex }),
     popup.getByRole('option', { name: regex }),
+    popup.getByRole('checkbox', { name: regex }),
     popup.getByText(regex),
-    page.locator('[aria-selected],li[role="option"]').filter({ hasText: regex })
+    page.locator('[aria-selected],li[role="option"],li[role="menuitem"]').filter({ hasText: regex }),
+    page.locator('label').filter({ hasText: regex }),
+    page.getByText(regex, { exact: true })
   ];
   for (const loc of candidates) {
     const c = await firstUsable(loc);

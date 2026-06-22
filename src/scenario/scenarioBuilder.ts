@@ -24,6 +24,14 @@ export async function buildScenarios(options: {
   const payloadByScenarioId = new Map(testData.map((record) => [record.scenario_id, record]));
   const groupedRows = groupRowsByScenario(rows);
 
+  try {
+    const { clearSharedState } = require('../../tests/data/sharedStateManager');
+    clearSharedState();
+    logger.info('Cleared shared state for new pipeline run.');
+  } catch (err) {
+    logger.warn('Could not clear shared state:', err);
+  }
+
   await fs.emptyDir(outputDir);
 
   const scenarios: Scenario[] = [];
