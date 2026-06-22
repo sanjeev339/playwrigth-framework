@@ -16,3 +16,4 @@ test-results/
 /tests/seed/
 /generated-quarantine/
 .DS_Store
+/input/

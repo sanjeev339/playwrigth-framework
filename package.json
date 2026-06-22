@@ -17,7 +17,7 @@
     "run:healed": "ts-node src/runner/playwrightHealedRunner.ts",
     "heal": "ts-node src/llm/healer.ts",
     "report": "ts-node src/reports/reportWriter.ts",
-    "pipeline": "npm run build:scenarios && npm run run:webwright && npm run generate && npm run validate && npm run run:generated && npm run heal && npm run run:healed && npm run report",
+    "pipeline": "npm run build:scenarios && npm run run:webwright && npm run generate && npm run validate && npm run run:generated && npm run report",
     "typecheck": "tsc --noEmit",
     "test:generator": "ts-node src/llm/generator.test.ts",
     "test:normalizer": "ts-node src/scenario/stepNormalizer.test.ts",

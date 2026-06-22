@@ -416,7 +416,7 @@ async function ensureFrameworkFiles(testsDir: string): Promise<void> {
     return;
   }
 
-  const layers = ['actions', 'fixtures', 'data', 'pages/base', 'pages/index.ts'];
+  const layers = ['actions', 'fixtures', 'data', 'pages'];
   for (const layer of layers) {
     const srcPath = path.join(frameworkTestsDir, layer);
     const destPath = path.join(testsDir, layer);
