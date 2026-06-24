@@ -102,26 +102,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
         // from the same parent directory — so wherever QA saved files,
         // Playwright reads and writes to that same folder automatically.
         if (args.inputFlowPath) {
-          const outDir = path.dirname(args.inputFlowPath);
+          let outDir = path.dirname(args.inputFlowPath);
+          if (path.basename(outDir) === 'test_cases') {
+            outDir = path.dirname(outDir);
+          }
           env.INPUT_FLOW_PATH = args.inputFlowPath;
-          env.INPUT_DATA_PATH = args.inputDataPath || path.join(outDir, 'test_data.json');
-          env.SCENARIO_OUTPUT_DIR = path.join(outDir, 'scenarios');
-          env.RECON_SUMMARY_OUTPUT_DIR = path.join(outDir, 'recon-summary');
-          env.DYNAMIC_RECON_OUTPUT_DIR = path.join(outDir, 'dynamic-recon');
-          env.GENERATED_TEST_OUTPUT_DIR = path.join(outDir, 'tests', 'generated');
-          env.GENERATED_TEST_QUARANTINE_DIR = path.join(outDir, 'generated-quarantine');
-          env.HEALED_TEST_OUTPUT_DIR = path.join(outDir, 'tests', 'healed');
-          env.REPORT_OUTPUT_DIR = path.join(outDir, 'reports');
-          env.GENERATION_REPORT_PATH = path.join(outDir, 'reports', 'generation-result.json');
-          env.RUN_RESULT_PATH = path.join(outDir, 'reports', 'run-result.json');
-          env.LOCATOR_VALIDATION_REPORT_PATH = path.join(outDir, 'reports', 'locator-validation.json');
-          env.FINAL_REPORT_JSON_PATH = path.join(outDir, 'reports', 'final-report.json');
-          env.FINAL_REPORT_HTML_PATH = path.join(outDir, 'reports', 'final-report.html');
-          env.DYNAMIC_REPORT_JSON_PATH = path.join(outDir, 'reports', 'dynamic-run-result.json');
-          env.DYNAMIC_REPORT_HTML_PATH = path.join(outDir, 'reports', 'dynamic-run-result.html');
-          env.HEALING_REPORT_PATH = path.join(outDir, 'reports', 'healing-result.json');
-          env.FRONTEND_REVIEW_OUTPUT_DIR = path.join(outDir, 'reports', 'frontend-reviews');
-          env.DOCUMENT_REPORT_OUTPUT_DIR = path.join(outDir, 'reports', 'document-report');
+          env.INPUT_DATA_PATH = args.inputDataPath || path.join(outDir, 'test_data', 'test_data.json');
+          env.SCENARIO_OUTPUT_DIR = path.join(outDir, 'metadata', 'scenarios');
+          env.RECON_SUMMARY_OUTPUT_DIR = path.join(outDir, 'metadata', 'recon-summary');
+          env.DYNAMIC_RECON_OUTPUT_DIR = path.join(outDir, 'metadata', 'dynamic-recon');
+          env.GENERATED_TEST_OUTPUT_DIR = path.join(outDir, 'playwright_scripts');
+          env.GENERATED_TEST_QUARANTINE_DIR = path.join(outDir, 'metadata', 'generated-quarantine');
+          env.HEALED_TEST_OUTPUT_DIR = path.join(outDir, 'playwright_scripts', 'healed');
+          env.REPORT_OUTPUT_DIR = path.join(outDir, 'metadata', 'reports');
+          env.GENERATION_REPORT_PATH = path.join(outDir, 'metadata', 'reports', 'generation-result.json');
+          env.RUN_RESULT_PATH = path.join(outDir, 'metadata', 'reports', 'run-result.json');
+          env.LOCATOR_VALIDATION_REPORT_PATH = path.join(outDir, 'metadata', 'reports', 'locator-validation.json');
+          env.FINAL_REPORT_JSON_PATH = path.join(outDir, 'metadata', 'reports', 'final-report.json');
+          env.FINAL_REPORT_HTML_PATH = path.join(outDir, 'metadata', 'reports', 'final-report.html');
+          env.DYNAMIC_REPORT_JSON_PATH = path.join(outDir, 'metadata', 'reports', 'dynamic-run-result.json');
+          env.DYNAMIC_REPORT_HTML_PATH = path.join(outDir, 'metadata', 'reports', 'dynamic-run-result.html');
+          env.HEALING_REPORT_PATH = path.join(outDir, 'metadata', 'reports', 'healing-result.json');
+          env.FRONTEND_REVIEW_OUTPUT_DIR = path.join(outDir, 'metadata', 'reports', 'frontend-reviews');
+          env.DOCUMENT_REPORT_OUTPUT_DIR = path.join(outDir, 'metadata', 'reports', 'document-report');
         } else if (args.inputDataPath) {
           env.INPUT_DATA_PATH = args.inputDataPath;
         }
